@@ -1,25 +1,28 @@
-export default function HomePage() {
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuthStore } from "@/store/auth-store";
+
+export default function Home() {
+  const router = useRouter();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
+  useEffect(() => {
+    
+    if (isAuthenticated) {
+      router.push("/dashboard");
+    } else {
+      router.push("/login");
+    }
+  }, [isAuthenticated, router]);
+
+  // Show loading while redirecting
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center">
-      <div className="w-full max-w-2xl p-8 text-center space-y-6">
-        <h1 className="text-4xl font-bold">Welcome to Genuis</h1>
-        <p className="text-lg text-gray-600">
-          Your AI-powered career companion. Analyze resumes, track job applications, and land your dream job.
-        </p>
-        <div className="flex justify-center gap-4 pt-4">
-          <a
-            href="/login"
-            className="rounded-md bg-primary px-6 py-3 text-primary-foreground hover:bg-primary/90"
-          >
-            Sign In
-          </a>
-          <a
-            href="/register"
-            className="rounded-md border border-gray-300 px-6 py-3 hover:bg-gray-50"
-          >
-            Sign Up
-          </a>
-        </div>
+    <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        <p className="text-zinc-500 text-sm">Loading...</p>
       </div>
     </div>
   );

@@ -1,4 +1,63 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useAuthStore } from "@/store/auth-store";
+
 export default function LoginPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { isAuthenticated, isLoading, error, login, clearError, loginWithGoogle, handleGoogleCallback } = useAuthStore();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [formError, setFormError] = useState("");
+
+  // Check for Google OAuth callback
+  useEffect(() => {
+    const code = searchParams.get("code");
+    if (code) {
+      handleGoogleCallback(code);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.push("/dashboard");
+    }
+  }, [isAuthenticated, router]);
+
+  useEffect(() => {
+    return () => clearError();
+  }, [clearError]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError("");
+    
+    if (!email || !password) {
+      setFormError("Please fill in all fields");
+      return;
+    }
+
+    try {
+      await login(email, password);
+    } catch (err) {
+      // Error is handled by the store
+    }
+  };
+
+  // Show loading while checking auth
+  if (isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-zinc-500 text-sm">Redirecting...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen bg-black text-white selection:bg-primary/30">
       {/* Left Side - Branding */}
@@ -19,11 +78,11 @@ export default function LoginPage() {
                 <path d="M12.871 4.285a.75.75 0 0 0-1.142 0l-4.7 5.485c-.566.66-.188 1.73.682 1.73h2.039v5.25a.75.75 0 0 0 1.5 0v-5.25h2.039c.87 0 1.248-1.07.682-1.73l-4.7-5.485zM4 19.25a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H4.75a.75.75 0 0 1-.75-.75z" />
               </svg>
             </div>
-            <span className="text-xl font-bold tracking-tight">Smart Career Assistant</span>
+            <span className="text-xl font-bold tracking-tight">Genius </span>
           </div>
 
           {/* Main Content */}
-          <div className="space-y-6 max-w-lg">
+          <div className="space-y-6 w-full">
             <h1 className="text-7xl font-bold leading-[1.1] tracking-tight">
               Elevate Your <br />
               <span className="text-primary">Career</span> Path.
@@ -69,7 +128,11 @@ export default function LoginPage() {
           </div>
 
           {/* Social Login */}
-          <button className="w-full flex items-center justify-center gap-3 px-4 py-3.5 rounded-xl border border-zinc-800 bg-transparent hover:bg-zinc-900 transition-all group">
+          <button 
+            onClick={() => loginWithGoogle()}
+            disabled={isLoading}
+            className="w-full flex items-center justify-center gap-3 px-4 py-3.5 rounded-xl border border-zinc-800 bg-transparent hover:bg-zinc-900 transition-all group disabled:opacity-50"
+          >
             <svg viewBox="0 0 24 24" className="w-5 h-5" xmlns="http://www.w3.org/2000/svg">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
               <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
@@ -90,7 +153,13 @@ export default function LoginPage() {
           </div>
 
           {/* Form */}
-          <form className="space-y-6">
+          <form className="space-y-6" onSubmit={handleSubmit}>
+            {(error || formError) && (
+              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/50 text-red-400 text-sm">
+                {formError || error}
+              </div>
+            )}
+
             <div className="space-y-2">
               <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 px-1">
                 Email Address
@@ -98,6 +167,8 @@ export default function LoginPage() {
               <input
                 type="email"
                 placeholder="name@company.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-4 py-3.5 rounded-xl bg-zinc-900/30 border border-zinc-800 text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-primary/50 transition-colors"
               />
             </div>
@@ -114,6 +185,8 @@ export default function LoginPage() {
               <input
                 type="password"
                 placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-4 py-3.5 rounded-xl bg-zinc-900/30 border border-zinc-800 text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-primary/50 transition-colors"
               />
             </div>
@@ -131,9 +204,10 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              className="w-full py-4 rounded-full bg-primary text-black font-bold text-sm hover:opacity-90 transition-all shadow-[0_0_20px_rgba(0,242,156,0.2)]"
+              disabled={isLoading}
+              className="w-full py-4 rounded-full bg-primary text-black font-bold text-sm hover:opacity-90 transition-all shadow-[0_0_20px_rgba(0,242,156,0.2)] disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Sign In to Dashboard
+              {isLoading ? "Signing In..." : "Sign In to Dashboard"}
             </button>
           </form>
 

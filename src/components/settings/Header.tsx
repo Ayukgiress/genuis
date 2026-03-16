@@ -11,7 +11,7 @@ export const Header = () => {
               <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z" />
             </svg>
           </div>
-          <span className="font-bold text-white tracking-tight">Smart Career Assistant</span>
+          <span className="font-bold text-white tracking-tight">Genius</span>
         </div>
         
         <nav className="flex items-center gap-6 text-zinc-400 font-medium">

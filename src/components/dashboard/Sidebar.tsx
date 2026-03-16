@@ -67,7 +67,7 @@ export const Sidebar = () => {
             </svg>
           </div>
           <div>
-            <h1 className="text-sm font-bold text-white tracking-tight uppercase">Smart Career</h1>
+            <h1 className="text-sm font-bold text-white tracking-tight uppercase">Genuis</h1>
             <p className="text-[10px] text-primary font-bold uppercase tracking-widest">Pro Edition</p>
           </div>
         </div>

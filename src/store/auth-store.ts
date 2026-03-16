@@ -1,85 +1,217 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-
-interface User {
-  id: string;
-  email: string;
-  name: string;
-}
+import { api, setAuthToken, getAuthToken, ApiError } from "@/lib/api";
+import type { AuthUser, Token, UserCreate, VerificationResponse, RegisterResponse, GoogleOAuthResponse } from "@/types";
 
 interface AuthState {
-  user: User | null;
+  user: AuthUser | null;
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  error: string | null;
+  isEmailVerified: boolean;
+  showVerificationMessage: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   register: (name: string, email: string, password: string) => Promise<void>;
+  fetchCurrentUser: () => Promise<void>;
+  clearError: () => void;
+  verifyEmail: (token: string) => Promise<VerificationResponse>;
+  resendVerification: (email: string) => Promise<VerificationResponse>;
+  loginWithGoogle: () => Promise<void>;
+  handleGoogleCallback: (code: string) => Promise<void>;
+  setShowVerificationMessage: (show: boolean) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
       token: null,
       isAuthenticated: false,
       isLoading: false,
+      error: null,
+      isEmailVerified: false,
+      showVerificationMessage: false,
 
       login: async (email: string, password: string) => {
-        set({ isLoading: true });
+        set({ isLoading: true, error: null });
         try {
-          // Simulate API call
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-          
-          const user: User = {
-            id: "1",
-            email,
-            name: email.split("@")[0],
-          };
-          
-          set({
-            user,
-            token: "mock-token",
-            isAuthenticated: true,
-            isLoading: false,
-          });
+          // Use OAuth2 form data format for login
+          const tokenData: Token = await api.postForm<Token>(
+            "/auth/token",
+            {
+              username: email,
+              password: password,
+            }
+          );
+
+          // Store token
+          setAuthToken(tokenData.access_token);
+          set({ token: tokenData.access_token, isAuthenticated: true });
+
+          // Fetch current user
+          await get().fetchCurrentUser();
         } catch (error) {
-          set({ isLoading: false });
+          const message = error instanceof ApiError 
+            ? error.message 
+            : error instanceof Error 
+              ? error.message 
+              : "Login failed";
+          set({ error: message, isLoading: false });
           throw error;
         }
       },
 
       logout: () => {
+        setAuthToken(null);
         set({
           user: null,
           token: null,
           isAuthenticated: false,
+          error: null,
+          isEmailVerified: false,
+          showVerificationMessage: false,
         });
       },
 
       register: async (name: string, email: string, password: string) => {
-        set({ isLoading: true });
+        set({ isLoading: true, error: null, showVerificationMessage: false });
         try {
-          // Simulate API call
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-          
-          const user: User = {
-            id: "1",
+          const response: RegisterResponse = await api.post<RegisterResponse>("/auth/register", {
             email,
+            password,
             name,
-          };
-          
-          set({
-            user,
-            token: "mock-token",
-            isAuthenticated: true,
-            isLoading: false,
+          } as UserCreate);
+
+          // Show verification message instead of auto-login
+          set({ 
+            isLoading: false, 
+            showVerificationMessage: true,
+            isEmailVerified: false 
           });
         } catch (error) {
-          set({ isLoading: false });
+          const message = error instanceof ApiError 
+            ? error.message 
+            : error instanceof Error 
+              ? error.message 
+              : "Registration failed";
+          set({ error: message, isLoading: false });
           throw error;
         }
       },
+
+      verifyEmail: async (token: string) => {
+        set({ isLoading: true, error: null });
+        try {
+          // Backend expects token as query parameter
+          const response: VerificationResponse = await api.post<VerificationResponse>(
+            `/auth/verify-email?token=${encodeURIComponent(token)}`
+          );
+          
+          set({ isLoading: false, isEmailVerified: true });
+          return response;
+        } catch (error) {
+          const message = error instanceof ApiError 
+            ? error.message 
+            : error instanceof Error 
+              ? error.message 
+              : "Email verification failed";
+          set({ error: message, isLoading: false });
+          throw error;
+        }
+      },
+
+      resendVerification: async (email: string) => {
+        set({ isLoading: true, error: null });
+        try {
+          // Backend expects email as query parameter
+          const response: VerificationResponse = await api.post<VerificationResponse>(
+            `/auth/resend-verification?email=${encodeURIComponent(email)}`
+          );
+          
+          set({ isLoading: false });
+          return response;
+        } catch (error) {
+          const message = error instanceof ApiError 
+            ? error.message 
+            : error instanceof Error 
+              ? error.message 
+              : "Failed to resend verification email";
+          set({ error: message, isLoading: false });
+          throw error;
+        }
+      },
+
+      loginWithGoogle: async () => {
+        set({ isLoading: true, error: null });
+        try {
+          const response: GoogleOAuthResponse = await api.get<GoogleOAuthResponse>("/auth/google");
+          
+          // Redirect to Google OAuth authorization URL
+          if (response.authorization_url) {
+            window.location.href = response.authorization_url;
+          }
+        } catch (error) {
+          const message = error instanceof ApiError 
+            ? error.message 
+            : error instanceof Error 
+              ? error.message 
+              : "Failed to initiate Google login";
+          set({ error: message, isLoading: false });
+          throw error;
+        }
+      },
+
+      handleGoogleCallback: async (code: string) => {
+        set({ isLoading: true, error: null });
+        try {
+          // Get the code from URL and call the callback endpoint
+          const response = await api.get<{ access_token: string; user: AuthUser }>(
+            `/auth/google/callback?code=${code}`
+          );
+
+          // Store token
+          setAuthToken(response.access_token);
+          set({ 
+            token: response.access_token, 
+            isAuthenticated: true, 
+            user: response.user,
+            isLoading: false 
+          });
+        } catch (error) {
+          const message = error instanceof ApiError 
+            ? error.message 
+            : error instanceof Error 
+              ? error.message 
+              : "Google login failed";
+          set({ error: message, isLoading: false });
+          throw error;
+        }
+      },
+
+      setShowVerificationMessage: (show: boolean) => {
+        set({ showVerificationMessage: show });
+      },
+
+      fetchCurrentUser: async () => {
+        const token = getAuthToken();
+        if (!token) {
+          set({ isAuthenticated: false, user: null });
+          return;
+        }
+
+        try {
+          const user: AuthUser = await api.get<AuthUser>("/auth/me");
+          set({ user, isAuthenticated: true });
+        } catch (error) {
+          // Token might be invalid
+          setAuthToken(null);
+          set({ user: null, token: null, isAuthenticated: false });
+        }
+      },
+
+      clearError: () => set({ error: null }),
     }),
     {
       name: "auth-storage",

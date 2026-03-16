@@ -9,7 +9,7 @@ export const Footer = () => {
               <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z" />
             </svg>
         </div>
-        <span>© 2023 Smart Career Assistant AI. All rights reserved.</span>
+        <span>© 2026 Genius AI. All rights reserved.</span>
       </div>
       <div className="flex items-center gap-8">
         <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
