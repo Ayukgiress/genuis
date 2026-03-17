@@ -120,11 +120,11 @@ export { ApiError };
 export const analysisApi = {
   list: () => api.get<Analysis[]>("/analysis/"),
   get: (analysisId: string) => api.get<Analysis>(`/analysis/${analysisId}`),
-  getByResume: (resumeId: string) => api.get<Analysis>(`/analysis/resume/${resumeId}`),
+  getByResume: (resumeId: string | number) => api.get<Analysis>(`/analysis/resume/${resumeId}`),
   create: (data: AnalysisCreate) => api.post<Analysis>("/analysis/", data),
   update: (analysisId: string, data: AnalysisUpdate) => api.patch<Analysis>(`/analysis/${analysisId}`, data),
-  analyze: (resumeId: string) => api.post<Analysis>(`/analysis/resume/${resumeId}/analyze`),
-  getSuggestions: (resumeId: string, focusArea?: string) => 
+  analyze: (resumeId: string | number) => api.post<Analysis>(`/analysis/resume/${resumeId}/analyze`),
+  getSuggestions: (resumeId: string | number, focusArea?: string) => 
     api.post<{ suggestions: string[] }>(`/analysis/resume/${resumeId}/suggestions`, { focus_area: focusArea }),
 };
 
@@ -138,10 +138,10 @@ export const analyticsApi = {
 // Resume API
 export const resumeApi = {
   list: () => api.get<Resume[]>("/resumes/"),
-  get: (resumeId: string) => api.get<Resume>(`/resumes/${resumeId}`),
+  get: (resumeId: string | number) => api.get<Resume>(`/resumes/${resumeId}`),
   create: (data: ResumeCreate) => api.post<Resume>("/resumes/", data),
-  update: (resumeId: string, data: ResumeUpdate) => api.patch<Resume>(`/resumes/${resumeId}`, data),
-  delete: (resumeId: string) => api.delete<void>(`/resumes/${resumeId}`),
+  update: (resumeId: string | number, data: ResumeUpdate) => api.patch<Resume>(`/resumes/${resumeId}`, data),
+  delete: (resumeId: string | number) => api.delete<void>(`/resumes/${resumeId}`),
   upload: async (file: File) => {
     const formData = new FormData();
     formData.append('file', file);

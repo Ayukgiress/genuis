@@ -48,17 +48,7 @@ export interface GoogleOAuthCallbackResponse {
   user: AuthUser;
 }
 
-// Resume Types
-export interface Resume {
-  id: string;
-  name: string;
-  fileUrl: string;
-  fileType: string;
-  fileSize: number;
-  uploadedAt: Date;
-  analysis: ResumeAnalysis | null;
-}
-
+// Resume Analysis Types
 export interface ResumeAnalysis {
   id: string;
   score: number;
@@ -67,26 +57,6 @@ export interface ResumeAnalysis {
   suggestions: string[];
   keywords: string[];
   analyzedAt: Date;
-}
-
-// Kanban Types
-export type KanbanColumnId = "todo" | "in_progress" | "review" | "done";
-
-export interface KanbanCard {
-  id: string;
-  title: string;
-  description?: string;
-  company?: string;
-  location?: string;
-  salary?: string;
-  appliedAt?: Date;
-  columnId: KanbanColumnId;
-}
-
-export interface KanbanColumn {
-  id: KanbanColumnId;
-  title: string;
-  cards: KanbanCard[];
 }
 
 // Application Types
@@ -158,7 +128,7 @@ export interface AnalysisResult {
 
 export interface Analysis {
   id: string;
-  resume_id: string;
+  resume_id: number;
   status: "pending" | "completed" | "failed";
   result?: AnalysisResult;
   feedback?: string;
@@ -208,8 +178,8 @@ export interface AnalyticsSummary {
 
 // Resume Types
 export interface Resume {
-  id: string;
-  user_id: string;
+  id: number;
+  user_id: number;
   file_name: string;
   file_path?: string;
   content?: string;

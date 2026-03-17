@@ -1,16 +1,21 @@
 'use client';
 
 import React, { useEffect, useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { resumeApi, analysisApi, ApiError } from '@/lib/api';
 import type { Resume, Analysis } from '@/types';
 
 export default function ResumesPage() {
+  const router = useRouter();
   const [resumes, setResumes] = useState<Resume[]>([]);
   const [selectedResume, setSelectedResume] = useState<Resume | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState('');
+  const [editFileName, setEditFileName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -36,7 +41,7 @@ export default function ResumesPage() {
     }
   };
 
-  const fetchAnalysis = async (resumeId: string) => {
+  const fetchAnalysis = async (resumeId: string | number) => {
     try {
       const data = await analysisApi.getByResume(resumeId);
       setAnalysis(data);
@@ -81,7 +86,7 @@ export default function ResumesPage() {
     }
   };
 
-  const handleDeleteResume = async (resumeId: string) => {
+  const handleDeleteResume = async (resumeId: string | number) => {
     if (!confirm('Are you sure you want to delete this resume?')) return;
 
     try {
@@ -98,7 +103,7 @@ export default function ResumesPage() {
     }
   };
 
-  const handleAnalyzeResume = async (resumeId: string) => {
+  const handleAnalyzeResume = async (resumeId: string | number) => {
     try {
       setIsAnalyzing(true);
       setError(null);
@@ -117,6 +122,39 @@ export default function ResumesPage() {
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  const handleUpdateResume = async () => {
+    if (!selectedResume) return;
+
+    try {
+      setError(null);
+      setSuccess(null);
+      
+      const updatedResume = await resumeApi.update(selectedResume.id, {
+        file_name: editFileName,
+        content: editContent,
+      });
+      
+      setResumes(prev => prev.map(r => r.id === updatedResume.id ? updatedResume : r));
+      setSelectedResume(updatedResume);
+      setSuccess('Resume updated successfully!');
+      setIsEditing(false);
+    } catch (err) {
+      console.error('Failed to update resume:', err);
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError('Failed to update resume. Please try again.');
+      }
+    }
+  };
+
+  const openEditModal = () => {
+    if (!selectedResume) return;
+    setEditContent(selectedResume.content || '');
+    setEditFileName(selectedResume.file_name);
+    setIsEditing(true);
   };
 
   const formatDate = (dateStr: string) => {
@@ -319,6 +357,16 @@ export default function ResumesPage() {
 
                   <div className="flex items-center gap-3">
                     <button 
+                      onClick={(e) => { e.stopPropagation(); router.push(`/resumes/edit/${resume.id}`); }}
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs font-bold hover:border-primary/50 transition-all text-primary uppercase tracking-widest"
+                    >
+                      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                      </svg>
+                      Edit
+                    </button>
+                    <button 
                       onClick={(e) => { e.stopPropagation(); setSelectedResume(resume); }}
                       className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs font-bold hover:border-primary/50 transition-all text-primary uppercase tracking-widest"
                     >
@@ -455,7 +503,7 @@ export default function ResumesPage() {
                   <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                 </svg>
                 <p className="text-zinc-400">No analysis yet</p>
-                <p className="text-zinc-500 text-sm">Click "Generate Optimization" to analyze this resume</p>
+                <p className="text-zinc-500 text-sm">Click &quot;Generate Optimization&quot; to analyze this resume</p>
               </div>
             )}
           </div>
@@ -482,6 +530,7 @@ export default function ResumesPage() {
             )}
           </button>
           <button 
+            onClick={openEditModal}
             disabled={!selectedResume}
             className="px-6 py-4 bg-zinc-900 border border-zinc-800 font-bold rounded-2xl hover:bg-zinc-800 transition-all uppercase tracking-widest text-xs disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -489,6 +538,66 @@ export default function ResumesPage() {
           </button>
         </div>
       </div>
+
+      {/* Edit Modal */}
+      {isEditing && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-zinc-950 border border-zinc-800 rounded-[2.5rem] p-8 w-full max-w-4xl max-h-[90vh] flex flex-col space-y-6 shadow-[0_0_100px_rgba(0,0,0,0.5)]">
+            <div className="flex justify-between items-center">
+              <div className="space-y-1">
+                <h3 className="text-2xl font-bold tracking-tight">Edit Master Resume</h3>
+                <p className="text-zinc-500 text-sm tracking-widest uppercase font-bold">Neural document optimization</p>
+              </div>
+              <button 
+                onClick={() => setIsEditing(false)}
+                className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-500 hover:text-white transition-all"
+              >
+                <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 ml-2">File Name</label>
+                <input
+                  type="text"
+                  value={editFileName}
+                  onChange={(e) => setEditFileName(e.target.value)}
+                  className="w-full bg-zinc-900/50 border border-zinc-800 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-primary transition-all font-bold"
+                  placeholder="Resume name..."
+                />
+              </div>
+              <div className="space-y-2 flex-1 flex flex-col overflow-hidden">
+                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 ml-2">Resume Content</label>
+                <textarea
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  className="flex-1 w-full bg-zinc-900/50 border border-zinc-800 rounded-[2rem] px-6 py-6 text-white focus:outline-none focus:border-primary transition-all font-mono text-sm leading-relaxed resize-none scrollbar-hide"
+                  placeholder="Paste or edit resume text content here..."
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-4 pt-4">
+              <button
+                onClick={() => setIsEditing(false)}
+                className="flex-1 py-4 bg-zinc-900 border border-zinc-800 text-white font-bold rounded-2xl hover:bg-zinc-800 transition-all uppercase tracking-widest text-xs"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUpdateResume}
+                className="flex-1 py-4 bg-primary text-black font-black rounded-2xl hover:opacity-90 transition-all uppercase tracking-widest text-xs shadow-[0_0_30px_-5px_rgba(0,242,156,0.3)]"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
