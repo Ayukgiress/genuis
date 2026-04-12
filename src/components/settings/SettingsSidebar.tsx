@@ -1,5 +1,8 @@
+'use client';
+
 import React from 'react';
 import * as Icons from '@radix-ui/react-icons';
+import { useAuthStore } from '@/store/auth-store';
 
 const NavItem = ({ icon: Icon, label, active = false }: { icon: React.ComponentType<{ className?: string }>, label: string, active?: boolean }) => (
   <button className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
@@ -13,6 +16,8 @@ const NavItem = ({ icon: Icon, label, active = false }: { icon: React.ComponentT
 );
 
 export const SettingsSidebar = () => {
+  const { user } = useAuthStore();
+
   return (
     <aside className="w-64 flex flex-col gap-8 shrink-0">
       <div>
@@ -32,7 +37,7 @@ export const SettingsSidebar = () => {
       <div className="mt-auto bg-zinc-900/50 border border-zinc-800 rounded-xl p-5">
         <span className="text-[10px] font-bold text-[#00f29c] uppercase tracking-wider">Pro Plan</span>
         <p className="text-xs text-zinc-400 mt-2 mb-4 leading-relaxed">
-          Your subscription renews on Oct 12, 2023.
+          {user?.name || 'User'}, your subscription renews on Oct 12, 2023.
         </p>
         <button className="text-xs font-bold text-[#00f29c] hover:underline transition-all">
           Manage Billing

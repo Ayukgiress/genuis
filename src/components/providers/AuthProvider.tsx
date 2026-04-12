@@ -2,18 +2,28 @@
 
 import { useEffect, useState } from "react";
 import { useAuthStore } from "@/store/auth-store";
+import { setAuthToken } from "@/lib/api";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
-  const fetchCurrentUser = useAuthStore((state) => state.fetchCurrentUser);
+  const fetchCurrentUser = useAuthStore((state: any) => state.fetchCurrentUser);
 
   useEffect(() => {
     setMounted(true);
-    // Fetch current user on mount to restore session
+    
+    const cookies = document.cookie.split(';');
+    for (const cookie of cookies) {
+      const [name, value] = cookie.trim().split('=');
+      if (name === 'client_token' && value) {
+        setAuthToken(value);
+        useAuthStore.setState({ token: value, isAuthenticated: true });
+        break;
+      }
+    }
+    
     fetchCurrentUser();
   }, [fetchCurrentUser]);
 
-  // Prevent hydration mismatch by rendering nothing until mounted
   if (!mounted) {
     return <>{children}</>;
   }

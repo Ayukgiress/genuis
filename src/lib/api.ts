@@ -6,7 +6,8 @@ import type {
   Analytics, AnalyticsCreate,
   Resume, ResumeCreate, ResumeUpdate,
   KanbanBoard, KanbanBoardCreate, KanbanBoardUpdate,
-  KanbanCard, KanbanCardCreate, KanbanCardUpdate
+  KanbanCard, KanbanCardCreate, KanbanCardUpdate,
+  Job, JobSearchParams
 } from "@/types";
 
 // Token management
@@ -26,7 +27,18 @@ export const setAuthToken = (token: string | null) => {
 export const getAuthToken = (): string | null => {
   if (authToken) return authToken;
   if (typeof window !== "undefined") {
-    return localStorage.getItem("auth_token");
+    // Check localStorage first
+    const localToken = localStorage.getItem("auth_token");
+    if (localToken) return localToken;
+    
+    // Check cookies for server-side token (client_token for JavaScript access)
+    const cookies = document.cookie.split(';');
+    for (const cookie of cookies) {
+      const [name, value] = cookie.trim().split('=');
+      if (name === 'client_token') {
+        return value;
+      }
+    }
   }
   return null;
 };
@@ -174,4 +186,27 @@ export const kanbanApi = {
   createCard: (boardId: string, data: KanbanCardCreate) => api.post<KanbanCard>(`/kanban/boards/${boardId}/cards`, data),
   updateCard: (cardId: string, data: KanbanCardUpdate) => api.patch<KanbanCard>(`/kanban/cards/${cardId}`, data),
   deleteCard: (cardId: string) => api.delete<void>(`/kanban/cards/${cardId}`),
+};
+
+// Job Discovery API
+export const jobApi = {
+  search: (params?: JobSearchParams) => {
+    const queryParams: Record<string, string> = {};
+    if (params?.query) queryParams.query = params.query;
+    if (params?.location) queryParams.location = params.location;
+    if (params?.remote) queryParams.remote = 'true';
+    if (params?.job_type) queryParams.job_type = params.job_type;
+    if (params?.page) queryParams.page = params.page.toString();
+    if (params?.limit) queryParams.limit = params.limit.toString();
+    return api.get<Job[]>("/jobs/search", queryParams);
+  },
+  getById: (jobId: string) => api.get<Job>(`/jobs/${jobId}`),
+  getRecommendations: (resumeId?: number) => {
+    const params: Record<string, string> = {};
+    if (resumeId) params.resume_id = resumeId.toString();
+    return api.get<Job[]>("/jobs/recommendations", params);
+  },
+  matchWithResume: (jobId: string, resumeId: number) => api.post<Job>(`/jobs/${jobId}/match?resume_id=${resumeId}`, {}),
+  addToKanban: (jobId: string, boardId: number, status?: string) => 
+    api.post<KanbanCard>(`/jobs/${jobId}/add-to-kanban?board_id=${boardId}&status=${status || 'todo'}`, {}),
 };

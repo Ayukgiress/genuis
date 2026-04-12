@@ -4,7 +4,17 @@ export interface User {
   email: string;
   name?: string;
   avatar?: string;
+  bio?: string;
   createdAt: Date;
+}
+
+export interface CareerPreferences {
+  desired_roles?: string[];
+  min_salary?: number;
+  work_mode?: "remote" | "hybrid" | "onsite";
+  relocation?: boolean;
+  preferred_locations?: string[];
+  job_types?: string[];
 }
 
 // Auth Types (matching backend)
@@ -258,4 +268,31 @@ export interface KanbanCardUpdate {
   location?: string;
   salary?: string;
   applied_at?: string;
+}
+
+export interface Job {
+  id: string;
+  title: string;
+  company: string;
+  location: string;
+  description: string;
+  requirements: string[];
+  salary_range?: string;
+  job_type?: string;
+  source: string;
+  source_url: string;
+  posted_at: string;
+  match_score?: number;
+  matched_skills?: string[];
+  missing_skills?: string[];
+}
+
+export interface JobSearchParams {
+  query?: string;
+  location?: string;
+  remote?: boolean;
+  job_type?: string;
+  min_salary?: number;
+  page?: number;
+  limit?: number;
 }

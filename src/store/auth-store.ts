@@ -146,7 +146,11 @@ export const useAuthStore = create<AuthState>()(
       loginWithGoogle: async () => {
         set({ isLoading: true, error: null });
         try {
-          const response: GoogleOAuthResponse = await api.get<GoogleOAuthResponse>("/auth/google");
+          // Pass the frontend redirect URI to the backend
+          const redirectUri = typeof window !== "undefined" ? `${window.location.origin}/google/callback` : "";
+          const response: GoogleOAuthResponse = await api.get<GoogleOAuthResponse>(
+            `/auth/google?redirect_uri=${encodeURIComponent(redirectUri)}`
+          );
           
           // Redirect to Google OAuth authorization URL
           if (response.authorization_url) {
@@ -167,8 +171,10 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true, error: null });
         try {
           // Get the code from URL and call the callback endpoint
+          // Use the same redirect URI used in the initial step
+          const redirectUri = typeof window !== "undefined" ? `${window.location.origin}/google/callback` : "";
           const response = await api.get<{ access_token: string; user: AuthUser }>(
-            `/auth/google/callback?code=${code}`
+            `/auth/google/callback?code=${code}&redirect_uri=${encodeURIComponent(redirectUri)}`
           );
 
           // Store token

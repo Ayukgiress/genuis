@@ -51,10 +51,11 @@ export default function AnalysisPage() {
       setSuccess(null);
       
       const result = await analysisApi.analyze(resumeId);
+      const resumeIdNum = Number(resumeId);
       setAnalyses(prev => {
-        const existing = prev.find(a => a.resume_id === resumeId);
+        const existing = prev.find(a => a.resume_id === resumeIdNum);
         if (existing) {
-          return prev.map(a => a.resume_id === resumeId ? result : a);
+          return prev.map(a => a.resume_id === resumeIdNum ? result : a);
         }
         return [...prev, result];
       });
@@ -91,7 +92,7 @@ export default function AnalysisPage() {
     }
   };
 
-  const getResumeName = (resumeId: string) => {
+  const getResumeName = (resumeId: number) => {
     const resume = resumes.find(r => r.id === resumeId);
     return resume ? resume.file_name : `Resume #${resumeId}`;
   };
@@ -170,7 +171,7 @@ export default function AnalysisPage() {
                   }`}
                 >
                   <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-bold text-sm truncate flex-1">{getResumeName(analysis.resume_id)}</h3>
+                    <h3 className="font-bold text-sm truncate flex-1">{getResumeName(Number(analysis.resume_id))}</h3>
                     <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded ${
                       analysis.status === 'completed'
                         ? 'bg-primary/10 text-primary'
@@ -268,7 +269,7 @@ export default function AnalysisPage() {
                 <div className="flex justify-between items-center mb-6">
                   <h3 className="text-xl font-bold">AI Suggestions</h3>
                   <button
-                    onClick={() => handleGetSuggestions(selectedAnalysis.resume_id, selectedFocusArea || undefined)}
+                    onClick={() => handleGetSuggestions(String(selectedAnalysis.resume_id), selectedFocusArea || undefined)}
                     disabled={isGettingSuggestions}
                     className="flex items-center gap-2 px-4 py-2 bg-primary text-black font-bold rounded-lg hover:opacity-90 transition-all disabled:opacity-50"
                   >
@@ -357,7 +358,7 @@ export default function AnalysisPage() {
                       <p className="text-xs text-zinc-500">{formatDate(resume.created_at)}</p>
                     </div>
                     <button
-                      onClick={() => handleAnalyzeResume(resume.id)}
+                      onClick={() => handleAnalyzeResume(String(resume.id))}
                       disabled={isAnalyzing}
                       className="flex items-center gap-2 px-4 py-2 bg-primary text-black font-bold rounded-lg hover:opacity-90 transition-all disabled:opacity-50"
                     >

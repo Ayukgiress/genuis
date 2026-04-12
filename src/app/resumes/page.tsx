@@ -185,9 +185,7 @@ export default function ResumesPage() {
 
   return (
     <div className="flex h-full min-h-[calc(100vh-64px)] bg-black text-white overflow-hidden">
-      {/* Main Content */}
       <div className="flex-1 flex flex-col p-8 space-y-12 overflow-y-auto">
-        {/* Header */}
         <div className="space-y-4">
           <h1 className="text-4xl font-bold tracking-tight">Resume Management</h1>
           <p className="text-zinc-500 max-w-2xl leading-relaxed text-lg">
@@ -195,7 +193,6 @@ export default function ResumesPage() {
           </p>
         </div>
 
-        {/* Error/Success Messages */}
         {error && (
           <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
             {error}
