@@ -2,11 +2,13 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { jobApi, resumeApi, ApiError } from '@/lib/api';
+import { jobApi, resumeApi, analysisApi, ApiError } from '@/lib/api';
+import { useAuth } from '@/hooks/useAuth';
 import type { Job, Resume, Analysis } from '@/types';
 
 export default function JobsPage() {
   const router = useRouter();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [resumes, setResumes] = useState<Resume[]>([]);
   const [selectedResume, setSelectedResume] = useState<Resume | null>(null);
@@ -15,7 +17,7 @@ export default function JobsPage() {
   const [isMatching, setIsMatching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  
+
   const [searchQuery, setSearchQuery] = useState('');
   const [location, setLocation] = useState('');
   const [remoteOnly, setRemoteOnly] = useState(false);
@@ -23,8 +25,13 @@ export default function JobsPage() {
   const [page, setPage] = useState(1);
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!isAuthenticated) {
+      router.push('/login');
+      return;
+    }
     fetchData();
-  }, []);
+  }, [isAuthenticated, authLoading, router]);
 
   useEffect(() => {
     if (selectedResume) {
@@ -55,15 +62,10 @@ export default function JobsPage() {
 
   const fetchAnalysis = async (resumeId: number) => {
     try {
-      const data = await resumeApi.get(resumeId).then(async (resume) => {
-        if (resume && typeof resume === 'object' && 'id' in resume) {
-          const analysisData = await fetch(`/api/analysis/resume/${resumeId}`).then(r => r.json()).catch(() => null);
-          return analysisData;
-        }
-        return null;
-      });
-      setAnalysis(data as Analysis | null);
+      const analysisData = await analysisApi.getByResume(resumeId);
+      setAnalysis(analysisData);
     } catch (err) {
+      console.error('Analysis fetch failed:', err);
       setAnalysis(null);
     }
   };

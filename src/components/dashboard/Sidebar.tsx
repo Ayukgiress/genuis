@@ -91,8 +91,8 @@ export const Sidebar = () => {
               key={item.name}
               href={item.href}
               className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                isActive 
-                  ? 'bg-primary/10 text-primary border border-primary/20' 
+                isActive
+                  ? 'bg-primary/10 text-primary border border-primary/20'
                   : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900'
               }`}
             >

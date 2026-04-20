@@ -1,22 +1,26 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { 
-  AreaChart, 
-  Area, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import { useRouter } from 'next/navigation';
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer
 } from 'recharts';
 import { analysisApi, analyticsApi, jobApi, kanbanApi, ApiError } from '@/lib/api';
+import { useAuth } from '@/hooks/useAuth';
 import type { Analysis, AnalyticsSummary, Job, KanbanBoard } from '@/types';
 import Link from 'next/link';
 
 const COLORS = ['#00f29c', '#6366f1', '#f59e0b', '#ef4444'];
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [analyticsSummary, setAnalyticsSummary] = useState<AnalyticsSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -31,6 +35,12 @@ export default function DashboardPage() {
   const [jobFilters, setJobFilters] = useState({ remote: false, location: '' });
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!isAuthenticated) {
+      router.push('/login');
+      return;
+    }
+
     const fetchDashboardData = async () => {
       try {
         setIsLoading(true);
@@ -76,8 +86,13 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!isAuthenticated) {
+      router.push('/login');
+      return;
+    }
     fetchJobs();
-  }, []);
+  }, [isAuthenticated, authLoading, router]);
 
   const handleAddToKanban = async (job: Job) => {
     if (!selectedBoard) {
