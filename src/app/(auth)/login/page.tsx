@@ -12,7 +12,6 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [formError, setFormError] = useState("");
 
-  // Check for Google OAuth callback
   useEffect(() => {
     const code = searchParams.get("code");
     if (code) {
@@ -46,7 +45,6 @@ function LoginForm() {
     }
   };
 
-  // Show loading while checking auth
   if (isAuthenticated) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -120,7 +118,7 @@ function LoginForm() {
       </div>
 
       {/* Right Side - Login Form */}
-      <div className="flex-1 flex items-center justify-center p-6 lg:p-12">
+      <div className="flex-1 flex items-center justify-center min-h-screen p-6 lg:p-12">
         <div className="w-full max-w-[440px] space-y-8 bg-[#0D0D0D] border border-zinc-800/50 p-10 rounded-3xl shadow-2xl">
           <div className="space-y-2">
             <h2 className="text-3xl font-bold tracking-tight">Login</h2>

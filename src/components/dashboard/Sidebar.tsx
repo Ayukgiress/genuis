@@ -30,18 +30,27 @@ const navItems = [
       </svg>
     ) 
   },
-  { 
-    name: 'Jobs', 
+  {
+    name: 'Jobs',
     href: '/jobs',
     icon: (
       <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2">
         <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
         <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
       </svg>
-    ) 
+    )
   },
-  { 
-    name: 'Job Tracker', 
+  {
+    name: 'Interviews',
+    href: '/interviews',
+    icon: (
+      <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+      </svg>
+    )
+  },
+  {
+    name: 'Job Tracker',
     href: '/kanban',
     icon: (
       <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2">

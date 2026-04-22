@@ -296,3 +296,37 @@ export interface JobSearchParams {
   page?: number;
   limit?: number;
 }
+
+// Interview Types
+export interface Interview {
+  id: number;
+  user_id: number;
+  job_id: number;
+  status: "active" | "completed" | "cancelled";
+  created_at: string;
+  updated_at?: string;
+  messages?: InterviewMessage[];
+}
+
+export interface InterviewCreate {
+  job_id: string;
+  status?: "active" | "completed" | "cancelled";
+}
+
+export interface InterviewMessage {
+  id: number;
+  interview_id: number;
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
+}
+
+export interface InterviewMessageCreate {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface InterviewStartRequest {
+  job_id: number;
+  resume_content?: string;
+}

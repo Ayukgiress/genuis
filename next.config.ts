@@ -2,6 +2,11 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   trailingSlash: true,
+  experimental: {
+    turbo: {
+      noTurbopackDevWatcher: true,
+    },
+  } as any,
   async rewrites() {
     return [
       {

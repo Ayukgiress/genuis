@@ -1,13 +1,14 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 
 // Types
-import type { 
-  Analysis, AnalysisCreate, AnalysisUpdate, 
+import type {
+  Analysis, AnalysisCreate, AnalysisUpdate,
   Analytics, AnalyticsCreate,
   Resume, ResumeCreate, ResumeUpdate,
   KanbanBoard, KanbanBoardCreate, KanbanBoardUpdate,
   KanbanCard, KanbanCardCreate, KanbanCardUpdate,
-  Job, JobSearchParams
+  Job, JobSearchParams,
+  Interview, InterviewCreate, InterviewMessage, InterviewMessageCreate
 } from "@/types";
 
 // Token management
@@ -89,7 +90,15 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     let errorMessage = `API request failed: ${response.statusText}`;
     try {
       const errorData = await response.json();
-      errorMessage = errorData.detail || errorMessage;
+      if (errorData.detail) {
+        if (typeof errorData.detail === 'string') {
+          errorMessage = errorData.detail;
+        } else {
+          errorMessage = JSON.stringify(errorData.detail);
+        }
+      } else {
+        errorMessage = JSON.stringify(errorData);
+      }
     } catch {
       // Ignore JSON parse errors
     }
@@ -207,6 +216,18 @@ export const jobApi = {
     return api.get<Job[]>("/jobs/recommendations", params);
   },
   matchWithResume: (jobId: string, resumeId: number) => api.post<Job>(`/jobs/${jobId}/match?resume_id=${resumeId}`, {}),
-  addToKanban: (jobId: string, boardId: number, status?: string) => 
+  addToKanban: (jobId: string, boardId: number, status?: string) =>
     api.post<KanbanCard>(`/jobs/${jobId}/add-to-kanban?board_id=${boardId}&status=${status || 'todo'}`, {}),
+};
+
+// Interview API
+export const interviewApi = {
+  list: () => api.get<Interview[]>("/interviews/"),
+  get: (interviewId: number) => api.get<Interview>(`/interviews/${interviewId}`),
+  create: (data: InterviewCreate) => api.post<Interview>("/interviews/", data),
+  delete: (interviewId: number) => api.delete<void>(`/interviews/${interviewId}`),
+  complete: (interviewId: number) => api.post<{ message: string; interview: Interview }>(`/interviews/${interviewId}/complete`, {}),
+  sendMessage: (interviewId: number, data: InterviewMessageCreate) =>
+    api.post<InterviewMessage>(`/interviews/${interviewId}/messages`, data),
+  getMessages: (interviewId: number) => api.get<InterviewMessage[]>(`/interviews/${interviewId}/messages`),
 };

@@ -1,0 +1,98 @@
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap');
+
+.interview-page { font-family: 'Syne', sans-serif; }
+.mono { font-family: 'JetBrains Mono', monospace; }
+
+.mic-ring {
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 242, 156, 0.3);
+  animation: ring-pulse 2s ease-in-out infinite;
+}
+.mic-ring:nth-child(2) {
+  inset: -16px;
+  animation-delay: 0.3s;
+  opacity: 0.5;
+}
+.mic-ring:nth-child(3) {
+  inset: -24px;
+  animation-delay: 0.6s;
+  opacity: 0.25;
+}
+@keyframes ring-pulse {
+  0%, 100% { transform: scale(1); opacity: var(--opacity, 1); }
+  50% { transform: scale(1.05); opacity: calc(var(--opacity, 1) * 0.6); }
+}
+
+.waveform-bar {
+  width: 3px;
+  background: #00F29C;
+  border-radius: 2px;
+  animation: wave 1.2s ease-in-out infinite;
+}
+@keyframes wave {
+  0%, 100% { transform: scaleY(0.3); }
+  50% { transform: scaleY(1); }
+}
+
+.message-in {
+  animation: msg-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+@keyframes msg-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.interview-card {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+.interview-card::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 2px;
+  background: #00F29C;
+  transform: scaleY(0);
+  transition: transform 0.2s ease;
+  transform-origin: bottom;
+}
+.interview-card:hover::before,
+.interview-card.active::before {
+  transform: scaleY(1);
+}
+
+.glow-btn {
+  box-shadow: 0 0 0 rgba(0, 242, 156, 0);
+  transition: box-shadow 0.3s ease, transform 0.2s ease;
+}
+.glow-btn:hover {
+  box-shadow: 0 0 30px rgba(0, 242, 156, 0.25), 0 0 60px rgba(0, 242, 156, 0.1);
+  transform: translateY(-1px);
+}
+
+.noise-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  z-index: 0;
+}
+
+.scrollbar-hidden::-webkit-scrollbar { display: none; }
+.scrollbar-hidden { -ms-overflow-style: none; scrollbar-width: none; }
+
+.status-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #00F29C;
+  box-shadow: 0 0 6px #00F29C;
+  animation: blink 2s ease-in-out infinite;
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
