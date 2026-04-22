@@ -31,7 +31,20 @@ export const getAuthToken = (): string | null => {
     // Check localStorage first
     const localToken = localStorage.getItem("auth_token");
     if (localToken) return localToken;
-    
+
+    // Check persist storage as fallback
+    try {
+      const persistData = localStorage.getItem("auth-storage");
+      if (persistData) {
+        const parsed = JSON.parse(persistData);
+        if (parsed.state && parsed.state.token) {
+          return parsed.state.token;
+        }
+      }
+    } catch (e) {
+      // Ignore parse errors
+    }
+
     // Check cookies for server-side token (client_token for JavaScript access)
     const cookies = document.cookie.split(';');
     for (const cookie of cookies) {
