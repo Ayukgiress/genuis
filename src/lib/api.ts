@@ -17,7 +17,7 @@ let authToken: string | null = null;
 export const setAuthToken = (token: string | null) => {
   authToken = token;
   if (typeof window !== "undefined") {
-    if (token) {
+    if (token && token !== "null" && token !== "undefined") {
       localStorage.setItem("auth_token", token);
     } else {
       localStorage.removeItem("auth_token");
@@ -27,18 +27,21 @@ export const setAuthToken = (token: string | null) => {
 
 export const getAuthToken = (): string | null => {
   if (authToken) return authToken;
+  
   if (typeof window !== "undefined") {
     // Check localStorage first
     const localToken = localStorage.getItem("auth_token");
-    if (localToken) return localToken;
+    if (localToken && localToken !== "null" && localToken !== "undefined") return localToken;
 
     // Check persist storage as fallback
     try {
       const persistData = localStorage.getItem("auth-storage");
       if (persistData) {
         const parsed = JSON.parse(persistData);
-        if (parsed.state && parsed.state.token) {
-          return parsed.state.token;
+        // Handle both possible structures (with or without .state)
+        const token = parsed.state?.token || parsed.token;
+        if (token && token !== "null" && token !== "undefined") {
+          return token;
         }
       }
     } catch (e) {
@@ -49,7 +52,7 @@ export const getAuthToken = (): string | null => {
     const cookies = document.cookie.split(';');
     for (const cookie of cookies) {
       const [name, value] = cookie.trim().split('=');
-      if (name === 'client_token') {
+      if (name === 'client_token' && value && value !== "null" && value !== "undefined") {
         return value;
       }
     }
@@ -152,10 +155,10 @@ export { ApiError };
 
 // Analysis API
 export const analysisApi = {
-  list: () => api.get<Analysis[]>("/analysis/"),
+  list: () => api.get<Analysis[]>("/analysis"),
   get: (analysisId: string) => api.get<Analysis>(`/analysis/${analysisId}`),
   getByResume: (resumeId: string | number) => api.get<Analysis>(`/analysis/resume/${resumeId}`),
-  create: (data: AnalysisCreate) => api.post<Analysis>("/analysis/", data),
+  create: (data: AnalysisCreate) => api.post<Analysis>("/analysis", data),
   update: (analysisId: string, data: AnalysisUpdate) => api.patch<Analysis>(`/analysis/${analysisId}`, data),
   analyze: (resumeId: string | number) => api.post<Analysis>(`/analysis/resume/${resumeId}/analyze`),
   getSuggestions: (resumeId: string | number, focusArea?: string) => 
@@ -164,16 +167,16 @@ export const analysisApi = {
 
 // Analytics API
 export const analyticsApi = {
-  list: () => api.get<Analytics[]>("/analytics/"),
-  create: (data: AnalyticsCreate) => api.post<Analytics>("/analytics/", data),
+  list: () => api.get<Analytics[]>("/analytics"),
+  create: (data: AnalyticsCreate) => api.post<Analytics>("/analytics", data),
   getSummary: () => api.get<{ total_events: number; event_types: Record<string, number> }>("/analytics/summary"),
 };
 
 // Resume API
 export const resumeApi = {
-  list: () => api.get<Resume[]>("/resumes/"),
+  list: () => api.get<Resume[]>("/resumes"),
   get: (resumeId: string | number) => api.get<Resume>(`/resumes/${resumeId}`),
-  create: (data: ResumeCreate) => api.post<Resume>("/resumes/", data),
+  create: (data: ResumeCreate) => api.post<Resume>("/resumes", data),
   update: (resumeId: string | number, data: ResumeUpdate) => api.patch<Resume>(`/resumes/${resumeId}`, data),
   delete: (resumeId: string | number) => api.delete<void>(`/resumes/${resumeId}`),
   upload: async (file: File) => {
@@ -235,9 +238,9 @@ export const jobApi = {
 
 // Interview API
 export const interviewApi = {
-  list: () => api.get<Interview[]>("/interviews/"),
+  list: () => api.get<Interview[]>("/interviews"),
   get: (interviewId: number) => api.get<Interview>(`/interviews/${interviewId}`),
-  create: (data: InterviewCreate) => api.post<Interview>("/interviews/", data),
+  create: (data: InterviewCreate) => api.post<Interview>("/interviews", data),
   delete: (interviewId: number) => api.delete<void>(`/interviews/${interviewId}`),
   complete: (interviewId: number) => api.post<{ message: string; interview: Interview }>(`/interviews/${interviewId}/complete`, {}),
   sendMessage: (interviewId: number, data: InterviewMessageCreate) =>
