@@ -29,7 +29,7 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       token: null,
       isAuthenticated: false,
-      isLoading: false,
+      isLoading: true,
       error: null,
       isEmailVerified: false,
       showVerificationMessage: false,
@@ -39,7 +39,7 @@ export const useAuthStore = create<AuthState>()(
         try {
           // Use OAuth2 form data format for login
           const tokenData: Token = await api.postForm<Token>(
-            "/auth/token",
+            "/auth/token/",
             {
               username: email,
               password: password,
@@ -78,7 +78,7 @@ export const useAuthStore = create<AuthState>()(
       register: async (name: string, email: string, password: string) => {
         set({ isLoading: true, error: null, showVerificationMessage: false });
         try {
-          const response: RegisterResponse = await api.post<RegisterResponse>("/auth/register", {
+          const response: RegisterResponse = await api.post<RegisterResponse>("/auth/register/", {
             email,
             password,
             name,
@@ -106,7 +106,7 @@ export const useAuthStore = create<AuthState>()(
         try {
           // Backend expects token as query parameter
           const response: VerificationResponse = await api.post<VerificationResponse>(
-            `/auth/verify-email?token=${encodeURIComponent(token)}`
+            `/auth/verify-email/?token=${encodeURIComponent(token)}`
           );
           
           set({ isLoading: false, isEmailVerified: true });
@@ -203,17 +203,18 @@ export const useAuthStore = create<AuthState>()(
       fetchCurrentUser: async () => {
         const token = getAuthToken();
         if (!token) {
-          set({ isAuthenticated: false, user: null });
+          set({ isAuthenticated: false, user: null, isLoading: false });
           return;
         }
 
+        set({ isLoading: true, error: null });
         try {
           const user: AuthUser = await api.get<AuthUser>("/auth/me");
-          set({ user, isAuthenticated: true });
+          set({ user, isAuthenticated: true, isLoading: false });
         } catch (error) {
           // Token might be invalid
           setAuthToken(null);
-          set({ user: null, token: null, isAuthenticated: false });
+          set({ user: null, token: null, isAuthenticated: false, isLoading: false });
         }
       },
 

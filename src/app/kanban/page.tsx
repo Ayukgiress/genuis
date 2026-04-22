@@ -1,7 +1,9 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { kanbanApi, ApiError } from '@/lib/api';
+import { useAuth } from '@/hooks/useAuth';
 import type { KanbanBoard, KanbanCard, KanbanColumnId } from '@/types';
 
 const COLUMNS: { id: KanbanColumnId; title: string }[] = [
@@ -12,6 +14,8 @@ const COLUMNS: { id: KanbanColumnId; title: string }[] = [
 ];
 
 export default function KanbanPage() {
+  const router = useRouter();
+  const { isAuthenticated, isLoading: authLoading, logout } = useAuth();
   const [boards, setBoards] = useState<KanbanBoard[]>([]);
   const [currentBoard, setCurrentBoard] = useState<KanbanBoard | null>(null);
   const [cards, setCards] = useState<KanbanCard[]>([]);
@@ -26,11 +30,7 @@ export default function KanbanPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchBoards();
-  }, []);
-
-  const fetchBoards = async () => {
+  const fetchBoards = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
@@ -41,11 +41,25 @@ export default function KanbanPage() {
       }
     } catch (err) {
       console.error('Failed to fetch boards:', err);
-      setError('Failed to load boards. Please make sure the backend is running.');
+      if (err instanceof ApiError && err.status === 401) {
+        logout();
+        router.push('/login');
+      } else {
+        setError('Failed to load boards. Please make sure the backend is running.');
+      }
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [logout, router, currentBoard]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!isAuthenticated) {
+      router.push('/login');
+      return;
+    }
+    fetchBoards();
+  }, [authLoading, isAuthenticated, router, fetchBoards]);
 
   const fetchCards = async (boardId: string) => {
     try {

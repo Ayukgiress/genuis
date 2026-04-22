@@ -1,10 +1,14 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { analysisApi, resumeApi, ApiError } from '@/lib/api';
+import { useAuth } from '@/hooks/useAuth';
 import type { Analysis, Resume, FocusArea } from '@/types';
 
 export default function AnalysisPage() {
+  const router = useRouter();
+  const { isAuthenticated, isLoading: authLoading, logout } = useAuth();
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [resumes, setResumes] = useState<Resume[]>([]);
   const [selectedAnalysis, setSelectedAnalysis] = useState<Analysis | null>(null);
@@ -16,33 +20,43 @@ export default function AnalysisPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
-      
+
       const [analysesData, resumesData] = await Promise.all([
         analysisApi.list(),
         resumeApi.list()
       ]);
-      
+
       setAnalyses(analysesData);
       setResumes(resumesData);
-      
+
       if (analysesData.length > 0) {
         setSelectedAnalysis(analysesData[0]);
       }
     } catch (err) {
       console.error('Failed to fetch data:', err);
-      setError('Failed to load analyses. Please make sure the backend is running.');
+      if (err instanceof ApiError && err.status === 401) {
+        logout();
+        router.push('/login');
+      } else {
+        setError('Failed to load analyses. Please make sure the backend is running.');
+      }
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [logout, router]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!isAuthenticated) {
+      router.push('/login');
+      return;
+    }
+    fetchData();
+  }, [authLoading, isAuthenticated, router, fetchData]);
 
   const handleAnalyzeResume = async (resumeId: string) => {
     try {
@@ -329,7 +343,7 @@ export default function AnalysisPage() {
                   </div>
                 ) : (
                   <div className="text-center py-8 text-zinc-500">
-                    <p>Click "Generate" to get AI suggestions</p>
+                    <p>Click &quot;Generate&quot; to get AI suggestions</p>
                   </div>
                 )}
               </div>

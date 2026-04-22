@@ -155,35 +155,35 @@ export { ApiError };
 
 // Analysis API
 export const analysisApi = {
-  list: () => api.get<Analysis[]>("/analysis"),
-  get: (analysisId: string) => api.get<Analysis>(`/analysis/${analysisId}`),
-  getByResume: (resumeId: string | number) => api.get<Analysis>(`/analysis/resume/${resumeId}`),
-  create: (data: AnalysisCreate) => api.post<Analysis>("/analysis", data),
-  update: (analysisId: string, data: AnalysisUpdate) => api.patch<Analysis>(`/analysis/${analysisId}`, data),
-  analyze: (resumeId: string | number) => api.post<Analysis>(`/analysis/resume/${resumeId}/analyze`),
+  list: () => api.get<Analysis[]>("/analysis/"),
+  get: (analysisId: string) => api.get<Analysis>(`/analysis/${analysisId}/`),
+  getByResume: (resumeId: string | number) => api.get<Analysis>(`/analysis/resume/${resumeId}/`),
+  create: (data: AnalysisCreate) => api.post<Analysis>("/analysis/", data),
+  update: (analysisId: string, data: AnalysisUpdate) => api.patch<Analysis>(`/analysis/${analysisId}/`, data),
+  analyze: (resumeId: string | number) => api.post<Analysis>(`/analysis/resume/${resumeId}/analyze/`),
   getSuggestions: (resumeId: string | number, focusArea?: string) => 
-    api.post<{ suggestions: string[] }>(`/analysis/resume/${resumeId}/suggestions`, { focus_area: focusArea }),
+    api.post<{ suggestions: string[] }>(`/analysis/resume/${resumeId}/suggestions/`, { focus_area: focusArea }),
 };
 
 // Analytics API
 export const analyticsApi = {
-  list: () => api.get<Analytics[]>("/analytics"),
-  create: (data: AnalyticsCreate) => api.post<Analytics>("/analytics", data),
-  getSummary: () => api.get<{ total_events: number; event_types: Record<string, number> }>("/analytics/summary"),
+  list: () => api.get<Analytics[]>("/analytics/"),
+  create: (data: AnalyticsCreate) => api.post<Analytics>("/analytics/", data),
+  getSummary: () => api.get<{ total_events: number; event_types: Record<string, number> }>("/analytics/summary/"),
 };
 
 // Resume API
 export const resumeApi = {
-  list: () => api.get<Resume[]>("/resumes"),
-  get: (resumeId: string | number) => api.get<Resume>(`/resumes/${resumeId}`),
-  create: (data: ResumeCreate) => api.post<Resume>("/resumes", data),
-  update: (resumeId: string | number, data: ResumeUpdate) => api.patch<Resume>(`/resumes/${resumeId}`, data),
-  delete: (resumeId: string | number) => api.delete<void>(`/resumes/${resumeId}`),
+  list: () => api.get<Resume[]>("/resumes/"),
+  get: (resumeId: string | number) => api.get<Resume>(`/resumes/${resumeId}/`),
+  create: (data: ResumeCreate) => api.post<Resume>("/resumes/", data),
+  update: (resumeId: string | number, data: ResumeUpdate) => api.patch<Resume>(`/resumes/${resumeId}/`, data),
+  delete: (resumeId: string | number) => api.delete<void>(`/resumes/${resumeId}/`),
   upload: async (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
     const token = getAuthToken();
-    const response = await fetch(`${API_BASE_URL}/resumes/upload`, {
+    const response = await fetch(`${API_BASE_URL}/resumes/upload/`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -200,17 +200,17 @@ export const resumeApi = {
 // Kanban API
 export const kanbanApi = {
   // Boards
-  listBoards: () => api.get<KanbanBoard[]>("/kanban/boards"),
-  getBoard: (boardId: string) => api.get<KanbanBoard>(`/kanban/boards/${boardId}`),
-  createBoard: (data: KanbanBoardCreate) => api.post<KanbanBoard>("/kanban/boards", data),
-  updateBoard: (boardId: string, data: KanbanBoardUpdate) => api.patch<KanbanBoard>(`/kanban/boards/${boardId}`, data),
+  listBoards: () => api.get<KanbanBoard[]>("/kanban/boards/"),
+  getBoard: (boardId: string) => api.get<KanbanBoard>(`/kanban/boards/${boardId}/`),
+  createBoard: (data: KanbanBoardCreate) => api.post<KanbanBoard>("/kanban/boards/", data),
+  updateBoard: (boardId: string, data: KanbanBoardUpdate) => api.patch<KanbanBoard>(`/kanban/boards/${boardId}/`, data),
   
   // Cards
-  listCards: (boardId: string) => api.get<KanbanCard[]>(`/kanban/boards/${boardId}/cards`),
-  getCard: (cardId: string) => api.get<KanbanCard>(`/kanban/cards/${cardId}`),
-  createCard: (boardId: string, data: KanbanCardCreate) => api.post<KanbanCard>(`/kanban/boards/${boardId}/cards`, data),
-  updateCard: (cardId: string, data: KanbanCardUpdate) => api.patch<KanbanCard>(`/kanban/cards/${cardId}`, data),
-  deleteCard: (cardId: string) => api.delete<void>(`/kanban/cards/${cardId}`),
+  listCards: (boardId: string) => api.get<KanbanCard[]>(`/kanban/boards/${boardId}/cards/`),
+  getCard: (cardId: string) => api.get<KanbanCard>(`/kanban/cards/${cardId}/`),
+  createCard: (boardId: string, data: KanbanCardCreate) => api.post<KanbanCard>(`/kanban/boards/${boardId}/cards/`, data),
+  updateCard: (cardId: string, data: KanbanCardUpdate) => api.patch<KanbanCard>(`/kanban/cards/${cardId}/`, data),
+  deleteCard: (cardId: string) => api.delete<void>(`/kanban/cards/${cardId}/`),
 };
 
 // Job Discovery API
@@ -223,27 +223,27 @@ export const jobApi = {
     if (params?.job_type) queryParams.job_type = params.job_type;
     if (params?.page) queryParams.page = params.page.toString();
     if (params?.limit) queryParams.limit = params.limit.toString();
-    return api.get<Job[]>("/jobs/search", queryParams);
+    return api.get<Job[]>("/jobs/search/", queryParams);
   },
-  getById: (jobId: string) => api.get<Job>(`/jobs/${jobId}`),
+  getById: (jobId: string) => api.get<Job>(`/jobs/${jobId}/`),
   getRecommendations: (resumeId?: number) => {
     const params: Record<string, string> = {};
     if (resumeId) params.resume_id = resumeId.toString();
-    return api.get<Job[]>("/jobs/recommendations", params);
+    return api.get<Job[]>("/jobs/recommendations/", params);
   },
-  matchWithResume: (jobId: string, resumeId: number) => api.post<Job>(`/jobs/${jobId}/match?resume_id=${resumeId}`, {}),
+  matchWithResume: (jobId: string, resumeId: number) => api.post<Job>(`/jobs/${jobId}/match/?resume_id=${resumeId}`, {}),
   addToKanban: (jobId: string, boardId: number, status?: string) =>
-    api.post<KanbanCard>(`/jobs/${jobId}/add-to-kanban?board_id=${boardId}&status=${status || 'todo'}`, {}),
+    api.post<KanbanCard>(`/jobs/${jobId}/add-to-kanban/?board_id=${boardId}&status=${status || 'todo'}`, {}),
 };
 
 // Interview API
 export const interviewApi = {
-  list: () => api.get<Interview[]>("/interviews"),
-  get: (interviewId: number) => api.get<Interview>(`/interviews/${interviewId}`),
-  create: (data: InterviewCreate) => api.post<Interview>("/interviews", data),
-  delete: (interviewId: number) => api.delete<void>(`/interviews/${interviewId}`),
-  complete: (interviewId: number) => api.post<{ message: string; interview: Interview }>(`/interviews/${interviewId}/complete`, {}),
+  list: () => api.get<Interview[]>("/interviews/"),
+  get: (interviewId: number) => api.get<Interview>(`/interviews/${interviewId}/`),
+  create: (data: InterviewCreate) => api.post<Interview>("/interviews/", data),
+  delete: (interviewId: number) => api.delete<void>(`/interviews/${interviewId}/`),
+  complete: (interviewId: number) => api.post<{ message: string; interview: Interview }>(`/interviews/${interviewId}/complete/`, {}),
   sendMessage: (interviewId: number, data: InterviewMessageCreate) =>
-    api.post<InterviewMessage>(`/interviews/${interviewId}/messages`, data),
-  getMessages: (interviewId: number) => api.get<InterviewMessage[]>(`/interviews/${interviewId}/messages`),
+    api.post<InterviewMessage>(`/interviews/${interviewId}/messages/`, data),
+  getMessages: (interviewId: number) => api.get<InterviewMessage[]>(`/interviews/${interviewId}/messages/`),
 };
