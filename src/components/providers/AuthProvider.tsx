@@ -6,11 +6,12 @@ import { setAuthToken } from "@/lib/api";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const fetchCurrentUser = useAuthStore((state: any) => state.fetchCurrentUser);
 
   useEffect(() => {
     setMounted(true);
-    
+
     // Sync token from localStorage/store to the API module on mount
     const syncToken = () => {
       // Try cookies first
@@ -31,12 +32,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    syncToken();
-    fetchCurrentUser();
+    const checkAuth = async () => {
+      syncToken();
+      await fetchCurrentUser();
+      setAuthChecked(true);
+    };
+
+    checkAuth();
   }, [fetchCurrentUser]);
 
-  if (!mounted) {
-    return <>{children}</>;
+  if (!mounted || !authChecked) {
+    // Show loading while checking authentication
+    return (
+      <div className="flex h-screen items-center justify-center bg-black text-white">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-zinc-500 text-sm">Checking authentication...</p>
+        </div>
+      </div>
+    );
   }
 
   return <>{children}</>;

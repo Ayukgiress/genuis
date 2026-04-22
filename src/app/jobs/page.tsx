@@ -1,14 +1,14 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { jobApi, resumeApi, analysisApi, ApiError } from '@/lib/api';
+import { jobApi, resumeApi, analysisApi, ApiError, getAuthToken } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import type { Job, Resume, Analysis } from '@/types';
 
 export default function JobsPage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, logout } = useAuth();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [resumes, setResumes] = useState<Resume[]>([]);
   const [selectedResume, setSelectedResume] = useState<Resume | null>(null);
@@ -24,41 +24,46 @@ export default function JobsPage() {
   const [jobType, setJobType] = useState('');
   const [page, setPage] = useState(1);
 
+  const fetchData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const resumesData = await resumeApi.list();
+      setResumes(resumesData);
+
+      if (resumesData.length > 0) {
+        setSelectedResume(resumesData[0]);
+      }
+
+      await getRecommendations();
+    } catch (err) {
+      console.error('Failed to fetch data:', err);
+      if (err instanceof ApiError && err.status === 401) {
+        logout();
+        router.push('/login');
+      } else {
+        setError('Failed to load data. Please make sure the backend is running.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, [logout, router]);
+
   useEffect(() => {
     if (authLoading) return;
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !getAuthToken()) {
       router.push('/login');
       return;
     }
     fetchData();
-  }, [isAuthenticated, authLoading, router]);
+  }, [authLoading, isAuthenticated, router, fetchData]);
 
   useEffect(() => {
     if (selectedResume) {
       fetchAnalysis(selectedResume.id);
     }
   }, [selectedResume]);
-
-  const fetchData = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      const resumesData = await resumeApi.list();
-      setResumes(resumesData);
-      
-      if (resumesData.length > 0) {
-        setSelectedResume(resumesData[0]);
-      }
-      
-      await getRecommendations();
-    } catch (err) {
-      console.error('Failed to fetch data:', err);
-      setError('Failed to load data. Please make sure the backend is running.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const fetchAnalysis = async (resumeId: number) => {
     try {
@@ -98,18 +103,21 @@ export default function JobsPage() {
     try {
       setIsLoading(true);
       setError(null);
-      
+
       let resumeId: number | undefined;
       if (selectedResume) {
         resumeId = selectedResume.id;
       }
-      
+
       const data = await jobApi.getRecommendations(resumeId);
       setJobs(data);
       setSuccess('Job recommendations loaded based on your profile!');
     } catch (err) {
       console.error('Failed to get recommendations:', err);
-      if (err instanceof ApiError) {
+      if (err instanceof ApiError && err.status === 401) {
+        logout();
+        router.push('/login');
+      } else if (err instanceof ApiError) {
         setError(err.message);
       } else {
         setError('Failed to get recommendations');

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { kanbanApi, ApiError } from '@/lib/api';
+import { kanbanApi, ApiError, getAuthToken } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import type { KanbanBoard, KanbanCard, KanbanColumnId } from '@/types';
 
@@ -54,7 +54,7 @@ export default function KanbanPage() {
 
   useEffect(() => {
     if (authLoading) return;
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !getAuthToken()) {
       router.push('/login');
       return;
     }

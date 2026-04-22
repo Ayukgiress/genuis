@@ -1,12 +1,14 @@
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { resumeApi, analysisApi, ApiError } from '@/lib/api';
+import { resumeApi, analysisApi, ApiError, getAuthToken } from '@/lib/api';
+import { useAuth } from '@/hooks/useAuth';
 import type { Resume, Analysis } from '@/types';
 
 export default function ResumesPage() {
   const router = useRouter();
+  const { isAuthenticated, isLoading: authLoading, logout } = useAuth();
   const [resumes, setResumes] = useState<Resume[]>([]);
   const [selectedResume, setSelectedResume] = useState<Resume | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
@@ -17,11 +19,7 @@ export default function ResumesPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    fetchResumes();
-  }, []);
-
-  const fetchResumes = async () => {
+  const fetchResumes = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
@@ -32,11 +30,25 @@ export default function ResumesPage() {
       }
     } catch (err) {
       console.error('Failed to fetch resumes:', err);
-      setError('Failed to load resumes. Please make sure the backend is running.');
+      if (err instanceof ApiError && err.status === 401) {
+        logout();
+        router.push('/login');
+      } else {
+        setError('Failed to load resumes. Please make sure the backend is running.');
+      }
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [logout, router, selectedResume]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!isAuthenticated || !getAuthToken()) {
+      router.push('/login');
+      return;
+    }
+    fetchResumes();
+  }, [authLoading, isAuthenticated, router, fetchResumes]);
 
   const fetchAnalysis = async (resumeId: string | number) => {
     try {

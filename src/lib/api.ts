@@ -26,12 +26,18 @@ export const setAuthToken = (token: string | null) => {
 };
 
 export const getAuthToken = (): string | null => {
-  if (authToken) return authToken;
-  
+  if (authToken) {
+    console.log('Returning in-memory token');
+    return authToken;
+  }
+
   if (typeof window !== "undefined") {
     // Check localStorage first
     const localToken = localStorage.getItem("auth_token");
-    if (localToken && localToken !== "null" && localToken !== "undefined") return localToken;
+    if (localToken && localToken !== "null" && localToken !== "undefined") {
+      console.log('Returning localStorage token');
+      return localToken;
+    }
 
     // Check persist storage as fallback
     try {
@@ -41,6 +47,7 @@ export const getAuthToken = (): string | null => {
         // Handle both possible structures (with or without .state)
         const token = parsed.state?.token || parsed.token;
         if (token && token !== "null" && token !== "undefined") {
+          console.log('Returning persist token');
           return token;
         }
       }
@@ -53,10 +60,12 @@ export const getAuthToken = (): string | null => {
     for (const cookie of cookies) {
       const [name, value] = cookie.trim().split('=');
       if (name === 'client_token' && value && value !== "null" && value !== "undefined") {
+        console.log('Returning cookie token');
         return value;
       }
     }
   }
+  console.log('No token found');
   return null;
 };
 
@@ -79,14 +88,15 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   const { params, ...fetchOptions } = options;
 
   let url = `${API_BASE_URL}${endpoint}`;
-  
+
   if (params) {
     const searchParams = new URLSearchParams(params);
     url += `?${searchParams.toString()}`;
   }
 
   const token = getAuthToken();
-  
+  console.log('🔑 Token check:', { endpoint, hasToken: !!token, tokenPreview: token?.substring(0, 10) });
+
   const headers: HeadersInit = {
     "Content-Type": "application/json",
     ...fetchOptions.headers,
@@ -95,6 +105,9 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   // Add authorization header if token exists
   if (token) {
     (headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
+    console.log(`Sending request to ${API_BASE_URL}${endpoint} with token: ${token.substring(0, 20)}...`);
+  } else {
+    console.log(`Sending request to ${API_BASE_URL}${endpoint} without token`);
   }
 
   const response = await fetch(url, {

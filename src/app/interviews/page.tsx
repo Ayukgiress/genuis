@@ -10,7 +10,7 @@ declare global {
   }
 }
 import { useRouter } from 'next/navigation';
-import { interviewApi, jobApi, kanbanApi, ApiError } from '@/lib/api';
+import { interviewApi, jobApi, kanbanApi, ApiError, getAuthToken } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import type { Interview, InterviewCreate, InterviewMessageCreate, InterviewMessage, Job } from '@/types';
 import '@/styles/interview.css';
@@ -69,9 +69,9 @@ export default function InterviewsPage() {
 
   useEffect(() => {
     if (authLoading) return;
-    if (!isAuthenticated) { router.push('/login'); return; }
+    if (!isAuthenticated || !getAuthToken()) { router.push('/login'); return; }
     fetchData();
-  }, [isAuthenticated, authLoading, router, fetchData]);
+  }, [authLoading, isAuthenticated, router, fetchData]);
 
   useEffect(() => {
     if (interviews.length > 0 && !selectedInterview) {

@@ -2,16 +2,17 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   trailingSlash: true,
-  experimental: {
-    turbo: {
-      noTurbopackDevWatcher: true,
-    },
-  } as any,
+  webpack: (config) => {
+    config.watchOptions = {
+      ignored: [/node_modules/, /\.next/],
+    };
+    return config;
+  },
   async rewrites() {
     return [
       {
         source: '/api/:path*',
-        destination: 'https://genius-backen.onrender.com/:path*',
+        destination: process.env.NEXT_PUBLIC_API_URL ? `${process.env.NEXT_PUBLIC_API_URL}/:path*` : 'https://genius-backen.onrender.com/:path*',
       },
     ];
   },

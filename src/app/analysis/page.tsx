@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { analysisApi, resumeApi, ApiError } from '@/lib/api';
+import { analysisApi, resumeApi, ApiError, getAuthToken } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import type { Analysis, Resume, FocusArea } from '@/types';
 
@@ -51,7 +51,7 @@ export default function AnalysisPage() {
 
   useEffect(() => {
     if (authLoading) return;
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !getAuthToken()) {
       router.push('/login');
       return;
     }

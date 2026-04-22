@@ -11,7 +11,7 @@ import {
   Tooltip,
   ResponsiveContainer
 } from 'recharts';
-import { analysisApi, analyticsApi, jobApi, kanbanApi, ApiError } from '@/lib/api';
+import { analysisApi, analyticsApi, jobApi, kanbanApi, ApiError, getAuthToken } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import type { Analysis, AnalyticsSummary, Job, KanbanBoard } from '@/types';
 import Link from 'next/link';
@@ -36,7 +36,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (authLoading) return;
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !getAuthToken()) {
       router.push('/login');
       return;
     }
@@ -44,10 +44,10 @@ export default function DashboardPage() {
     const fetchDashboardData = async () => {
       try {
         setIsLoading(true);
-        
+
         const analysesData = await analysisApi.list();
         setAnalyses(analysesData);
-        
+
         const summaryData = await analyticsApi.getSummary();
         setAnalyticsSummary(summaryData);
 
@@ -56,7 +56,7 @@ export default function DashboardPage() {
         if (boardsData.length > 0) {
           setSelectedBoard(boardsData[0].id);
         }
-        
+
       } catch (err) {
         console.error('Failed to fetch dashboard data:', err);
       } finally {
@@ -65,7 +65,7 @@ export default function DashboardPage() {
     };
 
     fetchDashboardData();
-  }, []);
+  }, [authLoading, isAuthenticated, router]);
 
   const fetchJobs = async () => {
     try {
@@ -87,12 +87,12 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (authLoading) return;
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !getAuthToken()) {
       router.push('/login');
       return;
     }
     fetchJobs();
-  }, [isAuthenticated, authLoading, router]);
+  }, [authLoading, isAuthenticated, router]);
 
   const handleAddToKanban = async (job: Job) => {
     if (!selectedBoard) {
