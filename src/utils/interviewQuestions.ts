@@ -1,8 +1,18 @@
 import type { Job } from "@/types";
 
 export function generateInterviewQuestions(job: Job): string[] {
+  if (!job || !job.title) {
+    return [
+      "Tell me about yourself and your professional background.",
+      "What interests you about this role?",
+      "What are your career goals?",
+      "Describe a challenge you've overcome.",
+      "What are your strengths and areas for improvement?"
+    ];
+  }
+
   const title = job.title.toLowerCase();
-  const requirements = job.requirements.join(' ').toLowerCase();
+  const requirements = Array.isArray(job.requirements) ? job.requirements.join(' ').toLowerCase() : '';
 
   const isSoftwareDev = title.includes('developer') || title.includes('engineer') || title.includes('programmer') || requirements.includes('programming');
   const isDataScience = title.includes('data') || title.includes('analyst') || title.includes('scientist') || requirements.includes('python') || requirements.includes('machine learning');
