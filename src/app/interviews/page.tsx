@@ -12,8 +12,11 @@ declare global {
 import { useRouter } from 'next/navigation';
 import { interviewApi, jobApi, kanbanApi, ApiError, getAuthToken } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
-import type { Interview, InterviewCreate, InterviewMessageCreate, InterviewMessage, Job } from '@/types';
+import type { Interview, InterviewMessageCreate, InterviewMessage, Job } from '@/types';
+import { generateInterviewQuestions, calculateInterviewRating } from '@/utils/interviewQuestions';
 import '@/styles/interview.css';
+
+
 
 export default function InterviewsPage() {
   const router = useRouter();
@@ -34,6 +37,14 @@ export default function InterviewsPage() {
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string>('');
+
+  // Structured interview state
+  const [isStructuredMode, setIsStructuredMode] = useState(false);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [interviewQuestions, setInterviewQuestions] = useState<string[]>([]);
+  const [isInterviewStarted, setIsInterviewStarted] = useState(false);
+  const [interviewRating, setInterviewRating] = useState<number | null>(null);
+  const [structuredResponses, setStructuredResponses] = useState<string[]>([]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -129,6 +140,14 @@ export default function InterviewsPage() {
   };
 
   const handleSendMessage = async () => {
+    if (isStructuredMode && isInterviewStarted) {
+      await handleStructuredResponse();
+    } else {
+      await handleChatMessage();
+    }
+  };
+
+  const handleChatMessage = async () => {
     if (!selectedInterview || !newMessage.trim()) return;
     try {
       setIsSending(true);
@@ -185,6 +204,78 @@ export default function InterviewsPage() {
   const selectInterview = async (interview: Interview) => {
     setSelectedInterview(interview);
     if (!interview.messages) await fetchInterviewMessages(interview.id);
+    // Reset structured interview state
+    setIsStructuredMode(false);
+    setCurrentQuestionIndex(0);
+    setInterviewQuestions([]);
+    setIsInterviewStarted(false);
+    setInterviewRating(null);
+    setStructuredResponses([]);
+  };
+
+  const startStructuredInterview = () => {
+    if (!selectedInterview) return;
+    const job = getJobDetails(selectedInterview.job_id);
+    if (!job) return;
+
+    const questions = generateInterviewQuestions(job);
+    setInterviewQuestions(questions);
+    setIsStructuredMode(true);
+    setCurrentQuestionIndex(0);
+    setIsInterviewStarted(true);
+    setInterviewRating(null);
+    setStructuredResponses([]);
+
+    // Ask first question
+    setTimeout(() => {
+      speakText(questions[0]);
+    }, 1000);
+  };
+
+  const handleStructuredResponse = async () => {
+    if (!selectedInterview || !newMessage.trim() || !isStructuredMode) return;
+
+    try {
+      setIsSending(true);
+      setError(null);
+
+      // Add user response to messages (without AI response since we're not calling backend)
+      const userMessage: InterviewMessage = {
+        id: Date.now(),
+        interview_id: selectedInterview.id,
+        role: 'user',
+        content: newMessage.trim(),
+        created_at: new Date().toISOString()
+      };
+      const tempInterview = { ...selectedInterview, messages: [...(selectedInterview.messages || []), userMessage] };
+      setSelectedInterview(tempInterview);
+
+      // Collect response for rating calculation
+      setStructuredResponses(prev => [...prev, newMessage.trim()]);
+
+      setNewMessage('');
+
+      // Move to next question or finish
+      const nextIndex = currentQuestionIndex + 1;
+      if (nextIndex < interviewQuestions.length) {
+        setCurrentQuestionIndex(nextIndex);
+        setTimeout(() => {
+          speakText(interviewQuestions[nextIndex]);
+        }, 1000);
+      } else {
+        // Interview finished, provide rating
+        setTimeout(() => {
+          const rating = calculateInterviewRating(structuredResponses);
+          setInterviewRating(rating);
+          speakText(`Thank you for completing the interview. Based on your responses, I would rate your performance as ${rating} out of 10. ${rating >= 8 ? 'Excellent work!' : rating >= 6 ? 'Good job!' : 'Keep practicing!'}`);
+        }, 1000);
+      }
+    } catch (err) {
+      console.error('Error in structured response:', err);
+      setError('Failed to process response');
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -358,6 +449,12 @@ export default function InterviewsPage() {
                   <div>
                     <h3 className="font-bold text-white text-sm">{getJobDetails(selectedInterview.job_id)?.title || 'Interview Session'}</h3>
                     <p className="mono text-zinc-500 text-[11px]">{getJobDetails(selectedInterview.job_id)?.company || 'Company'}</p>
+                    {isStructuredMode && isInterviewStarted && (
+                      <p className="mono text-zinc-400 text-[10px] mt-1">
+                        Question {currentQuestionIndex + 1} of {interviewQuestions.length}
+                        {interviewRating && ` • Rating: ${interviewRating}/10`}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -414,6 +511,39 @@ export default function InterviewsPage() {
               {/* Voice Controls */}
               {selectedInterview.status !== 'completed' && (
                 <div className="px-7 py-6 border-t border-zinc-800/50 bg-zinc-900/30">
+                  {/* Start Structured Interview Button */}
+                  {!isStructuredMode && !isInterviewStarted && (
+                    <div className="w-full mb-4">
+                      <button
+                        onClick={startStructuredInterview}
+                        className="w-full bg-gradient-to-r from-[#00F29C] to-[#00D4FF] text-black font-bold py-3 px-6 rounded-xl hover:opacity-90 transition-all text-sm tracking-wide shadow-lg"
+                      >
+                        Start Structured Interview
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Current Question Display */}
+                  {isStructuredMode && isInterviewStarted && !interviewRating && (
+                    <div className="w-full mb-4 p-4 bg-zinc-800/50 border border-zinc-700/50 rounded-xl">
+                      <p className="text-zinc-300 text-sm font-medium mb-2">Current Question:</p>
+                      <p className="text-white text-sm leading-relaxed">{interviewQuestions[currentQuestionIndex]}</p>
+                    </div>
+                  )}
+
+                  {/* Rating Display */}
+                  {interviewRating && (
+                    <div className="w-full mb-4 p-4 bg-[#00F29C]/10 border border-[#00F29C]/20 rounded-xl">
+                      <div className="flex items-center justify-center gap-3">
+                        <div className="text-2xl">⭐</div>
+                        <div className="text-center">
+                          <p className="text-[#00F29C] text-lg font-bold">Interview Complete!</p>
+                          <p className="text-zinc-300 text-sm">Your rating: {interviewRating}/10</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex flex-col items-center gap-4">
 
                     {/* Waveform when recording */}
@@ -469,7 +599,7 @@ export default function InterviewsPage() {
                     </div>
 
                     <p className="mono text-[10px] tracking-widest uppercase text-zinc-600">
-                      {isSending ? 'Processing...' : isRecording ? 'Listening — tap to stop' : 'Tap to speak'}
+                      {isSending ? 'Processing...' : isRecording ? 'Listening — tap to stop' : isStructuredMode && isInterviewStarted && !interviewRating ? 'Answer the question' : 'Tap to speak'}
                     </p>
 
                     {newMessage && !isRecording && (
