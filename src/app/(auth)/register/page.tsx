@@ -77,10 +77,10 @@ function RegisterForm() {
               <p className="text-zinc-500 text-sm">Your email has been verified successfully. You can now login to your account.</p>
             </div>
             <button
-              onClick={() => router.push("/login")}
+              onClick={() => router.push("/plans")}
               className="w-full py-4 rounded-full bg-primary text-black font-bold text-sm hover:opacity-90 transition-all shadow-[0_0_20px_rgba(0,242,156,0.2)]"
             >
-              Sign In to Dashboard
+              Choose Your Plan
             </button>
           </div>
         </div>

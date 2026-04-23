@@ -3,6 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useAuthStore } from '@/store/auth-store';
 
 const navItems = [
   { 
@@ -75,6 +76,7 @@ const navItems = [
 
 export const Sidebar = () => {
   const pathname = usePathname();
+  const { user } = useAuthStore();
 
   return (
     <aside className="w-64 bg-black border-r border-zinc-800 flex flex-col h-screen fixed left-0 top-0">
@@ -113,17 +115,37 @@ export const Sidebar = () => {
       </nav>
 
       <div className="p-4 border-t border-zinc-800">
-        <div className="p-4 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-4">
-          <div className="space-y-1">
-            <h3 className="text-sm font-bold text-white">Upgrade to Premium</h3>
-            <p className="text-[10px] text-zinc-500 leading-relaxed">
-              Get advanced AI resume matching and tracking.
-            </p>
+        {user?.subscription_plan !== 'pro' && (
+          <div className="p-4 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-4">
+            <div className="space-y-1">
+              <h3 className="text-sm font-bold text-white">Upgrade to Pro</h3>
+              <p className="text-[10px] text-zinc-500 leading-relaxed">
+                Unlock unlimited AI optimizations and premium features.
+              </p>
+            </div>
+            <Link href="/payment?plan=pro">
+              <button className="w-full py-2.5 rounded-xl bg-primary text-black font-bold text-xs hover:opacity-90 transition-all">
+                Upgrade Now
+              </button>
+            </Link>
           </div>
-          <button className="w-full py-2.5 rounded-xl bg-primary text-black font-bold text-xs hover:opacity-90 transition-all">
-            Upgrade Now
-          </button>
-        </div>
+        )}
+
+        {user?.subscription_plan === 'pro' && (
+          <div className="p-4 rounded-2xl bg-primary/10 border border-primary/20">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+                <svg viewBox="0 0 24 24" className="w-4 h-4 text-black" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-primary">Pro Plan Active</h3>
+                <p className="text-[10px] text-zinc-400">Enjoy all premium features</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="mt-6 flex items-center gap-3 px-2">
           <div className="w-10 h-10 rounded-full bg-zinc-800 overflow-hidden border border-zinc-700">

@@ -21,6 +21,7 @@ interface AuthState {
   loginWithGoogle: () => Promise<void>;
   handleGoogleCallback: (code: string) => Promise<void>;
   setShowVerificationMessage: (show: boolean) => void;
+  getRedirectPath: () => string;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -216,6 +217,19 @@ export const useAuthStore = create<AuthState>()(
           setAuthToken(null);
           set({ user: null, token: null, isAuthenticated: false, isLoading: false });
         }
+      },
+
+      getRedirectPath: () => {
+        const user = get().user;
+        if (!user) return '/login';
+
+        // If user doesn't have a subscription plan set, redirect to plans
+        if (!user.subscription_plan) {
+          return '/plans';
+        }
+
+        // Otherwise, go to dashboard
+        return '/dashboard';
       },
 
       clearError: () => set({ error: null }),

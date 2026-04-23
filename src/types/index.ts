@@ -35,6 +35,9 @@ export interface AuthUser {
   name?: string;
   is_verified?: boolean;
   created_at?: string;
+  subscription_plan?: 'free' | 'pro';
+  subscription_status?: 'active' | 'inactive' | 'past_due' | 'cancelled';
+  stripe_customer_id?: string;
 }
 
 // Email verification

@@ -7,7 +7,7 @@ import { useAuthStore } from "@/store/auth-store";
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { isAuthenticated, isLoading, error, login, clearError, loginWithGoogle, handleGoogleCallback } = useAuthStore();
+  const { isAuthenticated, isLoading, error, login, clearError, loginWithGoogle, handleGoogleCallback, getRedirectPath } = useAuthStore();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [formError, setFormError] = useState("");
@@ -21,9 +21,10 @@ function LoginForm() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      router.push("/dashboard");
+      const redirectPath = getRedirectPath();
+      router.push(redirectPath);
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, router, getRedirectPath]);
 
   useEffect(() => {
     return () => clearError();

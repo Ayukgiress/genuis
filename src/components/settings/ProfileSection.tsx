@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import * as Icons from '@radix-ui/react-icons';
 import { useAuthStore } from '@/store/auth-store';
 import { api, ApiError } from '@/lib/api';
+import Link from 'next/link';
 
 export const ProfileSection = () => {
   const { user, fetchCurrentUser } = useAuthStore();
@@ -129,6 +130,55 @@ export const ProfileSection = () => {
             className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl py-3 px-4 text-sm text-zinc-300 focus:outline-none focus:border-zinc-700 transition-all resize-none"
             placeholder="Tell recruiters about yourself..."
           />
+        </div>
+
+        {/* Subscription Section */}
+        <div className="space-y-4 pt-6 border-t border-zinc-800">
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="text-sm font-bold text-white">Subscription Plan</h3>
+              <p className="text-xs text-zinc-500">Manage your subscription</p>
+            </div>
+            <div className={`px-3 py-1 rounded-full text-xs font-bold ${
+              user?.subscription_plan === 'pro'
+                ? 'bg-primary text-black'
+                : 'bg-zinc-800 text-zinc-400'
+            }`}>
+              {user?.subscription_plan === 'pro' ? 'Pro Plan' : 'Free Plan'}
+            </div>
+          </div>
+
+          {user?.subscription_plan !== 'pro' && (
+            <div className="p-4 rounded-xl bg-zinc-900/50 border border-zinc-800">
+              <div className="flex justify-between items-start">
+                <div className="space-y-1">
+                  <h4 className="text-sm font-bold text-white">Upgrade to Pro</h4>
+                  <p className="text-xs text-zinc-500">Unlock all premium features for $19/month</p>
+                </div>
+                <Link href="/payment?plan=pro">
+                  <button className="px-4 py-2 bg-primary text-black font-bold text-xs rounded-lg hover:opacity-90 transition-all">
+                    Upgrade
+                  </button>
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {user?.subscription_plan === 'pro' && (
+            <div className="p-4 rounded-xl bg-primary/10 border border-primary/20">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+                  <svg viewBox="0 0 24 24" className="w-4 h-4 text-black" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-primary">Pro Plan Active</h4>
+                  <p className="text-xs text-zinc-400">Your subscription is active and auto-renews</p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
