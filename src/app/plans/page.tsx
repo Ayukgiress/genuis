@@ -2,12 +2,12 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuthStore } from '@/store/auth-store';
 import Link from 'next/link';
 
 export default function PlansPage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, setIsNewUser } = useAuthStore();
 
   React.useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -16,6 +16,9 @@ export default function PlansPage() {
   }, [isAuthenticated, isLoading, router]);
 
   const handleSelectPlan = (plan: 'free' | 'pro') => {
+    // Clear new user flag since they've chosen a plan
+    setIsNewUser(false);
+
     if (plan === 'free') {
       router.push('/dashboard');
     } else {

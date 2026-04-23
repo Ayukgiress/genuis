@@ -11,6 +11,7 @@ interface AuthState {
   error: string | null;
   isEmailVerified: boolean;
   showVerificationMessage: boolean;
+  isNewUser: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   register: (name: string, email: string, password: string) => Promise<void>;
@@ -21,6 +22,7 @@ interface AuthState {
   loginWithGoogle: () => Promise<void>;
   handleGoogleCallback: (code: string) => Promise<void>;
   setShowVerificationMessage: (show: boolean) => void;
+  setIsNewUser: (isNew: boolean) => void;
   getRedirectPath: () => string;
 }
 
@@ -34,6 +36,7 @@ export const useAuthStore = create<AuthState>()(
       error: null,
       isEmailVerified: false,
       showVerificationMessage: false,
+      isNewUser: false,
 
       login: async (email: string, password: string) => {
         set({ isLoading: true, error: null });
@@ -49,7 +52,7 @@ export const useAuthStore = create<AuthState>()(
 
           // Store token
           setAuthToken(tokenData.access_token);
-          set({ token: tokenData.access_token, isAuthenticated: true });
+          set({ token: tokenData.access_token, isAuthenticated: true, isNewUser: false });
 
           // Fetch current user
           await get().fetchCurrentUser();
@@ -73,6 +76,7 @@ export const useAuthStore = create<AuthState>()(
           error: null,
           isEmailVerified: false,
           showVerificationMessage: false,
+          isNewUser: false,
         });
       },
 
@@ -85,17 +89,20 @@ export const useAuthStore = create<AuthState>()(
             name,
           } as UserCreate);
 
+          // Mark as new user for plan selection
+          set({ isNewUser: true });
+
           // Show verification message instead of auto-login
-          set({ 
-            isLoading: false, 
+          set({
+            isLoading: false,
             showVerificationMessage: true,
-            isEmailVerified: false 
+            isEmailVerified: false
           });
         } catch (error) {
-          const message = error instanceof ApiError 
-            ? error.message 
-            : error instanceof Error 
-              ? error.message 
+          const message = error instanceof ApiError
+            ? error.message
+            : error instanceof Error
+              ? error.message
               : "Registration failed";
           set({ error: message, isLoading: false });
           throw error;
@@ -180,11 +187,12 @@ export const useAuthStore = create<AuthState>()(
 
           // Store token
           setAuthToken(response.access_token);
-          set({ 
-            token: response.access_token, 
-            isAuthenticated: true, 
+          set({
+            token: response.access_token,
+            isAuthenticated: true,
             user: response.user,
-            isLoading: false 
+            isNewUser: false,
+            isLoading: false
           });
         } catch (error) {
           const message = error instanceof ApiError 
@@ -220,11 +228,11 @@ export const useAuthStore = create<AuthState>()(
       },
 
       getRedirectPath: () => {
-        const user = get().user;
+        const { user, isNewUser } = get();
         if (!user) return '/login';
 
-        // If user doesn't have a subscription plan set, redirect to plans
-        if (!user.subscription_plan) {
+        // Only redirect new users to plans if they don't have a subscription plan
+        if (isNewUser && !user.subscription_plan) {
           return '/plans';
         }
 
@@ -233,6 +241,8 @@ export const useAuthStore = create<AuthState>()(
       },
 
       clearError: () => set({ error: null }),
+
+      setIsNewUser: (isNew: boolean) => set({ isNewUser: isNew }),
     }),
     {
       name: "auth-storage",
