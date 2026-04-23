@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
-import { api, ApiError } from '@/lib/api';
+import { getAuthToken, ApiError } from '@/lib/api';
 
 export default function PaymentPage() {
   const router = useRouter();
@@ -25,10 +25,34 @@ export default function PaymentPage() {
       setIsProcessing(true);
       setError(null);
 
-      const response = await api.post<{ checkout_url: string }>('/payment/create-checkout-session', {});
+      const API_BASE = process.env.NEXT_PUBLIC_API_URL;
+      const token = getAuthToken();
+      const response = await fetch(`${API_BASE}/api/payment/create-checkout-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({}),
+      });
+
+      if (!response.ok) {
+        let errorMessage = 'Failed to create checkout session';
+        try {
+          const errorData = await response.json();
+          if (errorData.detail) {
+            errorMessage = errorData.detail;
+          }
+        } catch {
+          // Ignore
+        }
+        throw new ApiError(errorMessage, response.status, response.statusText);
+      }
+
+      const data = await response.json();
 
       // Redirect to Stripe Checkout
-      window.location.href = response.checkout_url;
+      window.location.href = data.checkout_url;
     } catch (err) {
       console.error('Failed to create checkout session:', err);
       if (err instanceof ApiError) {
