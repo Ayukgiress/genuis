@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   AreaChart,
@@ -25,6 +25,7 @@ export default function DashboardPage() {
   const [analyticsSummary, setAnalyticsSummary] = useState<AnalyticsSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [dataLoaded, setDataLoaded] = useState(false);
   
   // Job Discovery state
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -41,33 +42,60 @@ export default function DashboardPage() {
       return;
     }
 
+    // Set a timeout to prevent infinite loading
+    const timeout = setTimeout(() => {
+      console.log('Dashboard data loading timeout, showing dashboard anyway');
+      setIsLoading(false);
+      setDataLoaded(true);
+    }, 10000); // 10 second timeout
+
     const fetchDashboardData = async () => {
       try {
         setIsLoading(true);
+        setError(null);
 
-        const analysesData = await analysisApi.list();
-        setAnalyses(analysesData);
+        // Use Promise.allSettled to prevent one failing API call from blocking others
+        const [analysesResult, summaryResult, boardsResult] = await Promise.allSettled([
+          analysisApi.list(),
+          analyticsApi.getSummary(),
+          kanbanApi.listBoards()
+        ]);
 
-        const summaryData = await analyticsApi.getSummary();
-        setAnalyticsSummary(summaryData);
-
-        const boardsData = await kanbanApi.listBoards();
-        setBoards(boardsData);
-        if (boardsData.length > 0) {
-          setSelectedBoard(boardsData[0].id);
+        if (analysesResult.status === 'fulfilled') {
+          setAnalyses(analysesResult.value);
         }
 
+        if (summaryResult.status === 'fulfilled') {
+          setAnalyticsSummary(summaryResult.value);
+        }
+
+        if (boardsResult.status === 'fulfilled') {
+          setBoards(boardsResult.value);
+          if (boardsResult.value.length > 0) {
+            setSelectedBoard(boardsResult.value[0].id);
+          }
+        }
+
+        setDataLoaded(true);
+        clearTimeout(timeout);
       } catch (err) {
         console.error('Failed to fetch dashboard data:', err);
+        clearTimeout(timeout);
+        // Don't set error for auth issues, just show empty dashboard
+        if (!(err instanceof ApiError && (err.status === 401 || err.status === 403))) {
+          setError('Failed to load some dashboard data. Please try refreshing the page.');
+        }
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchDashboardData();
+
+    return () => clearTimeout(timeout);
   }, [authLoading, isAuthenticated, router]);
 
-  const fetchJobs = async () => {
+  const fetchJobs = useCallback(async () => {
     try {
       setIsLoadingJobs(true);
       const jobsData = await jobApi.search({
@@ -80,10 +108,14 @@ export default function DashboardPage() {
     } catch (err) {
       console.error('Failed to fetch jobs:', err);
       setJobs([]);
+      // If jobs fetch fails due to auth, don't show error since dashboard might still work
+      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+        console.log('Jobs fetch failed due to auth, but continuing...');
+      }
     } finally {
       setIsLoadingJobs(false);
     }
-  };
+  }, [searchQuery, jobFilters.remote, jobFilters.location]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -91,8 +123,9 @@ export default function DashboardPage() {
       router.push('/login');
       return;
     }
+
     fetchJobs();
-  }, [authLoading, isAuthenticated, router]);
+  }, [authLoading, isAuthenticated, router, fetchJobs]);
 
   const handleAddToKanban = async (job: Job) => {
     if (!selectedBoard) {
@@ -221,12 +254,36 @@ export default function DashboardPage() {
     { label: 'APPLYING', value: Math.floor(completedAnalyses * 0.5), percentage: totalAnalyses > 0 ? Math.floor((completedAnalyses / totalAnalyses) * 50) : 0 },
   ];
 
-  if (isLoading) {
+  if (isLoading && !dataLoaded) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="flex flex-col items-center gap-4">
           <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
           <p className="text-zinc-500 text-sm">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center">
+            <svg viewBox="0 0 24 24" className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="15" y1="9" x2="9" y2="15" />
+              <line x1="9" y1="9" x2="15" y2="15" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-bold text-white mb-2">Something went wrong</h2>
+          <p className="text-zinc-400 mb-6">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-6 py-3 bg-primary text-black font-bold rounded-xl hover:opacity-90 transition-all"
+          >
+            Try Again
+          </button>
         </div>
       </div>
     );

@@ -14,19 +14,50 @@ export default function PaymentSuccessPage() {
   const sessionId = searchParams.get('session_id');
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    if (isLoading) return;
+
+    if (!isAuthenticated) {
       router.push('/login');
       return;
     }
 
-    if (sessionId && isAuthenticated) {
-      // Refresh user data to get updated subscription status
-      fetchCurrentUser().then(() => {
-        setIsVerifying(false);
-      });
-    } else {
+    // Set a timeout to prevent infinite loading
+    const timeout = setTimeout(() => {
+      console.log('Payment verification timeout, proceeding to dashboard');
       setIsVerifying(false);
+      router.push('/dashboard');
+    }, 10000); // 10 second timeout
+
+    if (sessionId) {
+      // Refresh user data to get updated subscription status
+      fetchCurrentUser()
+        .then(() => {
+          clearTimeout(timeout);
+          setIsVerifying(false);
+          // Auto-redirect to dashboard after verification
+          setTimeout(() => {
+            router.push('/dashboard');
+          }, 2000);
+        })
+        .catch((error) => {
+          console.error('Failed to refresh user data:', error);
+          clearTimeout(timeout);
+          // Still proceed even if refresh fails
+          setIsVerifying(false);
+          setTimeout(() => {
+            router.push('/dashboard');
+          }, 2000);
+        });
+    } else {
+      // No session ID, just proceed
+      clearTimeout(timeout);
+      setIsVerifying(false);
+      setTimeout(() => {
+        router.push('/dashboard');
+      }, 2000);
     }
+
+    return () => clearTimeout(timeout);
   }, [isAuthenticated, isLoading, router, sessionId, fetchCurrentUser]);
 
   if (isLoading || isVerifying) {

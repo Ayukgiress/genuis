@@ -115,7 +115,7 @@ export const Sidebar = () => {
       </nav>
 
       <div className="p-4 border-t border-zinc-800">
-        {user?.subscription_plan !== 'pro' && (
+        {user?.subscription_plan !== 'pro' || user?.subscription_status !== 'active' ? (
           <div className="p-4 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-4">
             <div className="space-y-1">
               <h3 className="text-sm font-bold text-white">Upgrade to Pro</h3>
@@ -129,9 +129,7 @@ export const Sidebar = () => {
               </button>
             </Link>
           </div>
-        )}
-
-        {user?.subscription_plan === 'pro' && (
+        ) : (
           <div className="p-4 rounded-2xl bg-primary/10 border border-primary/20">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
