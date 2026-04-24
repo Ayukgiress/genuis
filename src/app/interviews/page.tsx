@@ -33,6 +33,7 @@ export default function InterviewsPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [isRecording, setIsRecording] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -133,58 +134,82 @@ export default function InterviewsPage() {
         recognitionRef.current.lang = 'en-US';
 
         let finalTranscript = '';
+        let silenceSendTimer: NodeJS.Timeout | null = null;
 
-        recognitionRef.current.onresult = async (event: any) => {
-          let interimTranscript = '';
+        recognitionRef.current.onresult = (event: any) => {
+          let interim = '';
           for (let i = event.resultIndex; i < event.results.length; i++) {
-            const transcript = event.results[i][0].transcript;
+            const t = event.results[i][0].transcript;
             if (event.results[i].isFinal) {
-              finalTranscript += transcript;
+              finalTranscript += t;
             } else {
-              interimTranscript += transcript;
+              interim += t;
             }
           }
 
-          // Reset silence timeout on speech activity
-          if (silenceTimeoutRef.current) {
-            clearTimeout(silenceTimeoutRef.current);
-            silenceTimeoutRef.current = setTimeout(() => {
-              if (recognitionRef.current && isRecording) {
-                recognitionRef.current.stop();
+          // Show live transcript
+          setNewMessage(finalTranscript + interim);
+
+          // Clear previous silence timer
+          if (silenceSendTimer) clearTimeout(silenceSendTimer);
+
+          // Auto-send after 1.8s of silence
+          if (finalTranscript.trim()) {
+            silenceSendTimer = setTimeout(async () => {
+              const msg = finalTranscript.trim();
+              if (!msg) return;
+
+              finalTranscript = '';
+              setNewMessage('');
+
+              if (recognitionRef.current) {
+                try { recognitionRef.current.stop(); } catch (e) {}
               }
-            }, 30000);
-          }
+              setIsRecording(false);
 
-          // Update UI with interim results
-          setNewMessage(finalTranscript + interimTranscript);
+              // Inject message and call AI
+              const userMessage: InterviewMessage = {
+                id: Date.now(),
+                interview_id: selectedInterview!.id,
+                role: 'user',
+                content: msg,
+                created_at: new Date().toISOString()
+              };
 
-          // Auto-send when final result is received
-          if (event.results[event.results.length - 1].isFinal && finalTranscript.trim()) {
-            const messageToSend = finalTranscript.trim();
-            setNewMessage(''); // Clear input immediately
-            finalTranscript = ''; // Reset for next utterance
-            setIsRecording(false); // Temporarily stop recording while processing
+              setSelectedInterview(prev => prev
+                ? { ...prev, messages: [...(prev.messages || []), userMessage] }
+                : prev
+              );
 
-            // Clear silence timeout during processing
-            if (silenceTimeoutRef.current) {
-              clearTimeout(silenceTimeoutRef.current);
-              silenceTimeoutRef.current = null;
-            }
+              try {
+                setIsSending(true);
+                const aiMessage = await interviewApi.sendMessage(
+                  selectedInterview!.id,
+                  { role: 'user', content: msg }
+                );
 
-            // Simulate sending the message
-            try {
-              setNewMessage(messageToSend); // Set the final message
-              await handleSendMessage(); // Send it
-            } catch (error) {
-              console.error('Error sending message:', error);
-            } finally {
-              // Restart recording after sending
-              setTimeout(() => {
-                if (recognitionRef.current && !isSocketConnected) {
-                  startRecording();
+                setSelectedInterview(prev => {
+                  if (!prev) return prev;
+                  return { ...prev, messages: [...(prev.messages || []), aiMessage] };
+                });
+
+                if (aiMessage.content?.includes('[INTERVIEW_COMPLETE]')) {
+                  const clean = aiMessage.content.replace('[INTERVIEW_COMPLETE]', '').trim();
+                  aiMessage.content = clean;
+                  await speakTextAndWait(clean);
+                  await handleCompleteInterview(selectedInterview!.id);
+                  setIsInterviewStarted(false);
+                  return;
                 }
-              }, 1000); // Brief pause before restarting
-            }
+
+                await speakTextAndWait(aiMessage.content);
+                setTimeout(() => startRecording(), 300);
+              } catch (e) {
+                setError('Failed to send message');
+              } finally {
+                setIsSending(false);
+              }
+            }, 1800);
           }
         };
 
@@ -253,6 +278,7 @@ export default function InterviewsPage() {
     try {
       setIsSending(true);
       setError(null);
+
       const userMessage: InterviewMessage = {
         id: Date.now(),
         interview_id: selectedInterview.id,
@@ -260,18 +286,53 @@ export default function InterviewsPage() {
         content: newMessage.trim(),
         created_at: new Date().toISOString()
       };
-      const tempInterview = { ...selectedInterview, messages: [...(selectedInterview.messages || []), userMessage] };
+
+      const tempInterview = {
+        ...selectedInterview,
+        messages: [...(selectedInterview.messages || []), userMessage]
+      };
       setSelectedInterview(tempInterview);
-      const aiMessage = await interviewApi.sendMessage(selectedInterview.id, { role: 'user', content: newMessage.trim() });
-      const finalInterview = { ...tempInterview, messages: [...tempInterview.messages, aiMessage] };
-      setSelectedInterview(finalInterview);
-      setInterviews(prev => prev.map(int => int.id === selectedInterview.id ? finalInterview : int));
       setNewMessage('');
-      if (aiMessage.content) speakText(aiMessage.content);
+
+      // Stop mic while AI is responding
+      if (recognitionRef.current && isRecording) {
+        recognitionRef.current.stop();
+        setIsRecording(false);
+      }
+
+      const aiMessage = await interviewApi.sendMessage(
+        selectedInterview.id,
+        { role: 'user', content: userMessage.content }
+      );
+
+      const finalInterview = {
+        ...tempInterview,
+        messages: [...tempInterview.messages, aiMessage]
+      };
+      setSelectedInterview(finalInterview);
+      setInterviews(prev =>
+        prev.map(int => int.id === selectedInterview.id ? finalInterview : int)
+      );
+
+      // Check if AI is ending the interview
+      if (aiMessage.content?.includes('[INTERVIEW_COMPLETE]')) {
+        const cleanContent = aiMessage.content.replace('[INTERVIEW_COMPLETE]', '').trim();
+        aiMessage.content = cleanContent;
+        await speakTextAndWait(cleanContent);
+        await handleCompleteInterview(selectedInterview.id);
+        setIsInterviewStarted(false);
+        return;
+      }
+
+      // Speak AI response then restart mic
+      await speakTextAndWait(aiMessage.content);
+      if (isInterviewStarted) {
+        setTimeout(() => startRecording(), 300);
+      }
+
     } catch (err) {
       if (err instanceof ApiError) setError(err.message);
       else setError('Failed to send message');
-      setSelectedInterview(selectedInterview);
     } finally {
       setIsSending(false);
     }
@@ -327,23 +388,46 @@ export default function InterviewsPage() {
     }
   };
 
-  const startStructuredInterview = () => {
+  const startStructuredInterview = async () => {
     if (!selectedInterview) return;
-    const job = getJobDetails(selectedInterview.job_id);
-    if (!job) return;
 
-    const questions = generateInterviewQuestions(job);
-    setInterviewQuestions(questions);
-    setIsStructuredMode(true);
-    setCurrentQuestionIndex(0);
     setIsInterviewStarted(true);
-    setInterviewRating(null);
-    setStructuredResponses([]);
+    setIsStructuredMode(false); // use chat mode, AI controls questions
+    setNewMessage('');
 
-    // Ask first question
-    setTimeout(() => {
-      speakText(questions[0]);
-    }, 1000);
+    // Send a hidden trigger message to start the interview
+    try {
+      setIsSending(true);
+
+      const triggerMessage: InterviewMessage = {
+        id: Date.now(),
+        interview_id: selectedInterview.id,
+        role: 'user',
+        content: '__START_INTERVIEW__',
+        created_at: new Date().toISOString()
+      };
+
+      const aiMessage = await interviewApi.sendMessage(
+        selectedInterview.id,
+        { role: 'user', content: '__START_INTERVIEW__' }
+      );
+
+      const updatedInterview = {
+        ...selectedInterview,
+        messages: [...(selectedInterview.messages || []), aiMessage]
+      };
+      setSelectedInterview(updatedInterview);
+      setInterviews(prev =>
+        prev.map(int => int.id === selectedInterview.id ? updatedInterview : int)
+      );
+
+      await speakTextAndWait(aiMessage.content);
+      startRecording(); // mic on after greeting
+    } catch (err) {
+      setError('Failed to start interview');
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const handleStructuredResponse = async () => {
@@ -435,15 +519,26 @@ export default function InterviewsPage() {
     }
   };
 
-  const speakText = (text: string) => {
-    if (typeof window !== 'undefined' && window.speechSynthesis) {
+  const speakTextAndWait = (text: string): Promise<void> => {
+    return new Promise((resolve) => {
+      if (typeof window === 'undefined' || !window.speechSynthesis) {
+        resolve();
+        return;
+      }
+      window.speechSynthesis.cancel();
+      setIsSpeaking(true);
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = 'en-US';
       utterance.rate = 0.9;
       utterance.pitch = 1;
+      utterance.onend = () => { setIsSpeaking(false); resolve(); };
+      utterance.onerror = () => { setIsSpeaking(false); resolve(); };
       window.speechSynthesis.speak(utterance);
-    }
+    });
   };
+
+  // Keep old one for non-blocking calls
+  const speakText = (text: string) => { speakTextAndWait(text); };
 
   const getJobDetails = (jobId: number) => jobs.find(job => job.id === jobId.toString());
 
@@ -649,110 +744,46 @@ export default function InterviewsPage() {
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* Voice Controls */}
-              {selectedInterview.status !== 'completed' && (
-                <div className="px-7 py-6 border-t border-zinc-800/50 bg-zinc-900/30">
-                  <div className="flex flex-col items-center gap-4">
+              {/* Start Interview Button - shown before interview starts */}
+              {!isInterviewStarted && selectedInterview.status !== 'completed' && (
+                <div className="px-7 py-6 border-t border-zinc-800/50 flex justify-center">
+                  <button
+                    onClick={startStructuredInterview}
+                    disabled={isSending}
+                    className="px-10 py-4 bg-[#00F29C] text-black font-bold rounded-2xl text-sm tracking-wide glow-btn disabled:opacity-40"
+                  >
+                    {isSending ? 'Starting...' : '▶ Start Interview'}
+                  </button>
+                </div>
+              )}
 
-                    {/* Waveform / Status display */}
-                    {(isRecording || isSocketListening || isSocketSpeaking) && (
-                      <div className="flex gap-1 items-end h-8">
-                        {[...Array(12)].map((_, i) => (
-                          <div
-                            key={i}
-                            className="waveform-bar"
-                            style={{
-                              height: isSocketSpeaking 
-                                ? `${Math.random() * 24 + 8}px` 
-                                : isSocketListening 
-                                ? `${Math.random() * 12 + 4}px` 
-                                : `${Math.random() * 16 + 8}px`,
-                              animationDelay: `${i * 0.1}s`,
-                              backgroundColor: isSocketSpeaking ? '#00D4FF' : '#00F29C',
-                              animationDuration: `${0.8 + Math.random() * 0.4}s`
-                            }}
-                          />
+              {/* Live interview controls - only shown after start */}
+              {isInterviewStarted && selectedInterview.status !== 'completed' && (
+                <div className="px-7 py-5 border-t border-zinc-800/50 bg-zinc-900/30">
+                  <div className="flex flex-col items-center gap-3">
+
+                    {/* Waveform */}
+                    {(isRecording || isSpeaking) && (
+                      <div className="flex gap-1 items-end h-7">
+                        {[...Array(10)].map((_, i) => (
+                          <div key={i} className="waveform-bar"
+                            style={{ height: `${Math.random() * 20 + 6}px`, animationDelay: `${i * 0.1}s` }} />
                         ))}
                       </div>
                     )}
 
-                    <div className="flex items-center gap-6">
-                       {/* Continuous Mic Button */}
-                       {!isSocketConnected && (
-                         <button
-                           onClick={isRecording ? stopRecording : startRecording}
-                           className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
-                             isRecording ? 'bg-[#00F29C] text-black animate-pulse' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
-                           }`}
-                         >
-                           <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2">
-                             <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-                             <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
-                           </svg>
-                         </button>
-                       )}
+                    {/* Status */}
+                    <p className="mono text-[10px] tracking-widest uppercase text-zinc-500">
+                      {isSending ? 'AI is thinking...' :
+                       isRecording ? '🎙 Listening — speak now' :
+                       'Waiting...'}
+                    </p>
 
-                      {/* Speech-to-Speech Toggle Button */}
-                      <div className="relative">
-                        {(isSocketListening || isSocketSpeaking) && (
-                          <>
-                            <div className="mic-ring" style={{ '--opacity': 0.8 } as any} />
-                            <div className="mic-ring" style={{ '--opacity': 0.5 } as any} />
-                          </>
-                        )}
-                        <button
-                          onClick={toggleSpeechMode}
-                          className={`relative z-10 w-20 h-20 rounded-full font-bold transition-all flex flex-col items-center justify-center gap-1 ${
-                            isSocketConnected
-                              ? 'bg-[#00F29C] text-black scale-110 shadow-[0_0_30px_rgba(0,242,156,0.4)]'
-                              : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 border border-zinc-700'
-                          }`}
-                        >
-                          <svg viewBox="0 0 24 24" className="w-8 h-8" fill="currentColor">
-                            <path d="M12 3v18M3 12h18M5 16.5a8.5 8.5 0 0 1 14 0M7.5 14a4.5 4.5 0 0 1 9 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
-                          </svg>
-                          <span className="text-[8px] uppercase tracking-tighter font-black">
-                            {isSocketConnected ? 'LIVE' : 'S2S'}
-                          </span>
-                        </button>
-                      </div>
-
-                      {/* Manual Send Button */}
-                      {!isSocketConnected && (
-                        <button
-                          onClick={handleSendMessage}
-                          disabled={!newMessage.trim() || isSending}
-                          className="w-12 h-12 rounded-full bg-[#00F29C]/10 text-[#00F29C] border border-[#00F29C]/20 flex items-center justify-center hover:bg-[#00F29C]/20 disabled:opacity-30"
-                        >
-                          <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
-                          </svg>
-                        </button>
-                      )}
-                    </div>
-
-                     <div className="text-center">
-                       <p className="mono text-[10px] tracking-widest uppercase text-zinc-500">
-                         {isSocketSpeaking ? 'AI is speaking...' :
-                          isSocketListening ? 'Listening...' :
-                          isSocketConnected ? 'Waiting for AI...' :
-                          isRecording ? 'Listening for your response...' :
-                          'Tap mic to start continuous listening'}
-                       </p>
-                     </div>
-
-                    {/* Text Input Fallback */}
-                    {!isSocketConnected && (
-                      <div className="w-full max-w-lg flex gap-2">
-                        <input
-                          type="text"
-                          value={newMessage}
-                          onChange={(e) => setNewMessage(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                          placeholder="Type your message..."
-                          className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-[#00F29C]/30"
-                        />
-                      </div>
+                    {/* Live transcript preview */}
+                    {newMessage && (
+                      <p className="text-zinc-400 text-xs italic text-center max-w-sm truncate">
+                        {newMessage}
+                      </p>
                     )}
                   </div>
                 </div>
