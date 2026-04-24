@@ -12,6 +12,7 @@ declare global {
 import { useRouter } from 'next/navigation';
 import { interviewApi, jobApi, kanbanApi, ApiError, getAuthToken } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
+import { useInterviewSocket } from '@/hooks/useInterviewSocket';
 import type { Interview, InterviewMessageCreate, InterviewMessage, Job } from '@/types';
 import { generateInterviewQuestions, calculateInterviewRating } from '@/utils/interviewQuestions';
 import '@/styles/interview.css';
@@ -37,6 +38,33 @@ export default function InterviewsPage() {
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string>('');
+
+  // Speech-to-Speech Socket
+  const {
+    isConnected: isSocketConnected,
+    isListening: isSocketListening,
+    isSpeaking: isSocketSpeaking,
+    transcript: socketTranscript,
+    error: socketError,
+    connect: connectSocket,
+    disconnect: disconnectSocket,
+    startRecording: startSocketRecording,
+    stopRecording: stopSocketRecording
+  } = useInterviewSocket(selectedInterview?.id || null);
+
+  // Update transcript from socket
+  useEffect(() => {
+    if (socketTranscript) {
+      setNewMessage(socketTranscript);
+    }
+  }, [socketTranscript]);
+
+  // Handle socket errors
+  useEffect(() => {
+    if (socketError) {
+      setError(socketError);
+    }
+  }, [socketError]);
 
   // Structured interview state
   const [isStructuredMode, setIsStructuredMode] = useState(false);
@@ -202,6 +230,11 @@ export default function InterviewsPage() {
   };
 
   const selectInterview = async (interview: Interview) => {
+    if (selectedInterview?.id === interview.id) return;
+    
+    // Disconnect previous socket if any
+    disconnectSocket();
+    
     setSelectedInterview(interview);
     if (!interview.messages) await fetchInterviewMessages(interview.id);
     // Reset structured interview state
@@ -211,6 +244,14 @@ export default function InterviewsPage() {
     setIsInterviewStarted(false);
     setInterviewRating(null);
     setStructuredResponses([]);
+  };
+
+  const toggleSpeechMode = () => {
+    if (isSocketConnected) {
+      disconnectSocket();
+    } else {
+      connectSocket();
+    }
   };
 
   const startStructuredInterview = () => {
@@ -511,51 +552,23 @@ export default function InterviewsPage() {
               {/* Voice Controls */}
               {selectedInterview.status !== 'completed' && (
                 <div className="px-7 py-6 border-t border-zinc-800/50 bg-zinc-900/30">
-                  {/* Start Structured Interview Button */}
-                  {!isStructuredMode && !isInterviewStarted && (
-                    <div className="w-full mb-4">
-                      <button
-                        onClick={startStructuredInterview}
-                        className="w-full bg-gradient-to-r from-[#00F29C] to-[#00D4FF] text-black font-bold py-3 px-6 rounded-xl hover:opacity-90 transition-all text-sm tracking-wide shadow-lg"
-                      >
-                        Start Structured Interview
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Current Question Display */}
-                  {isStructuredMode && isInterviewStarted && !interviewRating && (
-                    <div className="w-full mb-4 p-4 bg-zinc-800/50 border border-zinc-700/50 rounded-xl">
-                      <p className="text-zinc-300 text-sm font-medium mb-2">Current Question:</p>
-                      <p className="text-white text-sm leading-relaxed">{interviewQuestions[currentQuestionIndex]}</p>
-                    </div>
-                  )}
-
-                  {/* Rating Display */}
-                  {interviewRating && (
-                    <div className="w-full mb-4 p-4 bg-[#00F29C]/10 border border-[#00F29C]/20 rounded-xl">
-                      <div className="flex items-center justify-center gap-3">
-                        <div className="text-2xl">⭐</div>
-                        <div className="text-center">
-                          <p className="text-[#00F29C] text-lg font-bold">Interview Complete!</p>
-                          <p className="text-zinc-300 text-sm">Your rating: {interviewRating}/10</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
                   <div className="flex flex-col items-center gap-4">
 
-                    {/* Waveform when recording */}
-                    {isRecording && (
-                      <div className="flex gap-1 items-end h-6">
-                        {[...Array(9)].map((_, i) => (
+                    {/* Waveform / Status display */}
+                    {(isRecording || isSocketListening || isSocketSpeaking) && (
+                      <div className="flex gap-1 items-end h-8">
+                        {[...Array(12)].map((_, i) => (
                           <div
                             key={i}
                             className="waveform-bar"
                             style={{
-                              height: `${Math.random() * 16 + 8}px`,
+                              height: isSocketSpeaking 
+                                ? `${Math.random() * 24 + 8}px` 
+                                : isSocketListening 
+                                ? `${Math.random() * 12 + 4}px` 
+                                : `${Math.random() * 16 + 8}px`,
                               animationDelay: `${i * 0.1}s`,
+                              backgroundColor: isSocketSpeaking ? '#00D4FF' : '#00F29C',
                               animationDuration: `${0.8 + Math.random() * 0.4}s`
                             }}
                           />
@@ -563,48 +576,78 @@ export default function InterviewsPage() {
                       </div>
                     )}
 
-                    {/* Mic Button */}
-                    <div className="relative flex items-center justify-center">
-                      {isRecording && (
-                        <>
-                          <div className="mic-ring" />
-                          <div className="mic-ring" />
-                          <div className="mic-ring" />
-                        </>
-                      )}
-                      <button
-                        onClick={isRecording ? stopRecording : startRecording}
-                        disabled={isSending}
-                        className={`relative z-10 w-16 h-16 rounded-full font-bold transition-all flex items-center justify-center ${
-                          isRecording
-                            ? 'bg-red-500 text-white scale-110 shadow-[0_0_30px_rgba(239,68,68,0.4)]'
-                            : 'bg-[#00F29C] text-black hover:scale-105 shadow-[0_0_20px_rgba(0,242,156,0.3)]'
-                        } disabled:opacity-40 disabled:cursor-not-allowed disabled:scale-100`}
-                      >
-                        {isSending ? (
-                          <div className="w-6 h-6 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                        ) : isRecording ? (
-                          <svg viewBox="0 0 24 24" className="w-6 h-6" fill="currentColor">
-                            <rect x="6" y="6" width="12" height="12" rx="1" />
-                          </svg>
-                        ) : (
-                          <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2">
+                    <div className="flex items-center gap-6">
+                      {/* Legacy Mic Button (Optional Fallback) */}
+                      {!isSocketConnected && (
+                        <button
+                          onClick={isRecording ? stopRecording : startRecording}
+                          className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                            isRecording ? 'bg-red-500 text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                          }`}
+                        >
+                          <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2">
                             <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
                             <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
-                            <line x1="12" y1="19" x2="12" y2="23" />
-                            <line x1="8" y1="23" x2="16" y2="23" />
                           </svg>
+                        </button>
+                      )}
+
+                      {/* Speech-to-Speech Toggle Button */}
+                      <div className="relative">
+                        {(isSocketListening || isSocketSpeaking) && (
+                          <>
+                            <div className="mic-ring" style={{ '--opacity': 0.8 } as any} />
+                            <div className="mic-ring" style={{ '--opacity': 0.5 } as any} />
+                          </>
                         )}
-                      </button>
+                        <button
+                          onClick={toggleSpeechMode}
+                          className={`relative z-10 w-20 h-20 rounded-full font-bold transition-all flex flex-col items-center justify-center gap-1 ${
+                            isSocketConnected
+                              ? 'bg-[#00F29C] text-black scale-110 shadow-[0_0_30px_rgba(0,242,156,0.4)]'
+                              : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 border border-zinc-700'
+                          }`}
+                        >
+                          <svg viewBox="0 0 24 24" className="w-8 h-8" fill="currentColor">
+                            <path d="M12 3v18M3 12h18M5 16.5a8.5 8.5 0 0 1 14 0M7.5 14a4.5 4.5 0 0 1 9 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
+                          </svg>
+                          <span className="text-[8px] uppercase tracking-tighter font-black">
+                            {isSocketConnected ? 'LIVE' : 'S2S'}
+                          </span>
+                        </button>
+                      </div>
+
+                      {/* Manual Send Button */}
+                      {!isSocketConnected && (
+                        <button
+                          onClick={handleSendMessage}
+                          disabled={!newMessage.trim() || isSending}
+                          className="w-12 h-12 rounded-full bg-[#00F29C]/10 text-[#00F29C] border border-[#00F29C]/20 flex items-center justify-center hover:bg-[#00F29C]/20 disabled:opacity-30"
+                        >
+                          <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
+                          </svg>
+                        </button>
+                      )}
                     </div>
 
-                    <p className="mono text-[10px] tracking-widest uppercase text-zinc-600">
-                      {isSending ? 'Processing...' : isRecording ? 'Listening — tap to stop' : isStructuredMode && isInterviewStarted && !interviewRating ? 'Answer the question' : 'Tap to speak'}
-                    </p>
+                    <div className="text-center">
+                      <p className="mono text-[10px] tracking-widest uppercase text-zinc-500">
+                        {isSocketSpeaking ? 'AI is speaking...' : isSocketListening ? 'Listening...' : isSocketConnected ? 'Waiting for AI...' : 'Tap S2S for Speech-to-Speech'}
+                      </p>
+                    </div>
 
-                    {newMessage && !isRecording && (
-                      <div className="w-full max-w-sm bg-zinc-800/50 border border-zinc-700/50 rounded-xl px-4 py-3">
-                        <p className="mono text-zinc-400 text-xs text-center">"{newMessage}"</p>
+                    {/* Text Input Fallback */}
+                    {!isSocketConnected && (
+                      <div className="w-full max-w-lg flex gap-2">
+                        <input
+                          type="text"
+                          value={newMessage}
+                          onChange={(e) => setNewMessage(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                          placeholder="Type your message..."
+                          className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-[#00F29C]/30"
+                        />
                       </div>
                     )}
                   </div>

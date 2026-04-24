@@ -1,4 +1,5 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+const WS_BASE_URL = API_BASE_URL?.replace(/^http/, 'ws');
 
 // Types
 import type {
@@ -259,4 +260,5 @@ export const interviewApi = {
   sendMessage: (interviewId: number, data: InterviewMessageCreate) =>
     api.post<InterviewMessage>(`/api/interviews/${interviewId}/messages/`, data),
   getMessages: (interviewId: number) => api.get<InterviewMessage[]>(`/api/interviews/${interviewId}/messages/`),
+  getTalkUrl: (interviewId: number) => `${WS_BASE_URL}/api/interviews/${interviewId}/talk`,
 };
