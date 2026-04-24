@@ -74,6 +74,7 @@ export default function InterviewsPage() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [interviewQuestions, setInterviewQuestions] = useState<string[]>([]);
   const [isInterviewStarted, setIsInterviewStarted] = useState(false);
+  const isInterviewStartedRef = useRef(false);
   const [interviewRating, setInterviewRating] = useState<number | null>(null);
   const [structuredResponses, setStructuredResponses] = useState<string[]>([]);
 
@@ -128,6 +129,10 @@ export default function InterviewsPage() {
   useEffect(() => {
     selectedInterviewRef.current = selectedInterview;
   }, [selectedInterview]);
+
+  useEffect(() => {
+    isInterviewStartedRef.current = isInterviewStarted;
+  }, [isInterviewStarted]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -242,8 +247,9 @@ export default function InterviewsPage() {
             silenceTimeoutRef.current = null;
           }
           // Auto-restart if we're supposed to be recording (keeps mic alive)
+          // Don't auto-restart in AI-driven interview mode — recording is managed explicitly
           setTimeout(() => {
-            if (recognitionRef.current && !isSocketConnected) {
+            if (recognitionRef.current && !isSocketConnected && !isInterviewStartedRef.current) {
               startRecording();
             }
           }, 500);
@@ -502,13 +508,17 @@ export default function InterviewsPage() {
       }, 30000);
       try {
         recognitionRef.current.start();
-      } catch (error) {
-        console.error('Error starting recognition:', error);
-        setError('Failed to start speech recognition.');
-        setIsRecording(false);
-        if (silenceTimeoutRef.current) {
-          clearTimeout(silenceTimeoutRef.current);
-          silenceTimeoutRef.current = null;
+      } catch (error: any) {
+        if (error?.name === 'InvalidStateError') {
+          // Already started, ignore
+        } else {
+          console.error('Error starting recognition:', error);
+          setError('Failed to start speech recognition.');
+          setIsRecording(false);
+          if (silenceTimeoutRef.current) {
+            clearTimeout(silenceTimeoutRef.current);
+            silenceTimeoutRef.current = null;
+          }
         }
       }
     } else if (!recognitionRef.current) {
