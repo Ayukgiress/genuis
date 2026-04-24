@@ -37,6 +37,7 @@ export default function InterviewsPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const selectedInterviewRef = useRef<Interview | null>(null);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string>('');
@@ -125,6 +126,10 @@ export default function InterviewsPage() {
   useEffect(() => { scrollToBottom(); }, [selectedInterview?.messages]);
 
   useEffect(() => {
+    selectedInterviewRef.current = selectedInterview;
+  }, [selectedInterview]);
+
+  useEffect(() => {
     if (typeof window !== 'undefined') {
       const SpeechRecognition = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (SpeechRecognition) {
@@ -167,10 +172,13 @@ export default function InterviewsPage() {
               }
               setIsRecording(false);
 
+              const interview = selectedInterviewRef.current;
+              if (!interview) return;
+
               // Inject message and call AI
               const userMessage: InterviewMessage = {
                 id: Date.now(),
-                interview_id: selectedInterview!.id,
+                interview_id: interview.id,
                 role: 'user',
                 content: msg,
                 created_at: new Date().toISOString()
@@ -184,7 +192,7 @@ export default function InterviewsPage() {
               try {
                 setIsSending(true);
                 const aiMessage = await interviewApi.sendMessage(
-                  selectedInterview!.id,
+                  interview.id,
                   { role: 'user', content: msg }
                 );
 
@@ -197,7 +205,7 @@ export default function InterviewsPage() {
                   const clean = aiMessage.content.replace('[INTERVIEW_COMPLETE]', '').trim();
                   aiMessage.content = clean;
                   await speakTextAndWait(clean);
-                  await handleCompleteInterview(selectedInterview!.id);
+                  await handleCompleteInterview(interview.id);
                   setIsInterviewStarted(false);
                   return;
                 }
