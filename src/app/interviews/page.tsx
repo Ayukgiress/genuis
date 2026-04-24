@@ -35,6 +35,7 @@ export default function InterviewsPage() {
   const [isRecording, setIsRecording] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
+  const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string>('');
@@ -127,24 +128,96 @@ export default function InterviewsPage() {
       const SpeechRecognition = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (SpeechRecognition) {
         recognitionRef.current = new SpeechRecognition();
-        recognitionRef.current.continuous = false;
-        recognitionRef.current.interimResults = false;
+        recognitionRef.current.continuous = true;
+        recognitionRef.current.interimResults = true;
         recognitionRef.current.lang = 'en-US';
+
+        let finalTranscript = '';
+
         recognitionRef.current.onresult = async (event: any) => {
-          const transcript = event.results[0][0].transcript;
-          setNewMessage(transcript);
-          setIsRecording(false);
-          if (transcript.trim()) await handleSendMessage();
+          let interimTranscript = '';
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+              finalTranscript += transcript;
+            } else {
+              interimTranscript += transcript;
+            }
+          }
+
+          // Reset silence timeout on speech activity
+          if (silenceTimeoutRef.current) {
+            clearTimeout(silenceTimeoutRef.current);
+            silenceTimeoutRef.current = setTimeout(() => {
+              if (recognitionRef.current && isRecording) {
+                recognitionRef.current.stop();
+              }
+            }, 30000);
+          }
+
+          // Update UI with interim results
+          setNewMessage(finalTranscript + interimTranscript);
+
+          // Auto-send when final result is received
+          if (event.results[event.results.length - 1].isFinal && finalTranscript.trim()) {
+            const messageToSend = finalTranscript.trim();
+            setNewMessage(''); // Clear input immediately
+            finalTranscript = ''; // Reset for next utterance
+            setIsRecording(false); // Temporarily stop recording while processing
+
+            // Clear silence timeout during processing
+            if (silenceTimeoutRef.current) {
+              clearTimeout(silenceTimeoutRef.current);
+              silenceTimeoutRef.current = null;
+            }
+
+            // Simulate sending the message
+            try {
+              setNewMessage(messageToSend); // Set the final message
+              await handleSendMessage(); // Send it
+            } catch (error) {
+              console.error('Error sending message:', error);
+            } finally {
+              // Restart recording after sending
+              setTimeout(() => {
+                if (recognitionRef.current && !isSocketConnected) {
+                  startRecording();
+                }
+              }, 1000); // Brief pause before restarting
+            }
+          }
         };
+
         recognitionRef.current.onerror = (event: any) => {
           console.error('Speech recognition error:', event.error);
           setIsRecording(false);
-          if (event.error !== 'no-speech') setError('Speech recognition failed. Please try again.');
+          // Clear silence timeout on error
+          if (silenceTimeoutRef.current) {
+            clearTimeout(silenceTimeoutRef.current);
+            silenceTimeoutRef.current = null;
+          }
+          if (event.error !== 'no-speech' && event.error !== 'audio-capture') {
+            setError('Speech recognition failed. Please try again.');
+          }
         };
-        recognitionRef.current.onend = () => setIsRecording(false);
+
+        recognitionRef.current.onend = () => {
+          setIsRecording(false);
+          // Clear silence timeout
+          if (silenceTimeoutRef.current) {
+            clearTimeout(silenceTimeoutRef.current);
+            silenceTimeoutRef.current = null;
+          }
+          // Auto-restart if we're supposed to be recording (keeps mic alive)
+          setTimeout(() => {
+            if (recognitionRef.current && !isSocketConnected) {
+              startRecording();
+            }
+          }, 500);
+        };
       }
     }
-  }, []);
+  }, [isSocketConnected]);
 
   const handleCreateInterview = async () => {
     if (!selectedJobId) return;
@@ -325,14 +398,41 @@ export default function InterviewsPage() {
     if (recognitionRef.current && !isRecording) {
       setIsRecording(true);
       setError(null);
-      recognitionRef.current.start();
+      // Clear any existing silence timeout
+      if (silenceTimeoutRef.current) {
+        clearTimeout(silenceTimeoutRef.current);
+      }
+      // Set silence timeout (stop after 30 seconds of no speech)
+      silenceTimeoutRef.current = setTimeout(() => {
+        if (recognitionRef.current && isRecording) {
+          recognitionRef.current.stop();
+        }
+      }, 30000);
+      try {
+        recognitionRef.current.start();
+      } catch (error) {
+        console.error('Error starting recognition:', error);
+        setError('Failed to start speech recognition.');
+        setIsRecording(false);
+        if (silenceTimeoutRef.current) {
+          clearTimeout(silenceTimeoutRef.current);
+          silenceTimeoutRef.current = null;
+        }
+      }
     } else if (!recognitionRef.current) {
       setError('Speech recognition is not supported in this browser.');
     }
   };
 
   const stopRecording = () => {
-    if (recognitionRef.current && isRecording) recognitionRef.current.stop();
+    if (recognitionRef.current && isRecording) {
+      recognitionRef.current.stop();
+    }
+    // Clear silence timeout
+    if (silenceTimeoutRef.current) {
+      clearTimeout(silenceTimeoutRef.current);
+      silenceTimeoutRef.current = null;
+    }
   };
 
   const speakText = (text: string) => {
@@ -577,20 +677,20 @@ export default function InterviewsPage() {
                     )}
 
                     <div className="flex items-center gap-6">
-                      {/* Legacy Mic Button (Optional Fallback) */}
-                      {!isSocketConnected && (
-                        <button
-                          onClick={isRecording ? stopRecording : startRecording}
-                          className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
-                            isRecording ? 'bg-red-500 text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
-                          }`}
-                        >
-                          <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-                            <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
-                          </svg>
-                        </button>
-                      )}
+                       {/* Continuous Mic Button */}
+                       {!isSocketConnected && (
+                         <button
+                           onClick={isRecording ? stopRecording : startRecording}
+                           className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                             isRecording ? 'bg-[#00F29C] text-black animate-pulse' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                           }`}
+                         >
+                           <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2">
+                             <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                             <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
+                           </svg>
+                         </button>
+                       )}
 
                       {/* Speech-to-Speech Toggle Button */}
                       <div className="relative">
@@ -631,11 +731,15 @@ export default function InterviewsPage() {
                       )}
                     </div>
 
-                    <div className="text-center">
-                      <p className="mono text-[10px] tracking-widest uppercase text-zinc-500">
-                        {isSocketSpeaking ? 'AI is speaking...' : isSocketListening ? 'Listening...' : isSocketConnected ? 'Waiting for AI...' : 'Tap S2S for Speech-to-Speech'}
-                      </p>
-                    </div>
+                     <div className="text-center">
+                       <p className="mono text-[10px] tracking-widest uppercase text-zinc-500">
+                         {isSocketSpeaking ? 'AI is speaking...' :
+                          isSocketListening ? 'Listening...' :
+                          isSocketConnected ? 'Waiting for AI...' :
+                          isRecording ? 'Listening for your response...' :
+                          'Tap mic to start continuous listening'}
+                       </p>
+                     </div>
 
                     {/* Text Input Fallback */}
                     {!isSocketConnected && (
