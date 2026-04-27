@@ -9,7 +9,8 @@ import type {
   KanbanBoard, KanbanBoardCreate, KanbanBoardUpdate,
   KanbanCard, KanbanCardCreate, KanbanCardUpdate,
   Job, JobSearchParams,
-  Interview, InterviewCreate, InterviewMessage, InterviewMessageCreate
+  Interview, InterviewCreate, InterviewMessage, InterviewMessageCreate,
+  Letter, LetterCreate, LetterUpdate, LetterGenerateRequest
 } from "@/types";
 
 // Token management
@@ -189,26 +190,22 @@ export const analyticsApi = {
 // Resume API
 export const resumeApi = {
   list: () => api.get<Resume[]>("/api/resumes/"),
+  getUserResumes: () => api.get<Resume[]>("/api/resumes/"),
   get: (resumeId: string | number) => api.get<Resume>(`/api/resumes/${resumeId}/`),
   create: (data: ResumeCreate) => api.post<Resume>("/api/resumes/", data),
-  update: (resumeId: string | number, data: ResumeUpdate) => api.patch<Resume>(`/api/resumes/${resumeId}/`, data),
-  delete: (resumeId: string | number) => api.delete<void>(`/api/resumes/${resumeId}/`),
-  upload: async (file: File) => {
+  upload: (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    const token = getAuthToken();
-    const response = await fetch(`${API_BASE_URL}/api/resumes/upload/`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
+    return request<Resume>("/api/resumes/upload/", {
+      method: "POST",
       body: formData,
+      headers: {
+        // Don't set Content-Type for FormData - browser sets it with boundary
+      },
     });
-    if (!response.ok) {
-      throw new Error('Failed to upload resume');
-    }
-    return response.json();
   },
+  update: (resumeId: string | number, data: ResumeUpdate) => api.patch<Resume>(`/api/resumes/${resumeId}/`, data),
+  delete: (resumeId: string | number) => api.delete<void>(`/api/resumes/${resumeId}/`),
 };
 
 // Kanban API
@@ -248,6 +245,16 @@ export const jobApi = {
   matchWithResume: (jobId: string, resumeId: number) => api.post<Job>(`/api/jobs/${jobId}/match/?resume_id=${resumeId}`, {}),
   addToKanban: (jobId: string, boardId: number, status?: string) =>
     api.post<KanbanCard>(`/api/jobs/${jobId}/add-to-kanban/?board_id=${boardId}&status=${status || 'todo'}`, {}),
+};
+
+// Letter API
+export const letterApi = {
+  list: () => api.get<Letter[]>("/api/letters/"),
+  get: (letterId: number) => api.get<Letter>(`/api/letters/${letterId}/`),
+  create: (data: LetterCreate) => api.post<Letter>("/api/letters/", data),
+  update: (letterId: number, data: LetterUpdate) => api.patch<Letter>(`/api/letters/${letterId}/`, data),
+  delete: (letterId: number) => api.delete<void>(`/api/letters/${letterId}/`),
+  generate: (data: LetterGenerateRequest) => api.post<Letter>("/api/letters/generate/", data),
 };
 
 // Interview API

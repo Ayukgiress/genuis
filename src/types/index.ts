@@ -214,6 +214,43 @@ export interface ResumeUpdate {
   content?: string;
 }
 
+// Letter Types
+export type LetterType = 'cover_letter' | 'thank_you_letter' | 'follow_up_letter' | 'custom_letter';
+
+export interface Letter {
+  id: number;
+  user_id: number;
+  title: string;
+  recipient: string;
+  content: string;
+  letter_type: LetterType;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface LetterCreate {
+  title: string;
+  recipient: string;
+  content: string;
+  letter_type: LetterType;
+}
+
+export interface LetterUpdate {
+  title?: string;
+  recipient?: string;
+  content?: string;
+  letter_type?: LetterType;
+}
+
+export interface LetterGenerateRequest {
+  job_title: string;
+  company_name: string;
+  recipient_name?: string;
+  resume_id?: number;
+  letter_type: LetterType;
+  custom_instructions?: string;
+}
+
 // Kanban Types
 export type KanbanColumnId = "todo" | "in_progress" | "review" | "done";
 

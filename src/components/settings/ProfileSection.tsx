@@ -148,7 +148,7 @@ export const ProfileSection = () => {
             </div>
           </div>
 
-          {user?.subscription_plan !== 'pro' && (
+          {(user?.subscription_plan !== 'pro' || user?.subscription_status !== 'active') && (
             <div className="p-4 rounded-xl bg-zinc-900/50 border border-zinc-800">
               <div className="flex justify-between items-start">
                 <div className="space-y-1">
@@ -164,7 +164,7 @@ export const ProfileSection = () => {
             </div>
           )}
 
-          {user?.subscription_plan === 'pro' && (
+          {user?.subscription_plan === 'pro' && user?.subscription_status === 'active' && (
             <div className="p-4 rounded-xl bg-primary/10 border border-primary/20">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">

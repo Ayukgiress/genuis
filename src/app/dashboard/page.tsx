@@ -20,7 +20,7 @@ const COLORS = ['#00f29c', '#6366f1', '#f59e0b', '#ef4444'];
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, fetchCurrentUser } = useAuth();
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [analyticsSummary, setAnalyticsSummary] = useState<AnalyticsSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -41,6 +41,9 @@ export default function DashboardPage() {
       router.push('/login');
       return;
     }
+
+    // Refresh user data to ensure subscription status is up to date
+    fetchCurrentUser();
 
     // Set a timeout to prevent infinite loading
     const timeout = setTimeout(() => {
@@ -93,7 +96,7 @@ export default function DashboardPage() {
     fetchDashboardData();
 
     return () => clearTimeout(timeout);
-  }, [authLoading, isAuthenticated, router]);
+  }, [authLoading, isAuthenticated, router, fetchCurrentUser]);
 
   const fetchJobs = useCallback(async () => {
     try {
@@ -504,8 +507,8 @@ export default function DashboardPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 p-8 rounded-3xl bg-zinc-900/50 border border-zinc-800/50 flex flex-col gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 p-8 rounded-3xl bg-zinc-900/50 border border-zinc-800/50 space-y-6">
           <div className="flex justify-between items-center">
             <h3 className="font-bold">Weekly Activity</h3>
             <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-[10px] font-bold text-zinc-400">
@@ -515,8 +518,8 @@ export default function DashboardPage() {
               </svg>
             </button>
           </div>
-          <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={300}>
+          <div className="h-[300px] w-full min-h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={chartData}>
                 <defs>
                   <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
@@ -525,25 +528,25 @@ export default function DashboardPage() {
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#18181b" />
-                <XAxis 
-                  dataKey="name" 
-                  axisLine={false} 
-                  tickLine={false} 
+                <XAxis
+                  dataKey="name"
+                  axisLine={false}
+                  tickLine={false}
                   tick={{ fill: '#52525b', fontSize: 10, fontWeight: 700 }}
                   dy={10}
                 />
                 <YAxis hide />
-                <Tooltip 
+                <Tooltip
                   contentStyle={{ backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '12px' }}
                   itemStyle={{ color: '#00f29c' }}
                 />
-                <Area 
-                  type="monotone" 
-                  dataKey="value" 
-                  stroke="#00f29c" 
+                <Area
+                  type="monotone"
+                  dataKey="value"
+                  stroke="#00f29c"
                   strokeWidth={3}
-                  fillOpacity={1} 
-                  fill="url(#colorValue)" 
+                  fillOpacity={1}
+                  fill="url(#colorValue)"
                 />
               </AreaChart>
             </ResponsiveContainer>
