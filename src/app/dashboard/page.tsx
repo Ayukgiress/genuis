@@ -96,7 +96,7 @@ export default function DashboardPage() {
     fetchDashboardData();
 
     return () => clearTimeout(timeout);
-  }, [authLoading, isAuthenticated, router, fetchCurrentUser]);
+  }, [authLoading, isAuthenticated, router]);
 
   const fetchJobs = useCallback(async () => {
     try {
@@ -128,7 +128,7 @@ export default function DashboardPage() {
     }
 
     fetchJobs();
-  }, [authLoading, isAuthenticated, router, fetchJobs]);
+  }, [authLoading, isAuthenticated, router, searchQuery, jobFilters.remote, jobFilters.location]);
 
   const handleAddToKanban = async (job: Job) => {
     if (!selectedBoard) {

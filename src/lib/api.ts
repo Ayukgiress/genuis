@@ -208,15 +208,12 @@ export const resumeApi = {
   delete: (resumeId: string | number) => api.delete<void>(`/api/resumes/${resumeId}/`),
 };
 
-// Kanban API
 export const kanbanApi = {
-  // Boards
   listBoards: () => api.get<KanbanBoard[]>("/api/kanban/boards/"),
   getBoard: (boardId: string) => api.get<KanbanBoard>(`/api/kanban/boards/${boardId}/`),
   createBoard: (data: KanbanBoardCreate) => api.post<KanbanBoard>("/api/kanban/boards/", data),
   updateBoard: (boardId: string, data: KanbanBoardUpdate) => api.patch<KanbanBoard>(`/api/kanban/boards/${boardId}/`, data),
   
-  // Cards
   listCards: (boardId: string) => api.get<KanbanCard[]>(`/api/kanban/boards/${boardId}/cards/`),
   getCard: (cardId: string) => api.get<KanbanCard>(`/api/kanban/cards/${cardId}/`),
   createCard: (boardId: string, data: KanbanCardCreate) => api.post<KanbanCard>(`/api/kanban/boards/${boardId}/cards/`, data),
@@ -224,7 +221,6 @@ export const kanbanApi = {
   deleteCard: (cardId: string) => api.delete<void>(`/api/kanban/cards/${cardId}/`),
 };
 
-// Job Discovery API
 export const jobApi = {
   search: (params?: JobSearchParams) => {
     const queryParams: Record<string, string> = {};
@@ -242,9 +238,9 @@ export const jobApi = {
     if (resumeId) params.resume_id = resumeId.toString();
     return api.get<Job[]>("/api/jobs/recommendations/", params);
   },
-  matchWithResume: (jobId: string, resumeId: number) => api.post<Job>(`/api/jobs/${jobId}/match/?resume_id=${resumeId}`, {}),
+  matchWithResume: (jobId: string, resumeId: number) => api.post<Job>(`/api/jobs/${jobId}/match?resume_id=${resumeId}`, {}),
   addToKanban: (jobId: string, boardId: number, status?: string) =>
-    api.post<KanbanCard>(`/api/jobs/${jobId}/add-to-kanban/?board_id=${boardId}&status=${status || 'todo'}`, {}),
+    api.post<KanbanCard>(`/api/jobs/${jobId}/add-to-kanban?board_id=${boardId}&status=${status || 'todo'}`, {}),
 };
 
 // Letter API
@@ -257,7 +253,6 @@ export const letterApi = {
   generate: (data: LetterGenerateRequest) => api.post<Letter>("/api/letters/generate/", data),
 };
 
-// Interview API
 export const interviewApi = {
   list: () => api.get<Interview[]>("/api/interviews/"),
   get: (interviewId: number) => api.get<Interview>(`/api/interviews/${interviewId}/`),

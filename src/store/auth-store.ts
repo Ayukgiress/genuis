@@ -67,17 +67,23 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      logout: () => {
-        setAuthToken(null);
-        set({
-          user: null,
-          token: null,
-          isAuthenticated: false,
-          error: null,
-          isEmailVerified: false,
-          showVerificationMessage: false,
-          isNewUser: false,
-        });
+      logout: async () => {
+        try {
+          await api.post("/auth/logout");
+        } catch (error) {
+          console.error('Logout failed:', error);
+        } finally {
+          setAuthToken(null);
+          set({
+            user: null,
+            token: null,
+            isAuthenticated: false,
+            error: null,
+            isEmailVerified: false,
+            showVerificationMessage: false,
+            isNewUser: false,
+          });
+        }
       },
 
       register: async (name: string, email: string, password: string) => {

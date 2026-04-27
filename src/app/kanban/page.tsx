@@ -2,9 +2,9 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { kanbanApi, ApiError, getAuthToken } from '@/lib/api';
+import { kanbanApi, jobApi, ApiError, getAuthToken } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
-import type { KanbanBoard, KanbanCard, KanbanColumnId } from '@/types';
+import type { KanbanBoard, KanbanCard, KanbanColumnId, Job } from '@/types';
 
 const COLUMNS: { id: KanbanColumnId; title: string }[] = [
   { id: 'todo', title: 'WISHLIST' },
@@ -27,6 +27,8 @@ export default function KanbanPage() {
   const [newCardTitle, setNewCardTitle] = useState('');
   const [newCardCompany, setNewCardCompany] = useState('');
   const [newCardLocation, setNewCardLocation] = useState('');
+  const [availableJobs, setAvailableJobs] = useState<Job[]>([]);
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -71,6 +73,16 @@ export default function KanbanPage() {
     }
   };
 
+  const fetchAvailableJobs = async () => {
+    try {
+      const data = await jobApi.search({ limit: 50 }); // Fetch up to 50 jobs
+      setAvailableJobs(data);
+    } catch (err) {
+      console.error('Failed to fetch jobs:', err);
+      setAvailableJobs([]);
+    }
+  };
+
   useEffect(() => {
     if (currentBoard) {
       fetchCards(currentBoard.id);
@@ -94,6 +106,23 @@ export default function KanbanPage() {
     }
   };
 
+  const openCreateCardModal = async () => {
+    setIsCreatingCard(true);
+    await fetchAvailableJobs();
+  };
+
+  const handleJobSelect = (jobId: string) => {
+    const job = availableJobs.find(j => j.id === jobId);
+    if (job) {
+      setSelectedJob(job);
+      setNewCardTitle(job.title);
+      setNewCardCompany(job.company);
+      setNewCardLocation(job.location);
+    } else {
+      setSelectedJob(null);
+    }
+  };
+
   const handleCreateCard = async () => {
     if (!newCardTitle.trim() || !currentBoard || !selectedColumn) return;
 
@@ -109,6 +138,7 @@ export default function KanbanPage() {
       setNewCardTitle('');
       setNewCardCompany('');
       setNewCardLocation('');
+      setSelectedJob(null);
       setIsCreatingCard(false);
       setSelectedColumn(null);
       setSuccess('Application added successfully!');
@@ -226,10 +256,10 @@ export default function KanbanPage() {
             <button className="px-6 py-2 bg-zinc-800 text-primary text-xs font-black rounded-lg uppercase tracking-widest">Board</button>
             <button className="px-6 py-2 text-zinc-500 text-xs font-black uppercase tracking-widest hover:text-zinc-300">List</button>
           </div>
-          <button 
-            onClick={() => setIsCreatingCard(true)}
-            className="flex items-center gap-2 px-6 py-3 bg-primary text-black font-black rounded-xl hover:opacity-90 transition-all uppercase tracking-widest text-xs"
-          >
+           <button
+             onClick={openCreateCardModal}
+             className="flex items-center gap-2 px-6 py-3 bg-primary text-black font-black rounded-xl hover:opacity-90 transition-all uppercase tracking-widest text-xs"
+           >
             <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="3">
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
@@ -300,6 +330,18 @@ export default function KanbanPage() {
           <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8 w-full max-w-md space-y-6">
             <h3 className="text-xl font-bold">Add New Application</h3>
             <div className="space-y-4">
+              <select
+                value={selectedJob?.id || ''}
+                onChange={(e) => handleJobSelect(e.target.value)}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary"
+              >
+                <option value="">Select a scraped job (optional)</option>
+                {availableJobs.map(job => (
+                  <option key={job.id} value={job.id}>
+                    {job.title} at {job.company} - {job.location}
+                  </option>
+                ))}
+              </select>
               <input
                 type="text"
                 value={newCardTitle}
@@ -335,7 +377,7 @@ export default function KanbanPage() {
             </div>
             <div className="flex gap-4">
               <button
-                onClick={() => { setIsCreatingCard(false); setNewCardTitle(''); setNewCardCompany(''); setNewCardLocation(''); setSelectedColumn(null); }}
+                onClick={() => { setIsCreatingCard(false); setNewCardTitle(''); setNewCardCompany(''); setNewCardLocation(''); setSelectedColumn(null); setSelectedJob(null); }}
                 className="flex-1 py-3 bg-zinc-800 text-white font-bold rounded-xl hover:bg-zinc-700 transition-all"
               >
                 Cancel
@@ -421,11 +463,11 @@ export default function KanbanPage() {
                   </div>
                 ))}
                 
-                {column.id === 'todo' && (
-                  <button 
-                    onClick={() => setIsCreatingCard(true)}
-                    className="w-full py-4 border-2 border-dashed border-zinc-900 rounded-[2rem] text-xs font-black tracking-[0.2em] text-zinc-600 hover:border-zinc-800 hover:text-zinc-400 transition-all uppercase flex items-center justify-center gap-2"
-                  >
+                 {column.id === 'todo' && (
+                   <button
+                     onClick={openCreateCardModal}
+                     className="w-full py-4 border-2 border-dashed border-zinc-900 rounded-[2rem] text-xs font-black tracking-[0.2em] text-zinc-600 hover:border-zinc-800 hover:text-zinc-400 transition-all uppercase flex items-center justify-center gap-2"
+                   >
                     <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="3">
                       <line x1="12" y1="5" x2="12" y2="19" />
                       <line x1="5" y1="12" x2="19" y2="12" />

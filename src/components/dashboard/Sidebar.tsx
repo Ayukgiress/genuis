@@ -2,7 +2,7 @@
 
 import React, { useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 
 const navItems = [
@@ -89,12 +89,18 @@ const navItems = [
 
 export const Sidebar = () => {
   const pathname = usePathname();
-  const { user, fetchCurrentUser } = useAuth();
+  const router = useRouter();
+  const { user, fetchCurrentUser, logout } = useAuth();
 
   // Refresh user data when sidebar mounts to ensure subscription status is current
   useEffect(() => {
     fetchCurrentUser();
   }, [fetchCurrentUser]);
+
+  const handleLogout = async () => {
+    await logout();
+    router.push('/login');
+  };
 
   return (
     <aside className="w-64 bg-black border-r border-zinc-800 flex flex-col h-screen fixed left-0 top-0">
@@ -163,18 +169,32 @@ export const Sidebar = () => {
           </div>
         )}
 
-        <div className="mt-6 flex items-center gap-3 px-2">
-          <div className="w-10 h-10 rounded-full bg-zinc-800 overflow-hidden border border-zinc-700">
-            <img 
-              src="https://api.dicebear.com/7.x/avataaars/svg?seed=Alex" 
-              alt="Profile" 
-              className="w-full h-full object-cover"
-            />
+        <div className="mt-6 space-y-3">
+          <div className="flex items-center gap-3 px-2">
+            <div className="w-10 h-10 rounded-full bg-zinc-800 overflow-hidden border border-zinc-700">
+              <img
+                src={`https://avatar.iran.liara.run/public/boy?username=${user?.name || user?.email || 'user'}`}
+                alt="Profile"
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-white truncate">{user?.name || 'User'}</p>
+              <p className="text-[10px] text-zinc-500 truncate">{user?.email || ''}</p>
+            </div>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-white truncate">Alex Rivera</p>
-            <p className="text-[10px] text-zinc-500 truncate">alex@career.ai</p>
-          </div>
+
+          <button
+            onClick={handleLogout}
+            className="w-full py-2 px-4 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-300 rounded-lg text-xs font-medium transition-colors flex items-center gap-2 justify-center"
+          >
+            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+            Logout
+          </button>
         </div>
       </div>
     </aside>

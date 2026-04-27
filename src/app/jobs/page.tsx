@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { jobApi, resumeApi, analysisApi, ApiError, getAuthToken } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import type { Job, Resume, Analysis } from '@/types';
+import { ApplyJobModal } from '@/components/jobs/ApplyJobModal';
 
 export default function JobsPage() {
   const router = useRouter();
@@ -23,6 +24,36 @@ export default function JobsPage() {
   const [remoteOnly, setRemoteOnly] = useState(false);
   const [jobType, setJobType] = useState('');
   const [page, setPage] = useState(1);
+  const [showApplyModal, setShowApplyModal] = useState(false);
+  const [selectedJobForApply, setSelectedJobForApply] = useState<Job | null>(null);
+
+  const loadRecommendations = useCallback(async (resumeId?: number) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const data = await jobApi.getRecommendations(resumeId);
+      setJobs(data);
+      setSuccess(resumeId ? 'Job recommendations loaded based on your resume!' : 'General job listings loaded');
+    } catch (err) {
+      console.error('Failed to get recommendations:', err);
+      if (err instanceof ApiError && err.status === 401) {
+        logout();
+        router.push('/login');
+      } else if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError('Failed to get recommendations');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, [logout, router]);
+
+  const getRecommendations = async () => {
+    const resumeId = selectedResume?.id;
+    await loadRecommendations(resumeId);
+  };
 
   const fetchData = useCallback(async () => {
     try {
@@ -34,9 +65,12 @@ export default function JobsPage() {
 
       if (resumesData.length > 0) {
         setSelectedResume(resumesData[0]);
+        // Load recommendations based on the first resume
+        await loadRecommendations(resumesData[0].id);
+      } else {
+        // No resumes, load general jobs or show empty state
+        setJobs([]);
       }
-
-      await getRecommendations();
     } catch (err) {
       console.error('Failed to fetch data:', err);
       if (err instanceof ApiError && err.status === 401) {
@@ -48,7 +82,7 @@ export default function JobsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [logout, router]);
+  }, [logout, router, loadRecommendations]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -62,8 +96,10 @@ export default function JobsPage() {
   useEffect(() => {
     if (selectedResume) {
       fetchAnalysis(selectedResume.id);
+      // Load recommendations when resume changes
+      loadRecommendations(selectedResume.id);
     }
-  }, [selectedResume]);
+  }, [selectedResume, loadRecommendations]);
 
   const fetchAnalysis = async (resumeId: number) => {
     try {
@@ -99,34 +135,6 @@ export default function JobsPage() {
     searchJobs(searchQuery);
   };
 
-  const getRecommendations = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      let resumeId: number | undefined;
-      if (selectedResume) {
-        resumeId = selectedResume.id;
-      }
-
-      const data = await jobApi.getRecommendations(resumeId);
-      setJobs(data);
-      setSuccess('Job recommendations loaded based on your profile!');
-    } catch (err) {
-      console.error('Failed to get recommendations:', err);
-      if (err instanceof ApiError && err.status === 401) {
-        logout();
-        router.push('/login');
-      } else if (err instanceof ApiError) {
-        setError(err.message);
-      } else {
-        setError('Failed to get recommendations');
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleMatchJob = async (job: Job) => {
     if (!selectedResume) {
       setError('Please select a resume first');
@@ -151,6 +159,16 @@ export default function JobsPage() {
     } finally {
       setIsMatching(false);
     }
+  };
+
+  const handleOpenApplyModal = (job: Job) => {
+    setSelectedJobForApply(job);
+    setShowApplyModal(true);
+  };
+
+  const handleCloseApplyModal = () => {
+    setShowApplyModal(false);
+    setSelectedJobForApply(null);
   };
 
   const formatDate = (dateStr: string) => {
@@ -234,10 +252,11 @@ export default function JobsPage() {
           >
             Search
           </button>
-          <button
-            onClick={getRecommendations}
-            className="px-6 py-3 bg-zinc-800 text-white font-bold rounded-xl hover:bg-zinc-700 transition-all flex items-center gap-2"
-          >
+           <button
+             onClick={getRecommendations}
+             disabled={isLoading}
+             className="px-6 py-3 bg-zinc-800 text-white font-bold rounded-xl hover:bg-zinc-700 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+           >
             <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
             </svg>
@@ -339,14 +358,12 @@ export default function JobsPage() {
                         </svg>
                         Match
                       </button>
-                      <a
-                        href={job.source_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                      <button
+                        onClick={() => handleOpenApplyModal(job)}
                         className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs font-bold hover:border-primary/50 transition-all text-center"
                       >
                         Apply
-                      </a>
+                      </button>
                     </div>
                   </div>
                   
@@ -433,6 +450,13 @@ export default function JobsPage() {
           Edit Profile Settings
         </button>
       </div>
+
+      <ApplyJobModal
+        isOpen={showApplyModal}
+        onClose={handleCloseApplyModal}
+        job={selectedJobForApply}
+        resumes={resumes}
+      />
     </div>
   );
 }
