@@ -14,13 +14,18 @@ export const ProfileSection = () => {
   
   const [name, setName] = useState('');
   const [bio, setBio] = useState('');
+  const fetchAttempted = React.useRef(false);
 
   useEffect(() => {
     if (user) {
       setName(user.name || '');
     }
-    fetchCurrentUser();
-  }, []);
+    
+    if (!fetchAttempted.current) {
+      fetchCurrentUser();
+      fetchAttempted.current = true;
+    }
+  }, [fetchCurrentUser, user]);
 
   useEffect(() => {
     if (user) {

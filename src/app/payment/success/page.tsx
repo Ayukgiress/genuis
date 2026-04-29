@@ -10,16 +10,19 @@ export default function PaymentSuccessPage() {
   const searchParams = useSearchParams();
   const { isAuthenticated, isLoading, fetchCurrentUser } = useAuth();
   const [isVerifying, setIsVerifying] = useState(true);
+  const verificationStarted = React.useRef(false);
 
   const sessionId = searchParams.get('session_id');
 
   useEffect(() => {
-    if (isLoading) return;
+    if (isLoading || verificationStarted.current) return;
 
     if (!isAuthenticated) {
       router.push('/login');
       return;
     }
+
+    verificationStarted.current = true;
 
     // Set a timeout to prevent infinite loading
     const timeout = setTimeout(() => {
@@ -30,29 +33,37 @@ export default function PaymentSuccessPage() {
 
     if (sessionId) {
       // Refresh user data to get updated subscription status
-      fetchCurrentUser()
-        .then(() => {
+      // We wait a bit first because Stripe webhooks can take a moment to process
+      const verifyPayment = async () => {
+        try {
+          // Give the webhook a moment to fire
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          await fetchCurrentUser();
+          
           clearTimeout(timeout);
           setIsVerifying(false);
-          // Auto-redirect to dashboard after verification
+          
+          // Auto-redirect to dashboard after showing success state for a moment
           setTimeout(() => {
             router.push('/dashboard');
           }, 2000);
-        })
-        .catch((error) => {
+        } catch (error) {
           console.error('Failed to refresh user data:', error);
           clearTimeout(timeout);
-          // Still proceed even if refresh fails
           setIsVerifying(false);
+          // Still proceed to dashboard so user can continue
           setTimeout(() => {
             router.push('/dashboard');
-          }, 2000);
-        });
+          }, 1000);
+        }
+      };
+      
+      verifyPayment();
     } else {
       // No session ID, just proceed
       clearTimeout(timeout);
-      setIsVerifying(false);
       setTimeout(() => {
+        setIsVerifying(false);
         router.push('/dashboard');
       }, 2000);
     }

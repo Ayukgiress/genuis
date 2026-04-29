@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   AreaChart,
@@ -26,6 +26,7 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const fetchInitiated = useRef(false);
   
   // Job Discovery state
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -42,15 +43,11 @@ export default function DashboardPage() {
       return;
     }
 
-    // Refresh user data to ensure subscription status is up to date
-    fetchCurrentUser();
+    if (fetchInitiated.current) return;
+    fetchInitiated.current = true;
 
-    // Set a timeout to prevent infinite loading
-    const timeout = setTimeout(() => {
-      console.log('Dashboard data loading timeout, showing dashboard anyway');
-      setIsLoading(false);
-      setDataLoaded(true);
-    }, 10000); // 10 second timeout
+    // Refresh user data once to ensure subscription status is up to date
+    fetchCurrentUser();
 
     const fetchDashboardData = async () => {
       try {
@@ -80,10 +77,8 @@ export default function DashboardPage() {
         }
 
         setDataLoaded(true);
-        clearTimeout(timeout);
       } catch (err) {
         console.error('Failed to fetch dashboard data:', err);
-        clearTimeout(timeout);
         // Don't set error for auth issues, just show empty dashboard
         if (!(err instanceof ApiError && (err.status === 401 || err.status === 403))) {
           setError('Failed to load some dashboard data. Please try refreshing the page.');
@@ -94,9 +89,7 @@ export default function DashboardPage() {
     };
 
     fetchDashboardData();
-
-    return () => clearTimeout(timeout);
-  }, [authLoading, isAuthenticated, router]);
+  }, [authLoading, isAuthenticated, router, dataLoaded, fetchCurrentUser]);
 
   const fetchJobs = useCallback(async () => {
     try {
@@ -120,15 +113,17 @@ export default function DashboardPage() {
     }
   }, [searchQuery, jobFilters.remote, jobFilters.location]);
 
-  useEffect(() => {
-    if (authLoading) return;
-    if (!isAuthenticated || !getAuthToken()) {
-      router.push('/login');
-      return;
-    }
+  const jobsFetched = useRef(false);
 
+  useEffect(() => {
+    if (authLoading || !isAuthenticated || !getAuthToken()) return;
+    
+    if (jobsFetched.current) return;
+    jobsFetched.current = true;
+
+    // Initial jobs fetch
     fetchJobs();
-  }, [authLoading, isAuthenticated, router, searchQuery, jobFilters.remote, jobFilters.location]);
+  }, [authLoading, isAuthenticated, fetchJobs]);
 
   const handleAddToKanban = async (job: Job) => {
     if (!selectedBoard) {

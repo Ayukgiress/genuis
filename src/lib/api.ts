@@ -10,7 +10,9 @@ import type {
   KanbanCard, KanbanCardCreate, KanbanCardUpdate,
   Job, JobSearchParams,
   Interview, InterviewCreate, InterviewMessage, InterviewMessageCreate,
-  Letter, LetterCreate, LetterUpdate, LetterGenerateRequest
+  Letter, LetterCreate, LetterUpdate, LetterGenerateRequest,
+  AuthUser, Token, UserCreate, VerificationResponse, RegisterResponse,
+  GoogleOAuthResponse, GoogleOAuthCallbackResponse
 } from "@/types";
 
 // Token management
@@ -143,60 +145,61 @@ export const api = {
   get: <T>(endpoint: string, params?: Record<string, string>) =>
     request<T>(endpoint, { method: "GET", params }),
 
-  post: <T>(endpoint: string, data?: unknown) =>
-    request<T>(endpoint, { method: "POST", body: JSON.stringify(data) }),
+  post: <T>(endpoint: string, data?: unknown, params?: Record<string, string>) =>
+    request<T>(endpoint, { method: "POST", body: JSON.stringify(data), params }),
 
   // For OAuth2 form data requests (login)
-  postForm: <T>(endpoint: string, data: Record<string, string>) =>
+  postForm: <T>(endpoint: string, data: Record<string, string>, params?: Record<string, string>) =>
     request<T>(endpoint, { 
       method: "POST", 
       body: new URLSearchParams(data).toString(),
+      params,
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
       },
     }),
 
-  put: <T>(endpoint: string, data?: unknown) =>
-    request<T>(endpoint, { method: "PUT", body: JSON.stringify(data) }),
+  put: <T>(endpoint: string, data?: unknown, params?: Record<string, string>) =>
+    request<T>(endpoint, { method: "PUT", body: JSON.stringify(data), params }),
 
-  patch: <T>(endpoint: string, data?: unknown) =>
-    request<T>(endpoint, { method: "PATCH", body: JSON.stringify(data) }),
+  patch: <T>(endpoint: string, data?: unknown, params?: Record<string, string>) =>
+    request<T>(endpoint, { method: "PATCH", body: JSON.stringify(data), params }),
 
-  delete: <T>(endpoint: string) =>
-    request<T>(endpoint, { method: "DELETE" }),
+  delete: <T>(endpoint: string, params?: Record<string, string>) =>
+    request<T>(endpoint, { method: "DELETE", params }),
 };
 
 export { ApiError };
 
 // Analysis API
 export const analysisApi = {
-  list: () => api.get<Analysis[]>("/api/analysis/"),
-  get: (analysisId: string) => api.get<Analysis>(`/api/analysis/${analysisId}/`),
-  getByResume: (resumeId: string | number) => api.get<Analysis>(`/api/analysis/resume/${resumeId}/`),
-  create: (data: AnalysisCreate) => api.post<Analysis>("/api/analysis/", data),
-  update: (analysisId: string, data: AnalysisUpdate) => api.patch<Analysis>(`/api/analysis/${analysisId}/`, data),
-  analyze: (resumeId: string | number) => api.post<Analysis>(`/api/analysis/resume/${resumeId}/analyze/`),
+  list: () => api.get<Analysis[]>("/api/analysis"),
+  get: (analysisId: string) => api.get<Analysis>(`/api/analysis/${analysisId}`),
+  getByResume: (resumeId: string | number) => api.get<Analysis>(`/api/analysis/resume/${resumeId}`),
+  create: (data: AnalysisCreate) => api.post<Analysis>("/api/analysis", data),
+  update: (analysisId: string, data: AnalysisUpdate) => api.patch<Analysis>(`/api/analysis/${analysisId}`, data),
+  analyze: (resumeId: string | number) => api.post<Analysis>(`/api/analysis/resume/${resumeId}/analyze`),
   getSuggestions: (resumeId: string | number, focusArea?: string) => 
-    api.post<{ suggestions: string[] }>(`/api/analysis/resume/${resumeId}/suggestions/`, { focus_area: focusArea }),
+    api.post<{ suggestions: string[] }>(`/api/analysis/resume/${resumeId}/suggestions`, { focus_area: focusArea }),
 };
 
 // Analytics API
 export const analyticsApi = {
-  list: () => api.get<Analytics[]>("/api/analytics/"),
-  create: (data: AnalyticsCreate) => api.post<Analytics>("/api/analytics/", data),
-  getSummary: () => api.get<{ total_events: number; event_types: Record<string, number> }>("/api/analytics/summary/"),
+  list: () => api.get<Analytics[]>("/api/analytics"),
+  create: (data: AnalyticsCreate) => api.post<Analytics>("/api/analytics", data),
+  getSummary: () => api.get<{ total_events: number; event_types: Record<string, number> }>("/api/analytics/summary"),
 };
 
 // Resume API
 export const resumeApi = {
-  list: () => api.get<Resume[]>("/api/resumes/"),
-  getUserResumes: () => api.get<Resume[]>("/api/resumes/"),
-  get: (resumeId: string | number) => api.get<Resume>(`/api/resumes/${resumeId}/`),
-  create: (data: ResumeCreate) => api.post<Resume>("/api/resumes/", data),
+  list: () => api.get<Resume[]>("/api/resumes"),
+  getUserResumes: () => api.get<Resume[]>("/api/resumes"),
+  get: (resumeId: string | number) => api.get<Resume>(`/api/resumes/${resumeId}`),
+  create: (data: ResumeCreate) => api.post<Resume>("/api/resumes", data),
   upload: (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    return request<Resume>("/api/resumes/upload/", {
+    return request<Resume>("/api/resumes/upload", {
       method: "POST",
       body: formData,
       headers: {
@@ -204,21 +207,42 @@ export const resumeApi = {
       },
     });
   },
-  update: (resumeId: string | number, data: ResumeUpdate) => api.patch<Resume>(`/api/resumes/${resumeId}/`, data),
-  delete: (resumeId: string | number) => api.delete<void>(`/api/resumes/${resumeId}/`),
+  update: (resumeId: string | number, data: ResumeUpdate) => api.patch<Resume>(`/api/resumes/${resumeId}`, data),
+  delete: (resumeId: string | number) => api.delete<void>(`/api/resumes/${resumeId}`),
+};
+
+export const authApi = {
+  googleLogin: () => api.get<GoogleOAuthResponse>("/api/auth/google"),
+  googleCallback: (code: string) => api.get<GoogleOAuthCallbackResponse>(`/api/auth/google/callback`, { code }),
+  register: (data: UserCreate) => api.post<RegisterResponse>("/api/auth/register", data),
+  verifyEmail: (token: string) => api.post<VerificationResponse>(`/api/auth/verify-email?token=${token}`),
+  verifyEmailPage: (token: string) => api.get<any>(`/api/auth/verify-email-page?token=${token}`),
+  verifyEmailHtml: (token: string) => api.get<string>(`/api/auth/verify-email-html?token=${token}`),
+  resendVerification: (email: string) => api.post<VerificationResponse>(`/api/auth/resend-verification?email=${email}`),
+  login: (data: Record<string, string>) => api.postForm<Token>("/api/auth/token", data),
+  getMe: () => api.get<AuthUser>("/api/auth/me"),
+  updateMe: (data: { name?: string; bio?: string; career_preferences?: any }) => {
+    const params: Record<string, string> = {};
+    if (data.name) params.name = data.name;
+    if (data.bio) params.bio = data.bio;
+    if (data.career_preferences) params.career_preferences = JSON.stringify(data.career_preferences);
+    return api.patch<AuthUser>("/api/auth/me", undefined, params);
+  },
+  logout: () => api.post<{ message: string }>("/api/auth/logout"),
+  refresh: () => api.post<Token>("/api/auth/refresh"),
 };
 
 export const kanbanApi = {
-  listBoards: () => api.get<KanbanBoard[]>("/api/kanban/boards/"),
-  getBoard: (boardId: string) => api.get<KanbanBoard>(`/api/kanban/boards/${boardId}/`),
-  createBoard: (data: KanbanBoardCreate) => api.post<KanbanBoard>("/api/kanban/boards/", data),
-  updateBoard: (boardId: string, data: KanbanBoardUpdate) => api.patch<KanbanBoard>(`/api/kanban/boards/${boardId}/`, data),
+  listBoards: () => api.get<KanbanBoard[]>("/api/kanban/boards"),
+  getBoard: (boardId: string) => api.get<KanbanBoard>(`/api/kanban/boards/${boardId}`),
+  createBoard: (data: KanbanBoardCreate) => api.post<KanbanBoard>("/api/kanban/boards", data),
+  updateBoard: (boardId: string, data: KanbanBoardUpdate) => api.patch<KanbanBoard>(`/api/kanban/boards/${boardId}`, data),
   
-  listCards: (boardId: string) => api.get<KanbanCard[]>(`/api/kanban/boards/${boardId}/cards/`),
-  getCard: (cardId: string) => api.get<KanbanCard>(`/api/kanban/cards/${cardId}/`),
-  createCard: (boardId: string, data: KanbanCardCreate) => api.post<KanbanCard>(`/api/kanban/boards/${boardId}/cards/`, data),
-  updateCard: (cardId: string, data: KanbanCardUpdate) => api.patch<KanbanCard>(`/api/kanban/cards/${cardId}/`, data),
-  deleteCard: (cardId: string) => api.delete<void>(`/api/kanban/cards/${cardId}/`),
+  listCards: (boardId: string) => api.get<KanbanCard[]>(`/api/kanban/boards/${boardId}/cards`),
+  getCard: (cardId: string) => api.get<KanbanCard>(`/api/kanban/cards/${cardId}`),
+  createCard: (boardId: string, data: KanbanCardCreate) => api.post<KanbanCard>(`/api/kanban/boards/${boardId}/cards`, data),
+  updateCard: (cardId: string, data: KanbanCardUpdate) => api.patch<KanbanCard>(`/api/kanban/cards/${cardId}`, data),
+  deleteCard: (cardId: string) => api.delete<void>(`/api/kanban/cards/${cardId}`),
 };
 
 export const jobApi = {
@@ -230,13 +254,13 @@ export const jobApi = {
     if (params?.job_type) queryParams.job_type = params.job_type;
     if (params?.page) queryParams.page = params.page.toString();
     if (params?.limit) queryParams.limit = params.limit.toString();
-    return api.get<Job[]>("/api/jobs/search/", queryParams);
+    return api.get<Job[]>("/api/jobs/search", queryParams);
   },
-  getById: (jobId: string) => api.get<Job>(`/api/jobs/${jobId}/`),
+  getById: (jobId: string) => api.get<Job>(`/api/jobs/${jobId}`),
   getRecommendations: (resumeId?: number) => {
     const params: Record<string, string> = {};
     if (resumeId) params.resume_id = resumeId.toString();
-    return api.get<Job[]>("/api/jobs/recommendations/", params);
+    return api.get<Job[]>("/api/jobs/recommendations", params);
   },
   matchWithResume: (jobId: string, resumeId: number) => api.post<Job>(`/api/jobs/${jobId}/match?resume_id=${resumeId}`, {}),
   addToKanban: (jobId: string, boardId: number, status?: string) =>
@@ -245,22 +269,26 @@ export const jobApi = {
 
 // Letter API
 export const letterApi = {
-  list: () => api.get<Letter[]>("/api/letters/"),
-  get: (letterId: number) => api.get<Letter>(`/api/letters/${letterId}/`),
-  create: (data: LetterCreate) => api.post<Letter>("/api/letters/", data),
-  update: (letterId: number, data: LetterUpdate) => api.patch<Letter>(`/api/letters/${letterId}/`, data),
-  delete: (letterId: number) => api.delete<void>(`/api/letters/${letterId}/`),
-  generate: (data: LetterGenerateRequest) => api.post<Letter>("/api/letters/generate/", data),
+  list: () => api.get<Letter[]>("/api/letters"),
+  get: (letterId: number) => api.get<Letter>(`/api/letters/${letterId}`),
+  create: (data: LetterCreate) => api.post<Letter>("/api/letters", data),
+  update: (letterId: number, data: LetterUpdate) => api.patch<Letter>(`/api/letters/${letterId}`, data),
+  delete: (letterId: number) => api.delete<void>(`/api/letters/${letterId}`),
+  generate: (data: LetterGenerateRequest) => api.post<Letter>("/api/letters/generate", data),
+};
+
+export const paymentApi = {
+  createCheckoutSession: () => api.post<{ checkout_url: string }>("/api/payment/create-checkout-session"),
 };
 
 export const interviewApi = {
-  list: () => api.get<Interview[]>("/api/interviews/"),
-  get: (interviewId: number) => api.get<Interview>(`/api/interviews/${interviewId}/`),
-  create: (data: InterviewCreate) => api.post<Interview>("/api/interviews/", data),
-  delete: (interviewId: number) => api.delete<void>(`/api/interviews/${interviewId}/`),
-  complete: (interviewId: number) => api.post<{ message: string; interview: Interview }>(`/api/interviews/${interviewId}/complete/`, {}),
+  list: () => api.get<Interview[]>("/api/interviews"),
+  get: (interviewId: number) => api.get<Interview>(`/api/interviews/${interviewId}`),
+  create: (data: InterviewCreate) => api.post<Interview>("/api/interviews", data),
+  delete: (interviewId: number) => api.delete<void>(`/api/interviews/${interviewId}`),
+  complete: (interviewId: number) => api.post<{ message: string; interview: Interview }>(`/api/interviews/${interviewId}/complete`, {}),
   sendMessage: (interviewId: number, data: InterviewMessageCreate) =>
-    api.post<InterviewMessage>(`/api/interviews/${interviewId}/messages/`, data),
-  getMessages: (interviewId: number) => api.get<InterviewMessage[]>(`/api/interviews/${interviewId}/messages/`),
+    api.post<InterviewMessage>(`/api/interviews/${interviewId}/messages`, data),
+  getMessages: (interviewId: number) => api.get<InterviewMessage[]>(`/api/interviews/${interviewId}/messages`),
   getTalkUrl: (interviewId: number) => `${WS_BASE_URL}/api/interviews/${interviewId}/talk`,
 };

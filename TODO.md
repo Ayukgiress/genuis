@@ -1,20 +1,21 @@
-# Interview Page Updates - TODO
+# Pro Subscription Fix - Implementation Steps
 
-- [x] Add `isSpeaking` state declaration
-- [x] Replace `speakText` with `speakTextAndWait` (Promise-based) + keep old `speakText`
-- [x] Replace `handleChatMessage` with new response handler
-- [x] Replace `startStructuredInterview` to kick off with AI greeting
-- [x] Fix speech recognition `onresult` — auto-send after 1.8s silence
-- [x] Update bottom UI — show Start Interview button and hide manual controls during interview
+## Current Status: ✅ Plan Approved - 0/12 steps complete
 
-# Custom Letter Generation on Job Apply - TODO
+### Backend Changes (6 steps)
+- [ ] 1. **app/routers/auth.py**: Update `/auth/me` to return `subscription_plan`, `subscription_status`
+- [ ] 2. **app/crud/user.py**: Add `update_subscription_status(user_id, plan, status)` function  
+- [ ] 3. **app/routers/payment.py**: Create/add Stripe webhook endpoint `/webhook/stripe` to call crud update
+- [ ] 4. **app/schemas/user.py**: Ensure `UserOut`/`UserRead` includes subscription fields
+- [ ] 5. **app/main.py**: Add Stripe webhook route if missing
+- [ ] 6. **Test**: Backend - `curl /api/auth/me` shows Pro fields after manual DB update
 
-- [x] Create `src/components/jobs/ApplyJobModal.tsx`
-  - [x] Ask user if they want a custom cover letter
-  - [x] If yes, prompt resume selection (auto-select if only 1, show dropdown if >1, error if 0)
-  - [x] Generate letter via `letterApi.generate()`
-  - [x] Open `job.source_url` in new tab after generation/choice
-- [x] Modify `src/app/jobs/page.tsx`
-  - [x] Replace Apply `<a>` link with button that opens modal
-  - [x] Pass selected job and resumes into modal
+### Frontend Changes (6 steps)
+- [ ] 7. **src/app/payment/success/page.tsx**: Add `fetchCurrentUser()` + redirect to dashboard
+- [ ] 8. **src/components/dashboard/Sidebar.tsx**: Add manual refresh button for testing
+- [ ] 9. **src/store/auth-store.ts**: Log subscription data in `fetchCurrentUser`
+- [ ] 10. **src/lib/api.ts**: Log `/auth/me` response in `getMe`
+- [ ] 11. **Test**: Frontend - Payment success → upgrade button disappears
+- [ ] 12. **Final Test**: End-to-end - Pro payment → unlimited job recommendations (no 403)
 
+**Next Command**: `npm run dev` (frontend) + backend restart after changes

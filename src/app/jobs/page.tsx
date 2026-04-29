@@ -32,8 +32,10 @@ export default function JobsPage() {
       setIsLoading(true);
       setError(null);
 
-      const data = await jobApi.getRecommendations(resumeId);
-      setJobs(data);
+const data = await jobApi.getRecommendations(resumeId);
+      console.log('Jobs API response:', data);
+      const jobsArray = Array.isArray(data) ? data : (data as any)?.data || (data as any)?.jobs || [];
+      setJobs(jobsArray);
       setSuccess(resumeId ? 'Job recommendations loaded based on your resume!' : 'General job listings loaded');
     } catch (err) {
       console.error('Failed to get recommendations:', err);

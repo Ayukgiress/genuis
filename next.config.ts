@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   trailingSlash: true,
+  turbopack: {},
   webpack: (config) => {
     config.watchOptions = {
       ignored: [/node_modules/, /\.next/],

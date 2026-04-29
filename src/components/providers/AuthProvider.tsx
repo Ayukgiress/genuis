@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuthStore } from "@/store/auth-store";
 import { setAuthToken } from "@/lib/api";
 
@@ -8,6 +8,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
   const fetchCurrentUser = useAuthStore((state: any) => state.fetchCurrentUser);
+  const hasCheckedRef = useRef(false);
 
   useEffect(() => {
     setMounted(true);
@@ -33,6 +34,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const checkAuth = async () => {
+      if (hasCheckedRef.current) return;
+      hasCheckedRef.current = true;
       syncToken();
       await fetchCurrentUser();
       setAuthChecked(true);

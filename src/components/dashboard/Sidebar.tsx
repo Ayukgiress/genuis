@@ -91,10 +91,14 @@ export const Sidebar = () => {
   const pathname = usePathname();
   const router = useRouter();
   const { user, fetchCurrentUser, logout } = useAuth();
+  const fetchAttempted = React.useRef(false);
 
   // Refresh user data when sidebar mounts to ensure subscription status is current
   useEffect(() => {
-    fetchCurrentUser();
+    if (!fetchAttempted.current) {
+      fetchCurrentUser();
+      fetchAttempted.current = true;
+    }
   }, [fetchCurrentUser]);
 
   const handleLogout = async () => {

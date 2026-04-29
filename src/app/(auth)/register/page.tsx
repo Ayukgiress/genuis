@@ -46,14 +46,14 @@ function RegisterForm() {
   // Show verification success
   if (verificationSuccess) {
     return (
-      <div className="flex min-h-screen bg-black text-white selection:bg-primary/30">
-        <div className="hidden lg:flex flex-col justify-between w-1/2 p-16 relative overflow-hidden">
+      <div className="min-h-screen bg-black text-white selection:bg-primary/30 grid grid-cols-1 lg:grid-cols-2 items-center">
+        <div className="hidden lg:flex flex-col justify-center items-center p-16 relative overflow-hidden">
           <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-[120px] -z-10" />
-          <div className="space-y-12">
+          <div className="space-y-12 max-w-2xl">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
-                <svg 
-                  viewBox="0 0 24 24" 
+                <svg
+                  viewBox="0 0 24 24"
                   className="w-5 h-5 text-black"
                   fill="currentColor"
                   xmlns="http://www.w3.org/2000/svg"
@@ -65,7 +65,7 @@ function RegisterForm() {
             </div>
           </div>
         </div>
-        <div className="flex-1 flex items-center justify-center p-6 lg:p-12">
+        <div className="flex items-center justify-center p-6 lg:p-12 w-full">
           <div className="w-full max-w-[440px] space-y-8 bg-[#0D0D0D] border border-zinc-800/50 p-10 rounded-3xl shadow-2xl text-center">
             <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto">
               <svg viewBox="0 0 24 24" className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" strokeWidth="2">
@@ -91,14 +91,14 @@ function RegisterForm() {
   // Show verification message after registration
   if (showVerificationMessage) {
     return (
-      <div className="flex min-h-screen bg-black text-white selection:bg-primary/30">
-        <div className="hidden lg:flex flex-col justify-between w-1/2 p-16 relative overflow-hidden">
+      <div className="min-h-screen bg-black text-white selection:bg-primary/30 grid grid-cols-1 lg:grid-cols-2 items-center">
+        <div className="hidden lg:flex flex-col justify-center items-center p-16 relative overflow-hidden">
           <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-[120px] -z-10" />
-          <div className="space-y-12">
+          <div className="space-y-12 max-w-2xl">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
-                <svg 
-                  viewBox="0 0 24 24" 
+                <svg
+                  viewBox="0 0 24 24"
                   className="w-5 h-5 text-black"
                   fill="currentColor"
                   xmlns="http://www.w3.org/2000/svg"
@@ -110,7 +110,7 @@ function RegisterForm() {
             </div>
           </div>
         </div>
-        <div className="flex-1 flex items-center justify-center p-6 lg:p-12">
+        <div className="flex items-center justify-center p-6 lg:p-12 w-full">
           <div className="w-full max-w-[440px] space-y-8 bg-[#0D0D0D] border border-zinc-800/50 p-10 rounded-3xl shadow-2xl text-center">
             <div className="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center mx-auto">
               <svg viewBox="0 0 24 24" className="w-8 h-8 text-primary" fill="none" stroke="currentColor" strokeWidth="2">
@@ -180,42 +180,30 @@ function RegisterForm() {
   }
 
   return (
-    <div className="flex min-h-screen bg-black text-white selection:bg-primary/30">
+    <div className="min-h-screen bg-black text-white selection:bg-primary/30 grid grid-cols-1 lg:grid-cols-2 items-center">
       {/* Left Side - Branding */}
-      <div className="hidden lg:flex flex-col justify-between w-1/2 p-16 relative overflow-hidden">
+      <div className="hidden lg:flex flex-col justify-center items-center p-16 relative overflow-hidden">
         {/* Decorative background glow */}
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-[120px] -z-10" />
-        
-        <div className="space-y-12">
+
+        <div className="space-y-12 max-w-2xl">
           {/* Logo */}
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
-              <svg 
-                viewBox="0 0 24 24" 
-                className="w-5 h-5 text-black"
-                fill="currentColor"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path d="M12.871 4.285a.75.75 0 0 0-1.142 0l-4.7 5.485c-.566.66-.188 1.73.682 1.73h2.039v5.25a.75.75 0 0 0 1.5 0v-5.25h2.039c.87 0 1.248-1.07.682-1.73l-4.7-5.485zM4 19.25a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H4.75a.75.75 0 0 1-.75-.75z" />
-              </svg>
-            </div>
-            <span className="text-xl font-bold tracking-tight">Genius </span>
-          </div>
+          
 
           {/* Main Content */}
-          <div className="space-y-6 max-w-lg">
+          <div className="space-y-6 w-full text-center">
             <h1 className="text-7xl font-bold leading-[1.1] tracking-tight">
               Elevate Your <br />
               <span className="text-primary">Career</span> Path.
             </h1>
             <p className="text-zinc-400 text-lg leading-relaxed">
-              A high-end AI platform designed for the modern job seeker. 
+              A high-end AI platform designed for the modern job seeker.
               Leverage obsidian-grade intelligence to land your dream role.
             </p>
           </div>
 
           {/* Feature Badges */}
-          <div className="flex flex-wrap gap-4 pt-4">
+          <div className="flex flex-wrap justify-center gap-4 pt-4">
             <div className="flex items-center gap-2 px-4 py-2 rounded-full border border-zinc-800 bg-zinc-900/50 backdrop-blur-sm text-sm text-zinc-300">
               <svg viewBox="0 0 24 24" className="w-4 h-4 text-primary fill-current">
                 <path d="M12 2l2.4 7.2h7.6l-6 4.8 2.4 7.2-6-4.8-6 4.8 2.4-7.2-6-4.8h7.6z" />
@@ -231,17 +219,10 @@ function RegisterForm() {
             </div>
           </div>
         </div>
-
-        {/* Footer info for desktop */}
-        <div className="flex gap-8 text-[10px] tracking-widest text-zinc-600 uppercase">
-          <span>© 2024 OBSIDIAN SERIES</span>
-          <a href="#" className="hover:text-zinc-400 transition-colors">Privacy Protocol</a>
-          <a href="#" className="hover:text-zinc-400 transition-colors">Service Terms</a>
-        </div>
       </div>
 
       {/* Right Side - Register Form */}
-      <div className="flex-1 flex items-center justify-center p-6 lg:p-12">
+      <div className="flex items-center justify-center p-6 lg:p-12 w-full">
         <div className="w-full max-w-[440px] space-y-8 bg-[#0D0D0D] border border-zinc-800/50 p-10 rounded-3xl shadow-2xl">
           <div className="space-y-2">
             <h2 className="text-3xl font-bold tracking-tight">Create Account</h2>
@@ -353,6 +334,13 @@ function RegisterForm() {
             </a>
           </p>
         </div>
+      </div>
+
+      {/* Desktop Footer */}
+      <div className="hidden lg:flex absolute bottom-6 left-6 gap-8 text-[10px] tracking-widest text-zinc-600 uppercase">
+        <span>© 2024 OBSIDIAN SERIES</span>
+        <a href="#" className="hover:text-zinc-400 transition-colors">Privacy Protocol</a>
+        <a href="#" className="hover:text-zinc-400 transition-colors">Service Terms</a>
       </div>
 
       {/* Mobile Footer */}
