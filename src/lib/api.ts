@@ -136,7 +136,7 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   console.log('🔑 Token check:', { endpoint, hasToken: !!token, tokenPreview: token?.substring(0, 10) });
 
   const headers: HeadersInit = {
-    "Content-Type": "application/json",
+    ...(fetchOptions.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
     ...fetchOptions.headers,
   };
 
