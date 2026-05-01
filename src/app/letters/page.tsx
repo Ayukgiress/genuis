@@ -14,6 +14,7 @@ export default function LettersPage() {
   const [letters, setLetters] = useState<Letter[]>([]);
   const [isLoadingLetters, setIsLoadingLetters] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
 
   useEffect(() => {
@@ -29,6 +30,7 @@ export default function LettersPage() {
   const fetchLetters = async () => {
     try {
       setIsLoadingLetters(true);
+      setError(null);
       const data = await letterApi.list();
       setLetters(data);
     } catch (err) {
@@ -45,8 +47,10 @@ export default function LettersPage() {
     if (!confirm('Are you sure you want to delete this letter?')) return;
 
     try {
+      setError(null);
       await letterApi.delete(letterId);
       setLetters(prev => prev.filter(letter => letter.id !== letterId));
+      setSuccess('Letter deleted successfully!');
     } catch (err) {
       console.error('Failed to delete letter:', err);
       setError('Failed to delete letter');
@@ -68,7 +72,7 @@ export default function LettersPage() {
 
   if (isLoading || isLoadingLetters) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex items-center justify-center min-h-[calc(100vh-64px)] bg-black">
         <div className="flex flex-col items-center gap-4">
           <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
           <p className="text-zinc-500 text-sm">Loading letters...</p>
@@ -78,11 +82,11 @@ export default function LettersPage() {
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Custom Letters</h1>
-          <p className="text-zinc-500 text-sm mt-1">AI-generated professional correspondence</p>
+    <div className="p-8 space-y-10 min-h-screen bg-black text-white">
+      <div className="flex justify-between items-end">
+        <div className="space-y-1">
+          <h1 className="text-4xl font-bold tracking-tight">Custom Letters</h1>
+          <p className="text-zinc-500 text-lg">AI-generated professional correspondence tailored to your needs.</p>
         </div>
         <button
           onClick={() => setShowGenerateModal(true)}
@@ -93,8 +97,13 @@ export default function LettersPage() {
       </div>
 
       {error && (
-        <div className="p-4 bg-red-500/5 border border-red-500/20 rounded-xl">
-          <p className="text-red-400 text-sm">{error}</p>
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+          {error}
+        </div>
+      )}
+      {success && (
+        <div className="p-4 rounded-xl bg-primary/10 border border-primary/20 text-primary text-sm">
+          {success}
         </div>
       )}
 

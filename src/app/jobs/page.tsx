@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { jobApi, resumeApi, analysisApi, ApiError, getAuthToken } from '@/lib/api';
+import { jobApi, resumeApi, analysisApi, kanbanApi, ApiError, getAuthToken } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import type { Job, Resume, Analysis } from '@/types';
 import { ApplyJobModal } from '@/components/jobs/ApplyJobModal';
@@ -26,6 +26,7 @@ export default function JobsPage() {
   const [page, setPage] = useState(1);
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [selectedJobForApply, setSelectedJobForApply] = useState<Job | null>(null);
+  const [boards, setBoards] = useState<any[]>([]);
 
   const loadRecommendations = useCallback(async (resumeId?: number) => {
     try {
@@ -34,7 +35,15 @@ export default function JobsPage() {
 
 const data = await jobApi.getRecommendations(resumeId);
       console.log('Jobs API response:', data);
-      const jobsArray = Array.isArray(data) ? data : (data as any)?.data || (data as any)?.jobs || [];
+      let jobsArray: Job[] = [];
+      if (Array.isArray(data)) {
+        jobsArray = data;
+      } else if (data && typeof data === 'object') {
+        jobsArray = (data as any).jobs || (data as any).data?.jobs || (data as any).data || [];
+        if (!Array.isArray(jobsArray)) {
+          jobsArray = [];
+        }
+      }
       setJobs(jobsArray);
       setSuccess(resumeId ? 'Job recommendations loaded based on your resume!' : 'General job listings loaded');
     } catch (err) {
@@ -64,6 +73,9 @@ const data = await jobApi.getRecommendations(resumeId);
 
       const resumesData = await resumeApi.list();
       setResumes(resumesData);
+
+      const boardsData = await kanbanApi.listBoards();
+      setBoards(boardsData);
 
       if (resumesData.length > 0) {
         setSelectedResume(resumesData[0]);
@@ -160,6 +172,22 @@ const data = await jobApi.getRecommendations(resumeId);
       }
     } finally {
       setIsMatching(false);
+    }
+  };
+
+  const handleAddToKanban = async (job: Job) => {
+    if (boards.length === 0) {
+      setError('No kanban boards available. Please create a board first.');
+      return;
+    }
+
+    try {
+      setError(null);
+      await jobApi.addToKanban(job.id, parseInt(boards[0].id), 'todo');
+      setSuccess(`"${job.title}" added to your kanban board!`);
+    } catch (err) {
+      console.error('Failed to add to kanban:', err);
+      setError('Failed to add job to kanban board.');
     }
   };
 
@@ -360,12 +388,23 @@ const data = await jobApi.getRecommendations(resumeId);
                         </svg>
                         Match
                       </button>
-                      <button
-                        onClick={() => handleOpenApplyModal(job)}
-                        className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs font-bold hover:border-primary/50 transition-all text-center"
-                      >
-                        Apply
-                      </button>
+                       <button
+                         onClick={() => handleOpenApplyModal(job)}
+                         className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs font-bold hover:border-primary/50 transition-all text-center"
+                       >
+                         Apply
+                       </button>
+                       <button
+                         onClick={() => handleAddToKanban(job)}
+                         disabled={boards.length === 0}
+                         className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-purple-600 text-white text-xs font-bold hover:opacity-90 transition-all disabled:opacity-50 text-center"
+                       >
+                         <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
+                           <line x1="12" y1="5" x2="12" y2="19" />
+                           <line x1="5" y1="12" x2="19" y2="12" />
+                         </svg>
+                         Add to Kanban
+                       </button>
                     </div>
                   </div>
                   

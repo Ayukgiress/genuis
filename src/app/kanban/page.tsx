@@ -37,9 +37,15 @@ export default function KanbanPage() {
       setIsLoading(true);
       setError(null);
       const data = await kanbanApi.listBoards();
-      setBoards(data);
-      if (data.length > 0 && !currentBoard) {
-        setCurrentBoard(data[0]);
+      // Normalize ids to strings
+      const normalizedBoards = data.map(board => ({
+        ...board,
+        id: String(board.id),
+        user_id: String(board.user_id),
+      }));
+      setBoards(normalizedBoards);
+      if (normalizedBoards.length > 0 && !currentBoard) {
+        setCurrentBoard(normalizedBoards[0]);
       }
     } catch (err) {
       console.error('Failed to fetch boards:', err);
@@ -66,7 +72,13 @@ export default function KanbanPage() {
   const fetchCards = async (boardId: string) => {
     try {
       const data = await kanbanApi.listCards(boardId);
-      setCards(data);
+      // Normalize ids to strings
+      const normalizedCards = data.map(card => ({
+        ...card,
+        id: String(card.id),
+        board_id: String(card.board_id),
+      }));
+      setCards(normalizedCards);
     } catch (err) {
       console.error('Failed to fetch cards:', err);
       setCards([]);
@@ -95,8 +107,14 @@ export default function KanbanPage() {
     try {
       setError(null);
       const board = await kanbanApi.createBoard({ name: newBoardName });
-      setBoards(prev => [...prev, board]);
-      setCurrentBoard(board);
+      // Normalize ids to strings
+      const normalizedBoard = {
+        ...board,
+        id: String(board.id),
+        user_id: String(board.user_id),
+      };
+      setBoards(prev => [...prev, normalizedBoard]);
+      setCurrentBoard(normalizedBoard);
       setNewBoardName('');
       setIsCreatingBoard(false);
       setSuccess('Board created successfully!');
@@ -134,7 +152,13 @@ export default function KanbanPage() {
         company: newCardCompany,
         location: newCardLocation,
       });
-      setCards(prev => [...prev, card]);
+      // Normalize ids to strings
+      const normalizedCard = {
+        ...card,
+        id: String(card.id),
+        board_id: String(card.board_id),
+      };
+      setCards(prev => [...prev, normalizedCard]);
       setNewCardTitle('');
       setNewCardCompany('');
       setNewCardLocation('');
