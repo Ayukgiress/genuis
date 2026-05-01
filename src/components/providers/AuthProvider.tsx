@@ -11,8 +11,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const hasCheckedRef = useRef(false);
 
   useEffect(() => {
-    setMounted(true);
-
     // Sync token from localStorage/store to the API module on mount
     const syncToken = () => {
       // Try cookies first
@@ -42,6 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     checkAuth();
+    setMounted(true);
   }, [fetchCurrentUser]);
 
   if (!mounted || !authChecked) {

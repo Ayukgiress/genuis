@@ -15,8 +15,10 @@ function VerifyEmailForm() {
 
   useEffect(() => {
     if (!token) {
-      setStatus("error");
-      setMessage("No verification token provided. Please check your email for the verification link.");
+      setTimeout(() => {
+        setStatus("error");
+        setMessage("No verification token provided. Please check your email for the verification link.");
+      }, 0);
       return;
     }
 

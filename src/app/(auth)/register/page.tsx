@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/store/auth-store";
 
@@ -15,15 +15,11 @@ function RegisterForm() {
   const [formError, setFormError] = useState("");
   const [verificationSuccess, setVerificationSuccess] = useState(false);
 
-  // Check for verification token in URL
-  useEffect(() => {
-    const token = searchParams.get("token");
-    if (token) {
-      handleVerifyEmail(token);
-    }
-  }, [searchParams]);
+  const hasVerifiedRef = useRef(false);
 
-  const handleVerifyEmail = async (token: string) => {
+  const handleVerifyEmail = useCallback(async (token: string) => {
+    if (hasVerifiedRef.current) return;
+    hasVerifiedRef.current = true;
     try {
       await verifyEmail(token);
       setVerificationSuccess(true);
@@ -31,7 +27,14 @@ function RegisterForm() {
     } catch (error) {
       // Error is handled by the store
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const token = searchParams.get("token");
+    if (token && !hasVerifiedRef.current) {
+      handleVerifyEmail(token);
+    }
+  }, [searchParams, handleVerifyEmail]);
 
   useEffect(() => {
     if (isAuthenticated) {

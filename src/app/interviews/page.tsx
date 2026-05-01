@@ -573,7 +573,7 @@ export default function InterviewsPage() {
             <div className="absolute inset-0 rounded-full border-2 border-[#00F29C]/20" />
             <div className="absolute inset-0 rounded-full border-2 border-[#00F29C] border-t-transparent animate-spin" />
           </div>
-          <p className="text-zinc-500 text-sm tracking-widest uppercase text-[10px]">Loading sessions</p>
+          <p className="text-zinc-500 text-sm tracking-widest uppercase text-[10px]">LOADING</p>
         </div>
       </div>
     );
@@ -587,31 +587,48 @@ export default function InterviewsPage() {
         {/* Header */}
         <div className="flex justify-between items-end mb-10">
           <div>
-            <p className="mono text-[10px] tracking-[0.3em] text-zinc-600 uppercase mb-2">Session Manager</p>
-            <h1 className="text-4xl font-bold tracking-tight text-white">
-              AI Interview <span className="text-[#00F29C]">Studio</span>
-            </h1>
-            <p className="text-zinc-500 text-sm mt-1 mono">Voice-powered practice sessions</p>
           </div>
           <button
             onClick={() => setShowCreateModal(true)}
             className="glow-btn px-6 py-3 bg-[#00F29C] text-black font-bold rounded-xl text-sm tracking-wide"
           >
-            + New Session
+            NEW INTERVIEW
           </button>
         </div>
 
         {/* Alerts */}
-        {error && (
-          <div className="mb-6 p-4 bg-red-500/5 border border-red-500/20 rounded-xl flex items-center gap-3">
-            <div className="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0" />
-            <p className="text-red-400 text-sm mono">{error}</p>
-          </div>
-        )}
-        {success && (
-          <div className="mb-6 p-4 bg-[#00F29C]/5 border border-[#00F29C]/20 rounded-xl flex items-center gap-3">
-            <div className="w-1.5 h-1.5 rounded-full bg-[#00F29C] flex-shrink-0" />
-            <p className="text-[#00F29C] text-sm mono">{success}</p>
+        {(error || success) && (
+          <div className="mb-6">
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/25 rounded-xl p-4 flex items-center gap-3">
+                <svg viewBox="0 0 24 24" className="w-5 h-5 text-red-400 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="m15 9-6 6" />
+                  <path d="m9 9 6 6" />
+                </svg>
+                <p className="text-red-400 text-sm font-medium">{error}</p>
+                <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-300">
+                  <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M18 6L6 18" />
+                    <path d="M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            )}
+            {success && (
+              <div className="bg-[#00F29C]/10 border border-[#00F29C]/25 rounded-xl p-4 flex items-center gap-3">
+                <svg viewBox="0 0 24 24" className="w-5 h-5 text-[#00F29C] flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                <p className="text-[#00F29C] text-sm font-medium">{success}</p>
+                <button onClick={() => setSuccess(null)} className="ml-auto text-[#00F29C] hover:text-[#00F29C]/80">
+                  <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M18 6L6 18" />
+                    <path d="M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -620,7 +637,7 @@ export default function InterviewsPage() {
           {/* ── Left Panel: Sessions List ── */}
           <div className="space-y-3">
             <p className="mono text-[9px] tracking-[0.35em] text-zinc-600 uppercase px-1">
-              {interviews.length} Session{interviews.length !== 1 ? 's' : ''}
+              SESSIONS
             </p>
 
             {interviews.length === 0 ? (
@@ -631,8 +648,8 @@ export default function InterviewsPage() {
                     <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
                   </svg>
                 </div>
-                <p className="text-zinc-500 text-sm">No sessions yet</p>
-                <p className="text-zinc-700 text-xs mt-1 mono">Create your first practice session</p>
+                <p className="text-zinc-500 text-sm">No interviews yet</p>
+                <p className="text-zinc-700 text-xs mt-1 mono">CREATE YOUR FIRST INTERVIEW</p>
               </div>
             ) : (
               interviews.map((interview) => {
@@ -701,12 +718,18 @@ export default function InterviewsPage() {
                     </svg>
                   </div>
                   <div>
-                    <h3 className="font-bold text-white text-sm">{getJobDetails(selectedInterview.job_id)?.title || 'Interview Session'}</h3>
-                    <p className="mono text-zinc-500 text-[11px]">{getJobDetails(selectedInterview.job_id)?.company || 'Company'}</p>
+                    {(() => {
+                      const job = getJobDetails(selectedInterview.job_id);
+                      return (
+                        <>
+                          <h3 className="font-bold text-white text-sm">{job?.title || 'Interview Session'}</h3>
+                          <p className="mono text-zinc-500 text-[11px]">{job?.company || 'Practice Interview'}</p>
+                        </>
+                      );
+                    })()}
                     {isStructuredMode && isInterviewStarted && (
                       <p className="mono text-zinc-400 text-[10px] mt-1">
                         Question {currentQuestionIndex + 1} of {interviewQuestions.length}
-                        {interviewRating && ` • Rating: ${interviewRating}/10`}
                       </p>
                     )}
                   </div>
@@ -732,7 +755,7 @@ export default function InterviewsPage() {
                         <div key={i} className="waveform-bar" style={{ height: `${[14, 22, 28, 18, 12][i]}px`, animationDelay: `${i * 0.15}s` }} />
                       ))}
                     </div>
-                    <p className="mono text-zinc-500 text-xs tracking-widest uppercase">Press mic to begin session</p>
+                    <p className="mono text-zinc-500 text-xs tracking-widest uppercase">START YOUR INTERVIEW</p>
                   </div>
                 )}
 
@@ -770,7 +793,7 @@ export default function InterviewsPage() {
                     disabled={isSending}
                     className="px-10 py-4 bg-[#00F29C] text-black font-bold rounded-2xl text-sm tracking-wide glow-btn disabled:opacity-40"
                   >
-                    {isSending ? 'Starting...' : '▶ Start Interview'}
+                    START INTERVIEW
                   </button>
                 </div>
               )}
@@ -792,15 +815,13 @@ export default function InterviewsPage() {
 
                     {/* Status */}
                     <p className="mono text-[10px] tracking-widest uppercase text-zinc-500">
-                      {isSending ? 'AI is thinking...' :
-                       isRecording ? '🎙 Listening — speak now' :
-                       'Waiting...'}
+                      {isSpeaking ? 'AI SPEAKING' : isRecording ? 'LISTENING' : 'READY'}
                     </p>
 
                     {/* Live transcript preview */}
                     {newMessage && (
                       <p className="text-zinc-400 text-xs italic text-center max-w-sm truncate">
-                        {newMessage}
+                        "{newMessage}"
                       </p>
                     )}
                   </div>
@@ -812,7 +833,7 @@ export default function InterviewsPage() {
                   <svg viewBox="0 0 24 24" className="w-4 h-4 text-zinc-500" fill="none" stroke="currentColor" strokeWidth="2">
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
-                  <p className="mono text-zinc-500 text-xs tracking-widest uppercase">Session completed</p>
+                  <p className="mono text-zinc-500 text-xs tracking-widest uppercase">INTERVIEW COMPLETED</p>
                 </div>
               )}
             </div>
@@ -823,10 +844,10 @@ export default function InterviewsPage() {
                   <div key={i} className="waveform-bar" style={{ height: `${[10, 18, 26, 32, 26, 18, 10][i]}px`, animationDelay: `${i * 0.12}s` }} />
                 ))}
               </div>
-              <div className="text-center">
-                <p className="text-zinc-500 text-sm font-medium">Select a session</p>
-                <p className="mono text-zinc-700 text-xs mt-1">or create a new one to get started</p>
-              </div>
+                <div className="text-center">
+                  <p className="text-zinc-500 text-sm font-medium">Select an interview to start</p>
+                  <p className="mono text-zinc-700 text-xs mt-1">CHOOSE FROM THE LIST</p>
+                </div>
             </div>
           )}
         </div>
@@ -836,21 +857,21 @@ export default function InterviewsPage() {
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
             <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl">
               <div className="mb-6">
-                <p className="mono text-[9px] tracking-[0.35em] text-zinc-600 uppercase mb-2">New Session</p>
-                <h3 className="font-bold text-white text-xl">Configure Interview</h3>
+                <p className="mono text-[9px] tracking-[0.35em] text-zinc-600 uppercase mb-2">CREATE</p>
+                <h3 className="font-bold text-white text-xl">New Interview Session</h3>
               </div>
 
               <div className="space-y-5">
                 <div>
                   <label className="mono text-[10px] tracking-widest text-zinc-500 uppercase block mb-2">
-                    Job Position
+                    SELECT JOB POSITION
                   </label>
                   <select
                     value={selectedJobId}
                     onChange={(e) => setSelectedJobId(e.target.value)}
                     className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3.5 text-white text-sm focus:outline-none focus:border-[#00F29C]/50 transition-colors appearance-none"
                   >
-                    <option value="">Choose a position...</option>
+                    <option value="">Choose a job position...</option>
                     {jobs.map((job) => (
                       <option key={job.id} value={job.id}>{job.title} at {job.company}</option>
                     ))}
@@ -862,14 +883,14 @@ export default function InterviewsPage() {
                     onClick={() => setShowCreateModal(false)}
                     className="flex-1 px-4 py-3.5 bg-zinc-800 hover:bg-zinc-700 text-white font-bold rounded-xl transition-all text-sm"
                   >
-                    Cancel
+                    CANCEL
                   </button>
                   <button
                     onClick={handleCreateInterview}
                     disabled={!selectedJobId || isCreating}
                     className="flex-1 px-4 py-3.5 bg-[#00F29C] text-black font-bold rounded-xl hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed text-sm glow-btn"
                   >
-                    {isCreating ? 'Creating...' : 'Start Session'}
+                    {isCreating ? 'CREATING...' : 'CREATE'}
                   </button>
                 </div>
               </div>

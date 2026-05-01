@@ -20,39 +20,47 @@ export const useInterviewSocket = (interviewId: number | null) => {
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioQueueRef = useRef<string[]>([]);
   const isPlayingRef = useRef(false);
+  const processAudioQueueRef = useRef<() => void>();
 
-  // Initialize Audio Context for playback
-  const initAudio = useCallback(() => {
+  const initAudio = useCallback(async () => {
     if (!audioContextRef.current) {
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      audioContextRef.current = new AudioContext();
     }
     if (audioContextRef.current.state === 'suspended') {
-      audioContextRef.current.resume();
+      await audioContextRef.current.resume();
     }
   }, []);
 
-  // Play audio from base64
+  const decodeBase64Audio = useCallback(async (base64Audio: string): Promise<AudioBuffer> => {
+    const binaryString = atob(base64Audio);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    const audioBuffer = await audioContextRef.current!.decodeAudioData(bytes.buffer.slice());
+    return audioBuffer;
+  }, []);
+
   const playAudio = useCallback(async (base64Audio: string) => {
-    initAudio();
-    const audioData = Uint8Array.from(atob(base64Audio), c => c.charCodeAt(0));
     try {
-      const audioBuffer = await audioContextRef.current!.decodeAudioData(audioData.buffer);
+      await initAudio();
+      const audioBuffer = await decodeBase64Audio(base64Audio);
       const source = audioContextRef.current!.createBufferSource();
       source.buffer = audioBuffer;
       source.connect(audioContextRef.current!.destination);
-      
+
       setIsSpeaking(true);
       source.onended = () => {
         setIsSpeaking(false);
-        processAudioQueue();
+        processAudioQueueRef.current?.();
       };
       source.start();
     } catch (e) {
       console.error('Playback error:', e);
       setIsSpeaking(false);
-      processAudioQueue();
+      processAudioQueueRef.current?.();
     }
-  }, [initAudio]);
+  }, [initAudio, decodeBase64Audio]);
 
   const processAudioQueue = useCallback(() => {
     if (audioQueueRef.current.length > 0 && !isPlayingRef.current) {
@@ -65,6 +73,11 @@ export const useInterviewSocket = (interviewId: number | null) => {
       }
     }
   }, [playAudio]);
+
+  // Set the ref after processAudioQueue is defined
+  useEffect(() => {
+    processAudioQueueRef.current = processAudioQueue;
+  }, [processAudioQueue]);
 
   // Start recording
   const startRecording = useCallback(async () => {
