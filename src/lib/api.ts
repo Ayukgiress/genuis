@@ -246,24 +246,24 @@ export const resumeApi = {
 };
 
 export const authApi = {
-  googleLogin: () => api.get<GoogleOAuthResponse>("/api/auth/google"),
-  googleCallback: (code: string) => api.get<GoogleOAuthCallbackResponse>(`/api/auth/google/callback`, { code }),
-  register: (data: UserCreate) => api.post<RegisterResponse>("/api/auth/register", data),
-  verifyEmail: (token: string) => api.post<VerificationResponse>(`/api/auth/verify-email?token=${token}`),
-  verifyEmailPage: (token: string) => api.get<any>(`/api/auth/verify-email-page?token=${token}`),
-  verifyEmailHtml: (token: string) => api.get<string>(`/api/auth/verify-email-html?token=${token}`),
-  resendVerification: (email: string) => api.post<VerificationResponse>(`/api/auth/resend-verification?email=${email}`),
-  login: (data: Record<string, string>) => api.postForm<Token>("/api/auth/token", data),
-  getMe: () => api.get<AuthUser>("/api/auth/me"),
+  googleLogin: () => api.get<GoogleOAuthResponse>("/auth/google"),
+  googleCallback: (code: string) => api.get<GoogleOAuthCallbackResponse>(`/auth/google/callback`, { code }),
+  register: (data: UserCreate) => api.post<RegisterResponse>("/auth/register", data),
+  verifyEmail: (token: string) => api.post<VerificationResponse>(`/auth/verify-email?token=${token}`),
+  verifyEmailPage: (token: string) => api.get<any>(`/auth/verify-email-page?token=${token}`),
+  verifyEmailHtml: (token: string) => api.get<string>(`/auth/verify-email-html?token=${token}`),
+  resendVerification: (email: string) => api.post<VerificationResponse>(`/auth/resend-verification?email=${email}`),
+  login: (data: Record<string, string>) => api.postForm<Token>("/auth/token", data),
+  getMe: () => api.get<AuthUser>("/auth/me"),
   updateMe: (data: { name?: string; bio?: string; career_preferences?: any }) => {
     const params: Record<string, string> = {};
     if (data.name) params.name = data.name;
     if (data.bio) params.bio = data.bio;
     if (data.career_preferences) params.career_preferences = JSON.stringify(data.career_preferences);
-    return api.patch<AuthUser>("/api/auth/me", undefined, params);
+    return api.patch<AuthUser>("/auth/me", undefined, params);
   },
-  logout: () => api.post<{ message: string }>("/api/auth/logout"),
-  refresh: () => api.post<Token>("/api/auth/refresh"),
+  logout: () => api.post<{ message: string }>("/auth/logout"),
+  refresh: () => api.post<Token>("/auth/refresh"),
 };
 
 export const kanbanApi = {

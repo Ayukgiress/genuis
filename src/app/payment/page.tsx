@@ -25,7 +25,6 @@ export default function PaymentPage() {
       setIsProcessing(true);
       setError(null);
 
-// Validate and normalize API URL to ensure HTTPS
       let API_BASE = process.env.NEXT_PUBLIC_API_URL;
       if (!API_BASE) {
         API_BASE = 'https://genius-backen-production.up.railway.app';
