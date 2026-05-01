@@ -43,7 +43,7 @@ export const useAuthStore = create<AuthState>()(
         try {
           // Use OAuth2 form data format for login
           const tokenData: Token = await api.postForm<Token>(
-            "/auth/token/",
+            "/auth/token",
             {
               username: email,
               password: password,
@@ -89,7 +89,7 @@ export const useAuthStore = create<AuthState>()(
       register: async (name: string, email: string, password: string) => {
         set({ isLoading: true, error: null, showVerificationMessage: false });
         try {
-          const response: RegisterResponse = await api.post<RegisterResponse>("/auth/register/", {
+          const response: RegisterResponse = await api.post<RegisterResponse>("/auth/register", {
             email,
             password,
             name,
