@@ -20,7 +20,7 @@ export const useInterviewSocket = (interviewId: number | null) => {
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioQueueRef = useRef<string[]>([]);
   const isPlayingRef = useRef(false);
-  const processAudioQueueRef = useRef<() => void>();
+  const processAudioQueueRef = useRef<(() => void) | null>(null);
 
   const initAudio = useCallback(async () => {
     if (!audioContextRef.current) {
