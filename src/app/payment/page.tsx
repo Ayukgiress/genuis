@@ -25,7 +25,20 @@ export default function PaymentPage() {
       setIsProcessing(true);
       setError(null);
 
-      const API_BASE = process.env.NEXT_PUBLIC_API_URL;
+// Validate and normalize API URL to ensure HTTPS
+      let API_BASE = process.env.NEXT_PUBLIC_API_URL;
+      if (!API_BASE) {
+        API_BASE = 'https://genius-backen-production.up.railway.app';
+        console.warn('[payment/page.tsx] NEXT_PUBLIC_API_URL not set, using default production URL');
+      } else if (API_BASE.startsWith('http://')) {
+        console.warn('[payment/page.tsx] WARNING: NEXT_PUBLIC_API_URL uses HTTP. Changing to HTTPS for security.');
+        API_BASE = API_BASE.replace(/^http:/, 'https:');
+      } else if (!API_BASE.startsWith('https://')) {
+        console.error('[payment/page.tsx] ERROR: NEXT_PUBLIC_API_URL must start with https://');
+        API_BASE = 'https://genius-backen-production.up.railway.app';
+      }
+      console.log('[payment/page.tsx] Using API URL:', API_BASE);
+      
       const token = getAuthToken();
       const response = await fetch(`${API_BASE}/api/payment/create-checkout-session`, {
         method: 'POST',

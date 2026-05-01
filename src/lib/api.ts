@@ -1,4 +1,38 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+// Validate and normalize API URL to ensure HTTPS
+function getApiUrl(): string {
+  let apiUrl = process.env.NEXT_PUBLIC_API_URL;
+  
+  if (!apiUrl) {
+    // Fallback to production URL
+    apiUrl = 'https://genius-backen-production.up.railway.app';
+    if (typeof window !== 'undefined') {
+      console.warn('[api.ts] NEXT_PUBLIC_API_URL not set, using default production URL');
+    }
+  } else {
+    // Force HTTPS to prevent mixed content errors
+    if (apiUrl.startsWith('http://')) {
+      if (typeof window !== 'undefined') {
+        console.warn('[api.ts] WARNING: NEXT_PUBLIC_API_URL uses HTTP. Changing to HTTPS for security.');
+      }
+      apiUrl = apiUrl.replace(/^http:/, 'https:');
+    }
+    
+    // Validate URL format
+    if (!apiUrl.startsWith('https://')) {
+      if (typeof window !== 'undefined') {
+        console.error('[api.ts] ERROR: NEXT_PUBLIC_API_URL must start with https://');
+      }
+      apiUrl = 'https://genius-backen-production.up.railway.app';
+    }
+  }
+  
+  if (typeof window !== 'undefined') {
+    console.log('[api.ts] Using API URL:', apiUrl);
+  }
+  return apiUrl;
+}
+
+const API_BASE_URL = getApiUrl();
 const WS_BASE_URL = API_BASE_URL?.replace(/^http/, 'ws');
 
 // Types
