@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { letterApi, resumeApi } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import type { LetterGenerateRequest, Resume, LetterType } from '@/types';
+import { toast } from 'react-toastify';
 
 interface GenerateLetterModalProps {
   isOpen: boolean;
@@ -50,7 +51,7 @@ export const GenerateLetterModal: React.FC<GenerateLetterModalProps> = ({
 
     // Check subscription
     if (user.subscription_plan !== 'pro') {
-      alert('Custom letter generation is available for Pro users only. Please upgrade your subscription.');
+      toast.error('Custom letter generation is available for Pro users only. Please upgrade your subscription.');
       return;
     }
 
@@ -70,7 +71,7 @@ export const GenerateLetterModal: React.FC<GenerateLetterModalProps> = ({
     } catch (err) {
       console.error('Failed to generate letter:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to generate letter. Please try again.';
-      alert(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsGenerating(false);
     }

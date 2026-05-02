@@ -172,6 +172,11 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     throw new ApiError(errorMessage, response.status, response.statusText);
   }
 
+  // Handle responses with no content (e.g., 204 No Content)
+  if (response.status === 204 || response.headers.get('content-length') === '0') {
+    return null as T;
+  }
+
   return response.json();
 }
 

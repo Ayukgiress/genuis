@@ -72,7 +72,7 @@ export default function LettersPage() {
 
   if (isLoading || isLoadingLetters) {
     return (
-      <div className="flex items-center justify-center min-h-[calc(100vh-64px)] bg-black">
+      <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
         <div className="flex flex-col items-center gap-4">
           <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
           <p className="text-zinc-500 text-sm">Loading letters...</p>
@@ -82,7 +82,7 @@ export default function LettersPage() {
   }
 
   return (
-    <div className="p-8 space-y-10 min-h-screen bg-black text-white">
+    <div className="space-y-10">
       <div className="flex justify-between items-end">
         <div className="space-y-1">
           <h1 className="text-4xl font-bold tracking-tight">Custom Letters</h1>

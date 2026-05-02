@@ -292,6 +292,7 @@ export interface KanbanCardCreate {
   title: string;
   description?: string;
   column_id?: KanbanColumnId;
+  status?: KanbanColumnId;
   position?: number;
   company?: string;
   location?: string;
@@ -303,6 +304,7 @@ export interface KanbanCardUpdate {
   title?: string;
   description?: string;
   column_id?: KanbanColumnId;
+  status?: KanbanColumnId;
   position?: number;
   company?: string;
   location?: string;
@@ -316,7 +318,7 @@ export interface Job {
   company: string;
   location: string;
   description: string;
-  requirements: string[];
+  requirements: string[] | string;
   salary_range?: string;
   job_type?: string;
   source: string;

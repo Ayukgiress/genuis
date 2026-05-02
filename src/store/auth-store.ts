@@ -52,7 +52,7 @@ export const useAuthStore = create<AuthState>()(
 
           // Store token
           setAuthToken(tokenData.access_token);
-          set({ token: tokenData.access_token, isAuthenticated: true, isNewUser: false });
+          set({ token: tokenData.access_token, isNewUser: false });
 
           // Fetch current user
           await get().fetchCurrentUser();

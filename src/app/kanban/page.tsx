@@ -6,6 +6,17 @@ import { kanbanApi, jobApi, ApiError, getAuthToken } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import type { KanbanBoard, KanbanCard, KanbanColumnId, Job } from '@/types';
 
+interface JobApiResponse {
+  recommendations?: Job[];
+  jobs?: Job[];
+  data?: Job[] | { jobs: Job[] };
+}
+
+interface KanbanCardsResponse {
+  cards?: KanbanCard[];
+  data?: KanbanCard[] | { cards: KanbanCard[] };
+}
+
 const COLUMNS: { id: KanbanColumnId; title: string }[] = [
   { id: 'todo', title: 'WISHLIST' },
   { id: 'in_progress', title: 'APPLIED' },
@@ -72,11 +83,12 @@ export default function KanbanPage() {
   const fetchCards = async (boardId: string) => {
     try {
       const data = await kanbanApi.listCards(boardId);
-      // Normalize ids to strings
-      const normalizedCards = data.map(card => ({
+      // Normalize ids to strings and handle potential column_id/status mismatch
+      const normalizedCards = data.map((card: any) => ({
         ...card,
         id: String(card.id),
         board_id: String(card.board_id),
+        column_id: card.column_id || card.status || 'todo',
       }));
       setCards(normalizedCards);
     } catch (err) {
@@ -124,8 +136,11 @@ export default function KanbanPage() {
     }
   };
 
-  const openCreateCardModal = async () => {
+  const openCreateCardModal = async (columnId?: KanbanColumnId) => {
     setIsCreatingCard(true);
+    if (columnId) {
+      setSelectedColumn(columnId);
+    }
     await fetchAvailableJobs();
   };
 
@@ -149,14 +164,16 @@ export default function KanbanPage() {
       const card = await kanbanApi.createCard(currentBoard.id, {
         title: newCardTitle,
         column_id: selectedColumn,
+        status: selectedColumn,
         company: newCardCompany,
         location: newCardLocation,
       });
-      // Normalize ids to strings
+      // Normalize ids to strings and handle potential column_id/status mismatch
       const normalizedCard = {
-        ...card,
-        id: String(card.id),
-        board_id: String(card.board_id),
+        ...(card as any),
+        id: String((card as any).id),
+        board_id: String((card as any).board_id),
+        column_id: (card as any).column_id || (card as any).status || selectedColumn,
       };
       setCards(prev => [...prev, normalizedCard]);
       setNewCardTitle('');
@@ -177,7 +194,10 @@ export default function KanbanPage() {
       const card = cards.find(c => c.id === cardId);
       if (!card) return;
       
-      await kanbanApi.updateCard(cardId, { column_id: newColumnId });
+      await kanbanApi.updateCard(cardId, { 
+        column_id: newColumnId,
+        status: newColumnId
+      });
       setCards(prev => prev.map(c => 
         c.id === cardId ? { ...c, column_id: newColumnId } : c
       ));
@@ -281,7 +301,7 @@ export default function KanbanPage() {
             <button className="px-6 py-2 text-zinc-500 text-xs font-black uppercase tracking-widest hover:text-zinc-300">List</button>
           </div>
            <button
-             onClick={openCreateCardModal}
+             onClick={() => openCreateCardModal()}
              className="flex items-center gap-2 px-6 py-3 bg-primary text-black font-black rounded-xl hover:opacity-90 transition-all uppercase tracking-widest text-xs"
            >
             <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="3">
@@ -489,7 +509,7 @@ export default function KanbanPage() {
                 
                  {column.id === 'todo' && (
                    <button
-                     onClick={openCreateCardModal}
+                     onClick={() => openCreateCardModal('todo')}
                      className="w-full py-4 border-2 border-dashed border-zinc-900 rounded-[2rem] text-xs font-black tracking-[0.2em] text-zinc-600 hover:border-zinc-800 hover:text-zinc-400 transition-all uppercase flex items-center justify-center gap-2"
                    >
                     <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="3">

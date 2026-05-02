@@ -14,6 +14,7 @@ import {
 import { analysisApi, analyticsApi, jobApi, kanbanApi, ApiError, getAuthToken } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import type { Analysis, AnalyticsSummary, Job, KanbanBoard } from '@/types';
+import { toast } from 'react-toastify';
 import Link from 'next/link';
 
 const COLORS = ['#00f29c', '#6366f1', '#f59e0b', '#ef4444'];
@@ -127,15 +128,15 @@ export default function DashboardPage() {
 
   const handleAddToKanban = async (job: Job) => {
     if (!selectedBoard) {
-      alert('Please select a board first');
+      toast.warn('Please select a board first');
       return;
     }
     try {
       await jobApi.addToKanban(job.id, parseInt(selectedBoard), 'todo');
-      alert('Job added to pipeline!');
+      toast.success('Job added to pipeline!');
     } catch (err) {
       console.error('Failed to add job to kanban:', err);
-      alert('Failed to add job');
+      toast.error('Failed to add job');
     }
   };
 

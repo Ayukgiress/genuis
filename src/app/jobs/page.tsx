@@ -4,8 +4,14 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { jobApi, resumeApi, analysisApi, kanbanApi, ApiError, getAuthToken } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
-import type { Job, Resume, Analysis } from '@/types';
+import type { Job, Resume, Analysis, KanbanBoard } from '@/types';
 import { ApplyJobModal } from '@/components/jobs/ApplyJobModal';
+
+interface JobApiResponse {
+  recommendations?: Job[];
+  jobs?: Job[];
+  data?: Job[] | { jobs: Job[] };
+}
 
 export default function JobsPage() {
   const router = useRouter();
@@ -18,7 +24,6 @@ export default function JobsPage() {
   const [isMatching, setIsMatching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-
   const [searchQuery, setSearchQuery] = useState('');
   const [location, setLocation] = useState('');
   const [remoteOnly, setRemoteOnly] = useState(false);
@@ -26,23 +31,21 @@ export default function JobsPage() {
   const [page, setPage] = useState(1);
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [selectedJobForApply, setSelectedJobForApply] = useState<Job | null>(null);
-  const [boards, setBoards] = useState<any[]>([]);
+  const [boards, setBoards] = useState<KanbanBoard[]>([]);
 
   const loadRecommendations = useCallback(async (resumeId?: number) => {
     try {
       setIsLoading(true);
       setError(null);
 
-const data = await jobApi.getRecommendations(resumeId);
+      const data = await jobApi.getRecommendations(resumeId) as unknown as JobApiResponse;
       console.log('Jobs API response:', data);
       let jobsArray: Job[] = [];
       if (Array.isArray(data)) {
         jobsArray = data;
       } else if (data && typeof data === 'object') {
-        jobsArray = (data as any).jobs || (data as any).data?.jobs || (data as any).data || [];
-        if (!Array.isArray(jobsArray)) {
-          jobsArray = [];
-        }
+        const d = data as JobApiResponse;
+        jobsArray = d.recommendations || d.jobs || (Array.isArray(d.data) ? d.data : d.data?.jobs) || [];
       }
       setJobs(jobsArray);
       setSuccess(resumeId ? 'Job recommendations loaded based on your resume!' : 'General job listings loaded');
@@ -135,8 +138,15 @@ const data = await jobApi.getRecommendations(resumeId);
       if (remoteOnly) params.remote = 'true';
       if (jobType) params.job_type = jobType;
       
-      const data = await jobApi.search(params);
-      setJobs(data);
+      const data = await jobApi.search(params) as unknown as JobApiResponse;
+      let jobsArray: Job[] = [];
+      if (Array.isArray(data)) {
+        jobsArray = data;
+      } else if (data && typeof data === 'object') {
+        const d = data as JobApiResponse;
+        jobsArray = d.jobs || (Array.isArray(d.data) ? d.data : d.data?.jobs) || d.recommendations || [];
+      }
+      setJobs(jobsArray);
       setPage(1);
     } catch (err) {
       console.error('Failed to search jobs:', err);

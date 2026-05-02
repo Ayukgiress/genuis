@@ -12,7 +12,9 @@ export function generateInterviewQuestions(job: Job): string[] {
   }
 
   const title = job.title.toLowerCase();
-  const requirements = Array.isArray(job.requirements) ? job.requirements.join(' ').toLowerCase() : '';
+  const requirements = Array.isArray(job.requirements) 
+    ? job.requirements.join(' ').toLowerCase() 
+    : (typeof job.requirements === 'string' ? job.requirements.toLowerCase() : '');
 
   const isSoftwareDev = title.includes('developer') || title.includes('engineer') || title.includes('programmer') || requirements.includes('programming');
   const isDataScience = title.includes('data') || title.includes('analyst') || title.includes('scientist') || requirements.includes('python') || requirements.includes('machine learning');
