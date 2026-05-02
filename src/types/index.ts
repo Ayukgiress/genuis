@@ -33,6 +33,9 @@ export interface AuthUser {
   id: number;
   email: string;
   name?: string;
+  bio?: string;
+  profile_picture?: string;
+  career_preferences?: CareerPreferences;
   is_verified?: boolean;
   created_at?: string;
   subscription_plan?: 'free' | 'pro';

@@ -177,7 +177,7 @@ export const Sidebar = () => {
           <div className="flex items-center gap-3 px-2">
             <div className="w-10 h-10 rounded-full bg-zinc-800 overflow-hidden border border-zinc-700">
               <img
-                src={`https://avatar.iran.liara.run/public/boy?username=${user?.name || user?.email || 'user'}`}
+                src={user?.profile_picture || `https://avatar.iran.liara.run/public/boy?username=${user?.name || user?.email || 'user'}`}
                 alt="Profile"
                 className="w-full h-full object-cover"
               />

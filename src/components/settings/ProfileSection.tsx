@@ -3,22 +3,25 @@
 import React, { useEffect, useState } from 'react';
 import * as Icons from '@radix-ui/react-icons';
 import { useAuthStore } from '@/store/auth-store';
-import { api, ApiError } from '@/lib/api';
+import { authApi, ApiError } from '@/lib/api';
 import Link from 'next/link';
 
 export const ProfileSection = () => {
   const { user, fetchCurrentUser } = useAuthStore();
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   
   const [name, setName] = useState('');
   const [bio, setBio] = useState('');
   const fetchAttempted = React.useRef(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (user) {
       setName(user.name || '');
+      setBio(user.bio || '');
     }
     
     if (!fetchAttempted.current) {
@@ -30,6 +33,7 @@ export const ProfileSection = () => {
   useEffect(() => {
     if (user) {
       setName(user.name || '');
+      setBio(user.bio || '');
     }
   }, [user]);
 
@@ -39,7 +43,7 @@ export const ProfileSection = () => {
       setError(null);
       setSuccess(null);
       
-      const updated = await api.patch<{ id: number; email: string; name?: string; bio?: string }>("/auth/me", {
+      await authApi.updateMe({
         name,
         bio,
       });
@@ -55,6 +59,30 @@ export const ProfileSection = () => {
       }
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsUploading(true);
+      setError(null);
+      setSuccess(null);
+      
+      await authApi.uploadProfilePicture(file);
+      await fetchCurrentUser();
+      setSuccess('Profile picture updated successfully!');
+    } catch (err) {
+      console.error('Failed to upload profile picture:', err);
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError('Failed to upload profile picture');
+      }
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -81,23 +109,53 @@ export const ProfileSection = () => {
           <div className="relative group">
             <div className="w-24 h-24 rounded-full bg-orange-200 border-4 border-zinc-800 overflow-hidden">
               <img 
-                src={`https://avatar.iran.liara.run/public/boy?username=${name || 'user'}`} 
+                src={user?.profile_picture || `https://avatar.iran.liara.run/public/boy?username=${name || 'user'}`} 
                 alt="Profile"
                 className="w-full h-full object-cover"
               />
+              {isUploading && (
+                <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                  <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
             </div>
-            <button className="absolute bottom-0 right-0 p-1.5 bg-[#00f29c] rounded-full border-2 border-zinc-900 shadow-xl group-hover:scale-110 transition-transform">
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              className="absolute bottom-0 right-0 p-1.5 bg-[#00f29c] rounded-full border-2 border-zinc-900 shadow-xl group-hover:scale-110 transition-transform"
+            >
               <Icons.Pencil1Icon className="w-3.5 h-3.5 text-black" />
             </button>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              className="hidden"
+              accept="image/*"
+            />
           </div>
           <div>
             <h3 className="font-bold text-white mb-0.5 text-[15px]">Profile Photo</h3>
             <p className="text-xs text-zinc-500 mb-4">JPG, GIF or PNG. Max size 2MB.</p>
             <div className="flex items-center gap-3">
-              <button className="px-4 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-xs font-bold transition-colors">
-                Upload new
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="px-4 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-xs font-bold transition-colors disabled:opacity-50"
+              >
+                {isUploading ? 'Uploading...' : 'Upload new'}
               </button>
-              <button className="px-4 py-1.5 text-red-500 hover:bg-red-500/10 rounded-lg text-xs font-bold transition-colors">
+              <button 
+                onClick={async () => {
+                  try {
+                    await authApi.updateMe({ profile_picture: '' });
+                    await fetchCurrentUser();
+                    setSuccess('Profile picture removed');
+                  } catch (_err) {
+                    setError('Failed to remove profile picture');
+                  }
+                }}
+                className="px-4 py-1.5 text-red-500 hover:bg-red-500/10 rounded-lg text-xs font-bold transition-colors"
+              >
                 Remove
               </button>
             </div>

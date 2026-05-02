@@ -260,12 +260,21 @@ export const authApi = {
   resendVerification: (email: string) => api.post<VerificationResponse>(`/auth/resend-verification?email=${email}`),
   login: (data: Record<string, string>) => api.postForm<Token>("/auth/token", data),
   getMe: () => api.get<AuthUser>("/auth/me"),
-  updateMe: (data: { name?: string; bio?: string; career_preferences?: any }) => {
+  updateMe: (data: { name?: string; bio?: string; profile_picture?: string; career_preferences?: any }) => {
     const params: Record<string, string> = {};
-    if (data.name) params.name = data.name;
-    if (data.bio) params.bio = data.bio;
-    if (data.career_preferences) params.career_preferences = JSON.stringify(data.career_preferences);
-    return api.patch<AuthUser>("/auth/me", undefined, params);
+    if (data.name !== undefined) params.name = data.name;
+    if (data.bio !== undefined) params.bio = data.bio;
+    if (data.profile_picture !== undefined) params.profile_picture = data.profile_picture;
+    if (data.career_preferences !== undefined) params.career_preferences = JSON.stringify(data.career_preferences);
+    return api.put<AuthUser>("/auth/me", undefined, params);
+  },
+  uploadProfilePicture: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return request<AuthUser>("/auth/me/upload-profile-picture", {
+      method: "POST",
+      body: formData,
+    });
   },
   logout: () => api.post<{ message: string }>("/auth/logout"),
   refresh: () => api.post<Token>("/auth/refresh"),
