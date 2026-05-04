@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { analysisApi, resumeApi, ApiError, getAuthToken } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import type { Analysis, Resume, FocusArea } from '@/types';
+import { OptimizationPreview } from '@/components/resumes/OptimizationPreview';
 
 export default function AnalysisPage() {
   const router = useRouter();
@@ -347,6 +348,13 @@ export default function AnalysisPage() {
                   </div>
                 )}
               </div>
+
+              {/* Optimization Preview Section */}
+              {selectedAnalysis.result && (
+                <div className="p-8 rounded-3xl bg-zinc-900/50 border border-zinc-800">
+                  <OptimizationPreview result={selectedAnalysis.result} />
+                </div>
+              )}
             </>
           ) : (
             <div className="flex flex-col items-center justify-center h-96 text-center">

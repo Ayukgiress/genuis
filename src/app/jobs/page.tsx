@@ -6,6 +6,8 @@ import { jobApi, resumeApi, analysisApi, kanbanApi, ApiError, getAuthToken } fro
 import { useAuth } from '@/hooks/useAuth';
 import type { Job, Resume, Analysis, KanbanBoard } from '@/types';
 import { ApplyJobModal } from '@/components/jobs/ApplyJobModal';
+import { useApplicationStore } from '@/store/applicationStore';
+import Link from 'next/link';
 
 interface JobApiResponse {
   recommendations?: Job[];
@@ -32,6 +34,7 @@ export default function JobsPage() {
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [selectedJobForApply, setSelectedJobForApply] = useState<Job | null>(null);
   const [boards, setBoards] = useState<KanbanBoard[]>([]);
+  const { applications } = useApplicationStore();
 
   const loadRecommendations = useCallback(async (resumeId?: number) => {
     try {
@@ -157,48 +160,6 @@ export default function JobsPage() {
 
   const handleSearch = () => {
     searchJobs(searchQuery);
-  };
-
-  const handleMatchJob = async (job: Job) => {
-    if (!selectedResume) {
-      setError('Please select a resume first');
-      return;
-    }
-
-    try {
-      setIsMatching(true);
-      setError(null);
-      
-      const matched = await jobApi.matchWithResume(job.id, selectedResume.id);
-      
-      setJobs(prev => prev.map(j => j.id === job.id ? { ...j, ...matched } : j));
-      setSuccess(`Matched "${job.title}" with your resume! Score: ${matched.match_score || 'N/A'}%`);
-    } catch (err) {
-      console.error('Failed to match job:', err);
-      if (err instanceof ApiError) {
-        setError(err.message);
-      } else {
-        setError('Failed to match job with resume');
-      }
-    } finally {
-      setIsMatching(false);
-    }
-  };
-
-  const handleAddToKanban = async (job: Job) => {
-    if (boards.length === 0) {
-      setError('No kanban boards available. Please create a board first.');
-      return;
-    }
-
-    try {
-      setError(null);
-      await jobApi.addToKanban(job.id, parseInt(boards[0].id), 'todo');
-      setSuccess(`"${job.title}" added to your kanban board!`);
-    } catch (err) {
-      console.error('Failed to add to kanban:', err);
-      setError('Failed to add job to kanban board.');
-    }
   };
 
   const handleOpenApplyModal = (job: Job) => {
@@ -386,35 +347,29 @@ export default function JobsPage() {
                     
                     <div className="flex flex-col gap-2">
                       <button
-                        onClick={() => handleMatchJob(job)}
-                        disabled={isMatching || !selectedResume}
-                        className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-black font-bold hover:opacity-90 transition-all text-xs disabled:opacity-50"
+                        onClick={() => handleOpenApplyModal(job)}
+                        className={`flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold transition-all text-sm ${
+                          applications.some(app => app.jobId === job.id)
+                            ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
+                            : 'bg-primary text-black hover:opacity-90'
+                        }`}
+                        disabled={applications.some(app => app.jobId === job.id)}
                       >
-                        <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                          <circle cx="8.5" cy="7" r="4" />
-                          <line x1="20" y1="8" x2="20" y2="14" />
-                          <line x1="23" y1="11" x2="17" y2="11" />
-                        </svg>
-                        Match
+                        {applications.some(app => app.jobId === job.id) 
+                          ? 'Applied' 
+                          : job.match_score 
+                            ? `Apply (${job.match_score}% Match)`
+                            : 'Apply'
+                        }
                       </button>
-                       <button
-                         onClick={() => handleOpenApplyModal(job)}
-                         className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs font-bold hover:border-primary/50 transition-all text-center"
-                       >
-                         Apply
-                       </button>
-                       <button
-                         onClick={() => handleAddToKanban(job)}
-                         disabled={boards.length === 0}
-                         className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-purple-600 text-white text-xs font-bold hover:opacity-90 transition-all disabled:opacity-50 text-center"
-                       >
-                         <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
-                           <line x1="12" y1="5" x2="12" y2="19" />
-                           <line x1="5" y1="12" x2="19" y2="12" />
-                         </svg>
-                         Add to Kanban
-                       </button>
+
+                      {applications.some(app => app.jobId === job.id) && (
+                        <Link href="/interviews">
+                          <button className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-blue-600/10 border border-blue-600/30 text-blue-400 text-xs font-bold hover:bg-blue-600/20 transition-all">
+                            Prep for Interview
+                          </button>
+                        </Link>
+                      )}
                     </div>
                   </div>
                   

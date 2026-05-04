@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { letterApi } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import type { Job, Resume, LetterGenerateRequest } from '@/types';
+import { useApplicationStore } from '@/store/applicationStore';
 
 interface ApplyJobModalProps {
   isOpen: boolean;
@@ -21,6 +22,7 @@ export const ApplyJobModal: React.FC<ApplyJobModalProps> = ({
   resumes,
 }) => {
   const { user } = useAuth();
+  const { addApplication } = useApplicationStore();
   const [step, setStep] = useState<Step>('ask');
   const [selectedResumeId, setSelectedResumeId] = useState<number | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -36,7 +38,16 @@ export const ApplyJobModal: React.FC<ApplyJobModalProps> = ({
     }
   }, [isOpen]);
 
-  const handleNoLetter = () => {
+  const handleNoLetter = async () => {
+    if (job) {
+      await addApplication({
+        jobId: job.id,
+        resumeId: resumes[0]?.id.toString() || '0',
+        status: 'applied',
+        company: job.company,
+        title: job.title,
+      });
+    }
     if (job?.source_url) {
       window.open(job.source_url, '_blank', 'noopener,noreferrer');
     }
