@@ -476,17 +476,29 @@ export default function JobsPage() {
         {selectedResume && analysis && (
           <div className="p-4 rounded-xl bg-zinc-900 border border-zinc-800 space-y-3">
             <div className="flex justify-between items-center">
-              <h4 className="text-sm font-bold">Resume Analysis</h4>
+              <h4 className="text-sm font-bold">Resume Score</h4>
               <span className="text-lg font-bold text-primary">{analysis.result?.score || 0}%</span>
             </div>
-            {analysis.result?.strengths && analysis.result.strengths.length > 0 && (
-              <div className="space-y-1">
-                <p className="text-[10px] text-zinc-500 uppercase">Top Skills</p>
-                <div className="flex flex-wrap gap-1">
-                  {analysis.result.strengths.slice(0, 3).map((s: string, i: number) => (
-                    <span key={i} className="px-2 py-0.5 rounded text-[10px] bg-primary/10 text-primary">
-                      {s}
-                    </span>
+            {analysis.result?.suggestions && analysis.result.suggestions.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-[10px] text-zinc-500 uppercase">Suggestions</p>
+                <div className="space-y-1">
+                  {analysis.result.suggestions.slice(0, 2).map((s: string, i: number) => (
+                    <p key={i} className="text-xs text-zinc-400 leading-relaxed">
+                      • {s}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
+            {analysis.result?.weaknesses && analysis.result.weaknesses.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-[10px] text-zinc-500 uppercase">Areas to Improve</p>
+                <div className="space-y-1">
+                  {analysis.result.weaknesses.slice(0, 2).map((w: string, i: number) => (
+                    <p key={i} className="text-xs text-zinc-400 leading-relaxed">
+                      • {w}
+                    </p>
                   ))}
                 </div>
               </div>

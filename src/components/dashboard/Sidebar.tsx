@@ -87,7 +87,12 @@ const navItems = [
    },
 ];
 
-export const Sidebar = () => {
+interface SidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const pathname = usePathname();
   const router = useRouter();
   const { user, fetchCurrentUser, logout } = useAuth();
@@ -107,8 +112,17 @@ export const Sidebar = () => {
   };
 
   return (
-    <aside className="w-64 bg-black border-r border-zinc-800 flex flex-col h-screen fixed left-0 top-0">
+    <aside className={`w-64 bg-black border-r border-zinc-800 flex flex-col h-screen fixed left-0 top-0 transition-transform duration-300 ease-in-out z-50 ${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
       <div className="p-6">
+        <div className="flex items-center justify-between mb-4 lg:hidden">
+          <div></div>
+          <button onClick={onClose} className="p-2 text-zinc-400 hover:text-white transition-colors">
+            <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-primary rounded flex items-center justify-center">
             <svg viewBox="0 0 24 24" className="w-5 h-5 text-black fill-current">

@@ -303,7 +303,7 @@ function RegisterForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-4 py-3.5 rounded-xl bg-zinc-900/30 border border-zinc-800 text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-primary/50 transition-colors"
-              />
+              />/
             </div>
 
             <div className="space-y-2">
@@ -341,14 +341,12 @@ function RegisterForm() {
 
       {/* Desktop Footer */}
       <div className="hidden lg:flex absolute bottom-6 left-6 gap-8 text-[10px] tracking-widest text-zinc-600 uppercase">
-        <span>© 2024 OBSIDIAN SERIES</span>
         <a href="#" className="hover:text-zinc-400 transition-colors">Privacy Protocol</a>
         <a href="#" className="hover:text-zinc-400 transition-colors">Service Terms</a>
       </div>
 
       {/* Mobile Footer */}
       <div className="lg:hidden absolute bottom-6 w-full text-center space-y-2 text-[10px] tracking-widest text-zinc-600 uppercase">
-        <p>© 2024 OBSIDIAN SERIES</p>
         <div className="flex justify-center gap-4">
           <a href="#">Privacy Protocol</a>
           <a href="#">Service Terms</a>

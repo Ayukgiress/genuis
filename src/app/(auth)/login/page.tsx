@@ -201,14 +201,12 @@ function LoginForm() {
 
       {/* Desktop Footer */}
       <div className="hidden lg:flex absolute bottom-6 left-6 gap-8 text-[10px] tracking-widest text-zinc-600 uppercase">
-        <span>© 2024 OBSIDIAN SERIES</span>
         <a href="#" className="hover:text-zinc-400 transition-colors">Privacy Protocol</a>
         <a href="#" className="hover:text-zinc-400 transition-colors">Service Terms</a>
       </div>
 
       {/* Mobile Footer */}
       <div className="lg:hidden absolute bottom-6 w-full text-center space-y-2 text-[10px] tracking-widest text-zinc-600 uppercase">
-        <p>© 2024 OBSIDIAN SERIES</p>
         <div className="flex justify-center gap-4">
           <a href="#">Privacy Protocol</a>
           <a href="#">Service Terms</a>

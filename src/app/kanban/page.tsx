@@ -273,14 +273,14 @@ export default function KanbanPage() {
   }
 
   return (
-    <div className="p-8 space-y-10 min-h-screen bg-black text-white">
+    <div className="p-4 md:p-8 space-y-6 md:space-y-10 min-h-screen bg-black text-white">
       {/* Header */}
-      <div className="flex justify-between items-end">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-4">
         <div className="space-y-1">
-          <h1 className="text-4xl font-bold tracking-tight">Application Pipeline</h1>
-          <p className="text-zinc-500 text-lg">Real-time AI matching and career stage tracking.</p>
+          <h1 className="text-2xl md:text-4xl font-bold tracking-tight">Application Pipeline</h1>
+          <p className="text-zinc-500 text-base md:text-lg">Real-time AI matching and career stage tracking.</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 md:gap-4 flex-wrap">
           {/* Board Selector */}
           {boards.length > 0 && (
             <select

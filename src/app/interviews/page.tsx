@@ -41,6 +41,7 @@ export default function InterviewsPage() {
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string>('');
+  const [hideAIMessages, setHideAIMessages] = useState(false);
 
   // Speech-to-Speech Socket
   const {
@@ -201,21 +202,28 @@ export default function InterviewsPage() {
                   { role: 'user', content: msg }
                 );
 
-                setSelectedInterview(prev => {
-                  if (!prev) return prev;
-                  return { ...prev, messages: [...(prev.messages || []), aiMessage] };
-                });
-
                 if (aiMessage.content?.includes('[INTERVIEW_COMPLETE]')) {
                   const clean = aiMessage.content.replace('[INTERVIEW_COMPLETE]', '').trim();
                   aiMessage.content = clean;
                   await speakTextAndWait(clean);
+                  
+                  setSelectedInterview(prev => {
+                    if (!prev) return prev;
+                    return { ...prev, messages: [...(prev.messages || []), aiMessage] };
+                  });
+
                   await handleCompleteInterview(interview.id);
                   setIsInterviewStarted(false);
                   return;
                 }
 
                 await speakTextAndWait(aiMessage.content);
+                
+                setSelectedInterview(prev => {
+                  if (!prev) return prev;
+                  return { ...prev, messages: [...(prev.messages || []), aiMessage] };
+                });
+
                 setTimeout(() => startRecording(), 300);
               } catch (e) {
                 setError('Failed to send message');
@@ -227,15 +235,15 @@ export default function InterviewsPage() {
         };
 
         recognitionRef.current.onerror = (event: any) => {
-          console.error('Speech recognition error:', event.error);
+          if (event.error !== 'no-speech' && event.error !== 'audio-capture') {
+            console.error('Speech recognition error:', event.error);
+            setError('Speech recognition failed. Please try again.');
+          }
           setIsRecording(false);
           // Clear silence timeout on error
           if (silenceTimeoutRef.current) {
             clearTimeout(silenceTimeoutRef.current);
             silenceTimeoutRef.current = null;
-          }
-          if (event.error !== 'no-speech' && event.error !== 'audio-capture') {
-            setError('Speech recognition failed. Please try again.');
           }
         };
 
@@ -319,6 +327,9 @@ export default function InterviewsPage() {
         { role: 'user', content: userMessage.content }
       );
 
+      // Speak AI response then display text and restart mic
+      await speakTextAndWait(aiMessage.content);
+
       const finalInterview = {
         ...tempInterview,
         messages: [...tempInterview.messages, aiMessage]
@@ -332,14 +343,17 @@ export default function InterviewsPage() {
       if (aiMessage.content?.includes('[INTERVIEW_COMPLETE]')) {
         const cleanContent = aiMessage.content.replace('[INTERVIEW_COMPLETE]', '').trim();
         aiMessage.content = cleanContent;
-        await speakTextAndWait(cleanContent);
+        // Re-assign to final interview with cleaned content
+        const cleanedInterview = {
+          ...tempInterview,
+          messages: [...tempInterview.messages, aiMessage]
+        };
+        setSelectedInterview(cleanedInterview);
         await handleCompleteInterview(selectedInterview.id);
         setIsInterviewStarted(false);
         return;
       }
 
-      // Speak AI response then restart mic
-      await speakTextAndWait(aiMessage.content);
       if (isInterviewStarted) {
         setTimeout(() => startRecording(), 300);
       }
@@ -426,6 +440,8 @@ export default function InterviewsPage() {
         { role: 'user', content: '__START_INTERVIEW__' }
       );
 
+      await speakTextAndWait(aiMessage.content);
+
       const updatedInterview = {
         ...selectedInterview,
         messages: [...(selectedInterview.messages || []), aiMessage]
@@ -435,7 +451,6 @@ export default function InterviewsPage() {
         prev.map(int => int.id === selectedInterview.id ? updatedInterview : int)
       );
 
-      await speakTextAndWait(aiMessage.content);
       startRecording(); // mic on after greeting
     } catch (err) {
       setError('Failed to start interview');
@@ -736,6 +751,13 @@ export default function InterviewsPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   {selectedInterview.status !== 'completed' && <div className="status-dot" />}
+                  <button
+                    onClick={() => setHideAIMessages(!hideAIMessages)}
+                    className="mono text-[9px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-lg border bg-zinc-800/50 text-zinc-400 border-zinc-700/50 hover:text-zinc-200 hover:border-zinc-600/50 transition-colors"
+                    title={hideAIMessages ? 'Show AI Messages' : 'Hide AI Messages'}
+                  >
+                    {hideAIMessages ? 'SHOW AI' : 'HIDE AI'}
+                  </button>
                   <span className={`mono text-[9px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-lg border ${
                     selectedInterview.status === 'completed'
                       ? 'bg-zinc-800/50 text-zinc-500 border-zinc-700/50'
@@ -759,7 +781,7 @@ export default function InterviewsPage() {
                   </div>
                 )}
 
-                {selectedInterview.messages?.map((message, idx) => (
+                {selectedInterview.messages?.filter(message => !hideAIMessages || message.role === 'user').map((message, idx) => (
                   <div
                     key={message.id}
                     className={`message-in flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
@@ -817,13 +839,6 @@ export default function InterviewsPage() {
                     <p className="mono text-[10px] tracking-widest uppercase text-zinc-500">
                       {isSpeaking ? 'AI SPEAKING' : isRecording ? 'LISTENING' : 'READY'}
                     </p>
-
-                    {/* Live transcript preview */}
-                    {newMessage && (
-                      <p className="text-zinc-400 text-xs italic text-center max-w-sm truncate">
-                        "{newMessage}"
-                      </p>
-                    )}
                   </div>
                 </div>
               )}

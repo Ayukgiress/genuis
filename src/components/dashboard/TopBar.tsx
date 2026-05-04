@@ -1,9 +1,24 @@
 import React from 'react';
 
-export const TopBar = () => {
+interface TopBarProps {
+  onToggleSidebar: () => void;
+}
+
+export const TopBar: React.FC<TopBarProps> = ({ onToggleSidebar }) => {
   return (
     <header className="h-20 border-b border-zinc-800 bg-black/50 backdrop-blur-md sticky top-0 z-10 flex items-center justify-between px-8">
-      <div className="flex-1 max-w-xl">
+      <div className="flex items-center gap-4 flex-1">
+        <button
+          onClick={onToggleSidebar}
+          className="lg:hidden p-2 text-zinc-400 hover:text-white transition-colors"
+        >
+          <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+        </button>
+        <div className="flex-1 max-w-xl">
         <div className="relative group">
           <svg 
             viewBox="0 0 24 24" 
@@ -22,6 +37,7 @@ export const TopBar = () => {
           />
         </div>
       </div>
+    </div>
 
       <div className="flex items-center gap-6">
         <div className="flex items-center gap-4 border-r border-zinc-800 pr-6">
