@@ -124,14 +124,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           </button>
         </div>
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-primary rounded flex items-center justify-center">
-            <svg viewBox="0 0 24 24" className="w-5 h-5 text-black fill-current">
-              <path d="M12.871 4.285a.75.75 0 0 0-1.142 0l-4.7 5.485c-.566.66-.188 1.73.682 1.73h2.039v5.25a.75.75 0 0 0 1.5 0v-5.25h2.039c.87 0 1.248-1.07.682-1.73l-4.7-5.485zM4 19.25a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H4.75a.75.75 0 0 1-.75-.75z" />
-            </svg>
-          </div>
           <div>
             <h1 className="text-sm font-bold text-white tracking-tight uppercase">Genuis</h1>
-            <p className="text-[10px] text-primary font-bold uppercase tracking-widest">Pro Edition</p>
           </div>
         </div>
       </div>
