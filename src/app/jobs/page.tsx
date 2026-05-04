@@ -34,7 +34,7 @@ export default function JobsPage() {
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [selectedJobForApply, setSelectedJobForApply] = useState<Job | null>(null);
   const [boards, setBoards] = useState<KanbanBoard[]>([]);
-  const { applications } = useApplicationStore();
+  const { applications, addApplication } = useApplicationStore();
 
   const loadRecommendations = useCallback(async (resumeId?: number) => {
     try {
@@ -162,7 +162,33 @@ export default function JobsPage() {
     searchJobs(searchQuery);
   };
 
-  const handleOpenApplyModal = (job: Job) => {
+  const handleApplyJob = async (job: Job) => {
+    if (!selectedResume) {
+      setError('Please select a resume first');
+      return;
+    }
+    
+    try {
+      await addApplication({
+        jobId: job.id,
+        resumeId: selectedResume.id.toString(),
+        status: 'applied',
+        company: job.company,
+        title: job.title,
+      });
+      
+      if (job.source_url) {
+        window.open(job.source_url, '_blank', 'noopener,noreferrer');
+      }
+      setSuccess(`Applied to ${job.title} at ${job.company}!`);
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err) {
+      console.error('Failed to apply:', err);
+      setError('Failed to apply. Please try again.');
+    }
+  };
+
+  const openApplyFlow = (job: Job) => {
     setSelectedJobForApply(job);
     setShowApplyModal(true);
   };
@@ -347,10 +373,12 @@ export default function JobsPage() {
                     
                     <div className="flex flex-col gap-2">
                       <button
-                        onClick={() => handleOpenApplyModal(job)}
+                        onClick={() => openApplyFlow(job)}
                         className={`flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold transition-all text-sm ${
                           applications.some(app => app.jobId === job.id)
                             ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
+                            : job.match_score && job.match_score >= 80
+                            ? 'bg-primary text-black hover:opacity-90'
                             : 'bg-primary text-black hover:opacity-90'
                         }`}
                         disabled={applications.some(app => app.jobId === job.id)}

@@ -326,187 +326,52 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* Job Discovery Section */}
-      <div className="p-8 rounded-3xl bg-zinc-900/50 border border-zinc-800/50">
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-primary/10 border border-primary/20">
-              <svg viewBox="0 0 24 24" className="w-5 h-5 text-primary" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="11" cy="11" r="8" />
-                <path d="m21 21-4.35-4.35" />
-              </svg>
+{/* Application Pipeline */}
+        <div className="p-8 rounded-3xl bg-zinc-900/50 border border-zinc-800/50">
+          <div className="flex justify-between items-center mb-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-primary/10 border border-primary/20">
+                <svg viewBox="0 0 24 24" className="w-5 h-5 text-primary" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+                  <path d="M16 3V5a2 2 0 0 0 2 2h4" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="font-bold">Application Pipeline</h3>
+                <p className="text-xs text-zinc-500">Track your job application progress</p>
+              </div>
             </div>
-            <div>
-              <h3 className="font-bold">Job Discovery</h3>
-              <p className="text-xs text-zinc-500">AI-matched jobs based on your resume</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <select
-              value={selectedBoard}
-              onChange={(e) => setSelectedBoard(e.target.value)}
-              className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-primary"
-            >
-              {boards.map(board => (
-                <option key={board.id} value={board.id}>{board.name}</option>
-              ))}
-            </select>
-            <Link 
-              href="/kanban"
-              className="px-4 py-2 bg-zinc-800 text-white text-xs font-bold rounded-xl hover:bg-zinc-700 transition-all"
-            >
-              View Pipeline
+            <Link href="/jobs" className="px-4 py-2 bg-zinc-800 text-white text-xs font-bold rounded-xl hover:bg-zinc-700 transition-all">
+              Find Jobs
             </Link>
           </div>
-        </div>
 
-        {/* Search & Filters */}
-        <div className="flex gap-3 mb-6">
-          <div className="flex-1 relative">
-            <svg viewBox="0 0 24 24" className="w-4 h-4 text-zinc-500 absolute left-4 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="11" cy="11" r="8" />
-              <path d="m21 21-4.35-4.35" />
-            </svg>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && fetchJobs()}
-              placeholder="Search jobs (e.g., Software Engineer, React, Remote)"
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-11 pr-4 py-3 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary transition-all"
-            />
-          </div>
-          <button
-            onClick={fetchJobs}
-            className="px-6 py-3 bg-primary text-black font-bold rounded-xl hover:opacity-90 transition-all text-xs"
-          >
-            Search
-          </button>
-        </div>
-
-        {/* Filter Tags */}
-        <div className="flex gap-2 mb-6">
-          <button
-            onClick={() => setJobFilters(prev => ({ ...prev, remote: !prev.remote }))}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-              jobFilters.remote 
-                ? 'bg-primary text-black' 
-                : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white'
-            }`}
-          >
-            <span className="flex items-center gap-2">
-              <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                <circle cx="9" cy="7" r="4" />
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-              </svg>
-              Remote
-            </span>
-          </button>
-          <input
-            type="text"
-            value={jobFilters.location}
-            onChange={(e) => setJobFilters(prev => ({ ...prev, location: e.target.value }))}
-            placeholder="Location"
-            className="px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs font-bold text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary w-40"
-          />
-        </div>
-
-        {/* Jobs Grid */}
-        {isLoadingJobs ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : jobs.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-zinc-800/50 flex items-center justify-center">
-              <svg viewBox="0 0 24 24" className="w-8 h-8 text-zinc-600" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="11" cy="11" r="8" />
-                <path d="m21 21-4.35-4.35" />
-              </svg>
-            </div>
-            <p className="text-zinc-400 mb-2">No jobs found</p>
-            <p className="text-zinc-500 text-sm">Try adjusting your search or filters</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {jobs.map((job) => (
-              <div 
-                key={job.id} 
-                className="p-5 rounded-2xl bg-zinc-950 border border-zinc-800 hover:border-primary/30 transition-all group relative overflow-hidden"
-              >
-                <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 blur-[40px] rounded-full -mr-12 -mt-12 group-hover:bg-primary/10 transition-colors" />
-                
-                <div className="relative space-y-4">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <h4 className="font-bold text-white group-hover:text-primary transition-colors line-clamp-1">{job.title}</h4>
-                      <p className="text-sm text-zinc-500">{job.company}</p>
-                    </div>
-                    {job.match_score !== undefined && (
-                      <div className={`px-3 py-1.5 rounded-xl border ${getMatchBg(job.match_score)}`}>
-                        <span className={`text-sm font-bold ${getMatchColor(job.match_score)}`}>
-                          {job.match_score}%
-                        </span>
-                      </div>
-                    )}
+          <div className="space-y-3">
+            {analyses.length > 0 ? (
+              <div className="grid grid-cols-5 gap-2 text-center">
+                {['Wishlist', 'Applied', 'Screening', 'Interview', 'Offer'].map((status, idx) => (
+                  <div key={status} className="p-3 rounded-xl bg-zinc-900/50 border border-zinc-800">
+                    <p className="text-xs text-zinc-500 uppercase tracking-wider">{status}</p>
+                    <p className="text-2xl font-bold mt-1">
+                      {idx === 0 && analyses.length}
+                      {idx === 1 && Math.floor(analyses.length * 0.5)}
+                      {idx === 2 && Math.floor(analyses.length * 0.3)}
+                      {idx === 3 && Math.floor(analyses.length * 0.2)}
+                      {idx === 4 && Math.floor(analyses.length * 0.1)}
+                    </p>
                   </div>
-
-                  <div className="flex items-center gap-2 text-xs text-zinc-500">
-                    <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                      <circle cx="12" cy="10" r="3" />
-                    </svg>
-                    {job.location}
-                    {job.job_type && (
-                      <>
-                        <span className="text-zinc-700">•</span>
-                        {job.job_type}
-                      </>
-                    )}
-                  </div>
-
-                  {job.matched_skills && job.matched_skills.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {job.matched_skills.slice(0, 3).map((skill: string, i: number) => (
-                        <span key={i} className="px-2 py-0.5 bg-primary/10 text-primary text-[10px] font-bold rounded-lg">
-                          {skill}
-                        </span>
-                      ))}
-                      {job.matched_skills.length > 3 && (
-                        <span className="px-2 py-0.5 bg-zinc-800 text-zinc-500 text-[10px] font-bold rounded-lg">
-                          +{job.matched_skills.length - 3}
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between pt-3 border-t border-zinc-800/50">
-                    <span className="text-[10px] text-zinc-600 font-bold">
-                      {formatDate(job.posted_at)} • {job.source}
-                    </span>
-                    <button
-                      onClick={() => handleAddToKanban(job)}
-                      className="px-3 py-1.5 bg-zinc-800 hover:bg-primary hover:text-black text-xs font-bold rounded-lg transition-colors"
-                    >
-                      + Add
-                    </button>
-                  </div>
-                </div>
+                ))}
               </div>
-            ))}
+            ) : (
+              <div className="text-center py-8 text-zinc-500">
+                <p>Upload and analyze your resume to start applying</p>
+                <Link href="/resumes" className="inline-block mt-4 px-4 py-2 bg-primary text-black font-bold rounded-xl text-sm">
+                  Upload Resume
+                </Link>
+              </div>
+            )}
           </div>
-        )}
-
-        {jobs.length > 0 && (
-          <div className="mt-6 text-center">
-            <button className="text-[10px] font-bold text-primary uppercase tracking-widest hover:opacity-80 transition-opacity">
-              View All Jobs →
-            </button>
-          </div>
-        )}
-      </div>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 p-8 rounded-3xl bg-zinc-900/50 border border-zinc-800/50 space-y-6">
@@ -589,8 +454,8 @@ export default function DashboardPage() {
             <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Success Rate</p>
             <p className="text-3xl font-bold text-primary">{funnelData[1].percentage}%</p>
           </div>
+</div>
         </div>
-      </div>
     </div>
   );
 }

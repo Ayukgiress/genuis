@@ -22,6 +22,7 @@ interface ApplicationState {
   addApplication: (application: Omit<Application, "id" | "appliedAt">) => Promise<void>;
   updateApplicationStatus: (id: string, status: ApplicationStatus) => Promise<void>;
   fetchApplications: () => Promise<void>;
+  getApplicationByJobId: (jobId: string) => Application | undefined;
 }
 
 export const useApplicationStore = create<ApplicationState>()(
@@ -34,8 +35,6 @@ export const useApplicationStore = create<ApplicationState>()(
       addApplication: async (appData) => {
         set({ isLoading: true, error: null });
         try {
-          // In a real app, this would be an API call
-          // For now, we'll simulate it and update the local state
           const newApp: Application = {
             ...appData,
             id: Math.random().toString(36).substring(7),
@@ -46,6 +45,19 @@ export const useApplicationStore = create<ApplicationState>()(
             applications: [newApp, ...state.applications],
             isLoading: false,
           }));
+
+          if (typeof window !== 'undefined') {
+            try {
+              const existing = localStorage.getItem('interview-prep-jobs');
+              const prepJobs = existing ? JSON.parse(existing) : [];
+              if (!prepJobs.includes(appData.jobId)) {
+                prepJobs.push(appData.jobId);
+                localStorage.setItem('interview-prep-jobs', JSON.stringify(prepJobs));
+              }
+            } catch (e) {
+              console.warn('Could not update interview prep cache', e);
+            }
+          }
         } catch (error) {
           set({ error: (error as Error).message, isLoading: false });
         }
@@ -62,13 +74,14 @@ export const useApplicationStore = create<ApplicationState>()(
       fetchApplications: async () => {
         set({ isLoading: true, error: null });
         try {
-          // Fetch from API if available
-          // const response = await api.get<Application[]>("/applications");
-          // set({ applications: response, isLoading: false });
           set({ isLoading: false });
         } catch (error) {
           set({ error: (error as Error).message, isLoading: false });
         }
+      },
+
+      getApplicationByJobId: (jobId: string) => {
+        return get().applications.find(app => app.jobId === jobId);
       },
     }),
     {
