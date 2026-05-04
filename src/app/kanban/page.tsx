@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
+import { Button } from '@/components/ui';
 import { useRouter } from 'next/navigation';
 import { kanbanApi, jobApi, ApiError, getAuthToken } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
@@ -280,37 +281,39 @@ export default function KanbanPage() {
           <h1 className="text-2xl md:text-4xl font-bold tracking-tight">Application Pipeline</h1>
           <p className="text-zinc-500 text-base md:text-lg">Real-time AI matching and career stage tracking.</p>
         </div>
-        <div className="flex items-center gap-2 md:gap-4 flex-wrap">
-          {/* Board Selector */}
-          {boards.length > 0 && (
-            <select
-              value={currentBoard?.id || ''}
-              onChange={(e) => {
-                const board = boards.find(b => b.id === e.target.value);
-                if (board) setCurrentBoard(board);
-              }}
-              className="bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-3 text-xs font-black uppercase tracking-widest text-white focus:outline-none focus:border-primary"
-            >
-              {boards.map(board => (
-                <option key={board.id} value={board.id}>{board.name}</option>
-              ))}
-            </select>
-          )}
-          <div className="flex bg-zinc-900/50 border border-zinc-800 rounded-xl p-1">
-            <button className="px-6 py-2 bg-zinc-800 text-primary text-xs font-black rounded-lg uppercase tracking-widest">Board</button>
-            <button className="px-6 py-2 text-zinc-500 text-xs font-black uppercase tracking-widest hover:text-zinc-300">List</button>
-          </div>
-           <button
-             onClick={() => openCreateCardModal()}
-             className="flex items-center gap-2 px-6 py-3 bg-primary text-black font-black rounded-xl hover:opacity-90 transition-all uppercase tracking-widest text-xs"
-           >
-            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="3">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            New Application
-          </button>
-        </div>
+<div className="flex items-center gap-2 md:gap-4 flex-wrap">
+  {/* Board Selector */}
+  {boards.length > 0 && (
+    <select
+      value={currentBoard?.id || ''}
+      onChange={(e) => {
+        const board = boards.find(b => b.id === e.target.value);
+        if (board) setCurrentBoard(board);
+      }}
+      className="bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-3 text-xs font-black uppercase tracking-widest text-white focus:outline-none focus:border-primary"
+    >
+      {boards.map(board => (
+        <option key={board.id} value={board.id}>{board.name}</option>
+      ))}
+    </select>
+  )}
+  <div className="flex bg-zinc-900/50 border border-zinc-800 rounded-xl p-1">
+    <Button variant="primary" size="sm" className="text-xs font-black uppercase tracking-widest rounded-lg">Board</Button>
+    <Button variant="ghost" size="sm" className="text-xs font-black uppercase tracking-widest">List</Button>
+  </div>
+  <Button
+    variant="primary" 
+    size="lg"
+    onClick={() => openCreateCardModal()}
+    className="uppercase tracking-widest text-xs gap-2"
+  >
+    <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="3">
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+    New Application
+  </Button>
+</div>
       </div>
 
       {/* Error/Success Messages */}
