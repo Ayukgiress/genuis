@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState, useRef, useCallback } from "react";
-
 import { useRouter } from "next/navigation";
 import {
   interviewApi,
@@ -13,16 +12,161 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { useInterviewWebSocket } from "@/hooks/useInterviewWebSocket";
 import type { Interview, InterviewMessage, Job } from "@/types";
-import { generateInterviewQuestions } from "@/utils/interviewQuestions";
-import "@/styles/interview.css";
+
+// ─── Inline styles ────────────────────────────────────────────────────────────
+const css = `
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap');
+
+  :root {
+    --green: #00F29C;
+    --green-dim: rgba(0,242,156,0.12);
+    --green-border: rgba(0,242,156,0.25);
+    --red: #FF4757;
+    --bg: #080A0E;
+    --surface: #0E1117;
+    --surface2: #13181F;
+    --border: rgba(255,255,255,0.06);
+    --text: #E8EAF0;
+    --muted: #5A6070;
+    --font-display: 'Syne', sans-serif;
+    --font-mono: 'Space Mono', monospace;
+  }
+
+  .iv-root { background: var(--bg); min-height: 100vh; font-family: var(--font-display); color: var(--text); position: relative; overflow-x: hidden; }
+  
+  /* Ambient orb */
+  .iv-orb { position: fixed; top: -200px; right: -200px; width: 600px; height: 600px; background: radial-gradient(circle, rgba(0,242,156,0.07) 0%, transparent 70%); pointer-events: none; z-index: 0; }
+
+  /* Layout */
+  .iv-layout { position: relative; z-index: 1; display: grid; grid-template-columns: 280px 1fr 300px; grid-template-rows: 72px 1fr; height: 100vh; gap: 0; }
+
+  /* Top bar */
+  .iv-topbar { grid-column: 1 / -1; display: flex; align-items: center; padding: 0 32px; border-bottom: 1px solid var(--border); background: rgba(8,10,14,0.8); backdrop-filter: blur(20px); gap: 16px; }
+  .iv-topbar-logo { font-size: 18px; font-weight: 800; letter-spacing: -0.5px; }
+  .iv-topbar-logo span { color: var(--green); }
+  .iv-topbar-badge { font-family: var(--font-mono); font-size: 10px; padding: 3px 8px; background: var(--green-dim); border: 1px solid var(--green-border); border-radius: 4px; color: var(--green); text-transform: uppercase; letter-spacing: 1px; }
+  .iv-topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+
+  /* Sidebar */
+  .iv-sidebar { grid-row: 2; border-right: 1px solid var(--border); overflow-y: auto; padding: 24px 16px; display: flex; flex-direction: column; gap: 8px; background: var(--surface); }
+  .iv-sidebar-header { font-family: var(--font-mono); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); padding: 0 8px 12px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+  .iv-session { padding: 14px 12px; border-radius: 12px; border: 1px solid transparent; cursor: pointer; transition: all 0.2s; }
+  .iv-session:hover { background: var(--surface2); border-color: var(--border); }
+  .iv-session.active { background: var(--green-dim); border-color: var(--green-border); }
+  .iv-session-title { font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .iv-session-company { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .iv-session-meta { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+  .iv-pill { font-family: var(--font-mono); font-size: 9px; padding: 2px 7px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .iv-pill.active { background: var(--green-dim); color: var(--green); border: 1px solid var(--green-border); }
+  .iv-pill.done { background: rgba(255,255,255,0.05); color: var(--muted); border: 1px solid var(--border); }
+  .iv-session-del { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; border-radius: 6px; font-size: 16px; color: var(--muted); hover: color: var(--red); transition: all 0.15s; }
+  .iv-session-del:hover { background: rgba(255,71,87,0.1); color: var(--red); }
+
+  /* Center — video stage */
+  .iv-stage { grid-row: 2; display: flex; flex-direction: column; overflow: hidden; }
+  .iv-video-area { flex: 1; position: relative; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .iv-video-area video { width: 100%; height: 100%; object-fit: cover; }
+  .iv-video-placeholder { display: flex; flex-direction: column; align-items: center; gap: 16px; color: var(--muted); }
+  .iv-video-placeholder svg { width: 56px; height: 56px; opacity: 0.3; }
+  .iv-video-placeholder p { font-family: var(--font-mono); font-size: 12px; letter-spacing: 1px; }
+  .iv-rec-badge { position: absolute; top: 20px; left: 20px; display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); border: 1px solid rgba(255,71,87,0.3); border-radius: 8px; padding: 6px 12px; font-family: var(--font-mono); font-size: 11px; color: var(--red); }
+  .iv-rec-dot { width: 8px; height: 8px; background: var(--red); border-radius: 50%; animation: blink 1s ease-in-out infinite; }
+  .iv-status-badge { position: absolute; top: 20px; right: 20px; display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); border: 1px solid var(--green-border); border-radius: 8px; padding: 6px 12px; font-family: var(--font-mono); font-size: 11px; color: var(--green); }
+  .iv-status-dot { width: 7px; height: 7px; background: var(--green); border-radius: 50%; }
+  .iv-status-dot.pulse { animation: pulse 2s ease-in-out infinite; }
+
+  /* Bottom bar */
+  .iv-controls { background: var(--surface); border-top: 1px solid var(--border); padding: 20px 28px; display: flex; align-items: center; gap: 16px; }
+  .iv-transcript-input { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; color: var(--text); font-family: var(--font-display); font-size: 14px; resize: none; height: 48px; line-height: 24px; transition: border-color 0.2s; outline: none; }
+  .iv-transcript-input:focus { border-color: var(--green-border); }
+  .iv-transcript-input::placeholder { color: var(--muted); }
+  .iv-ctrl-btn { width: 48px; height: 48px; border-radius: 12px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; background: var(--surface2); color: var(--muted); font-size: 18px; }
+  .iv-ctrl-btn:hover { border-color: rgba(255,255,255,0.15); color: var(--text); }
+  .iv-ctrl-btn.danger { border-color: rgba(255,71,87,0.3); color: var(--red); background: rgba(255,71,87,0.08); }
+  .iv-ctrl-btn.danger:hover { background: rgba(255,71,87,0.18); }
+  .iv-send-btn { height: 48px; padding: 0 24px; border-radius: 12px; background: var(--green); color: #000; font-family: var(--font-display); font-weight: 700; font-size: 14px; cursor: pointer; transition: all 0.2s; border: none; white-space: nowrap; }
+  .iv-send-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(0,242,156,0.3); }
+  .iv-send-btn:disabled { opacity: 0.4; transform: none; box-shadow: none; cursor: not-allowed; }
+  .iv-start-btn { height: 56px; padding: 0 36px; border-radius: 14px; background: linear-gradient(135deg, var(--green) 0%, #00d4a0 100%); color: #000; font-family: var(--font-display); font-weight: 800; font-size: 16px; letter-spacing: -0.3px; cursor: pointer; transition: all 0.25s; border: none; display: flex; align-items: center; gap: 10px; }
+  .iv-start-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 40px rgba(0,242,156,0.35); }
+  .iv-start-btn:disabled { opacity: 0.4; transform: none; box-shadow: none; cursor: not-allowed; }
+
+  /* Right panel — chat */
+  .iv-chat { grid-row: 2; border-left: 1px solid var(--border); display: flex; flex-direction: column; background: var(--surface); }
+  .iv-chat-header { padding: 20px 20px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .iv-chat-title { font-weight: 700; font-size: 15px; }
+  .iv-chat-sub { font-family: var(--font-mono); font-size: 10px; color: var(--muted); margin-top: 2px; letter-spacing: 0.5px; }
+  .iv-chat-toggle { font-family: var(--font-mono); font-size: 9px; padding: 4px 8px; border-radius: 6px; background: var(--surface2); border: 1px solid var(--border); color: var(--muted); cursor: pointer; text-transform: uppercase; letter-spacing: 1px; transition: all 0.15s; }
+  .iv-chat-toggle:hover { color: var(--text); border-color: rgba(255,255,255,0.15); }
+  .iv-chat-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .iv-chat-messages::-webkit-scrollbar { width: 4px; }
+  .iv-chat-messages::-webkit-scrollbar-track { background: transparent; }
+  .iv-chat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .iv-msg { max-width: 100%; }
+  .iv-msg.user { align-self: flex-end; }
+  .iv-msg.ai { align-self: flex-start; }
+  .iv-msg-bubble { padding: 10px 14px; border-radius: 14px; font-size: 13px; line-height: 1.5; }
+  .iv-msg.user .iv-msg-bubble { background: var(--green); color: #000; border-bottom-right-radius: 4px; font-weight: 500; }
+  .iv-msg.ai .iv-msg-bubble { background: var(--surface2); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+  .iv-msg-time { font-family: var(--font-mono); font-size: 9px; color: var(--muted); margin-top: 4px; padding: 0 2px; }
+  .iv-msg.user .iv-msg-time { text-align: right; }
+  .iv-chat-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: var(--muted); }
+  .iv-chat-empty-icon { width: 44px; height: 44px; border-radius: 12px; background: var(--surface2); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 20px; }
+
+  /* Empty state */
+  .iv-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 16px; color: var(--muted); }
+  .iv-empty-icon { width: 80px; height: 80px; border-radius: 24px; background: var(--surface2); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 36px; margin-bottom: 8px; }
+  .iv-empty h3 { font-size: 18px; font-weight: 700; color: var(--text); }
+  .iv-empty p { font-size: 13px; font-family: var(--font-mono); letter-spacing: 0.3px; }
+
+  /* Buttons */
+  .iv-btn-primary { padding: 12px 24px; border-radius: 10px; background: var(--green); color: #000; font-family: var(--font-display); font-weight: 700; font-size: 14px; cursor: pointer; border: none; transition: all 0.2s; }
+  .iv-btn-primary:hover { box-shadow: 0 6px 20px rgba(0,242,156,0.3); transform: translateY(-1px); }
+  .iv-btn-primary:disabled { opacity: 0.4; transform: none; box-shadow: none; cursor: not-allowed; }
+  .iv-btn-ghost { padding: 12px 24px; border-radius: 10px; background: transparent; color: var(--text); font-family: var(--font-display); font-weight: 600; font-size: 14px; cursor: pointer; border: 1px solid var(--border); transition: all 0.2s; }
+  .iv-btn-ghost:hover { border-color: rgba(255,255,255,0.15); background: var(--surface2); }
+
+  /* Modal */
+  .iv-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(12px); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 20px; }
+  .iv-modal { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; width: 100%; max-width: 440px; overflow: hidden; }
+  .iv-modal-header { padding: 28px 28px 24px; border-bottom: 1px solid var(--border); }
+  .iv-modal-header h3 { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; }
+  .iv-modal-header p { font-family: var(--font-mono); font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .iv-modal-body { padding: 28px; display: flex; flex-direction: column; gap: 20px; }
+  .iv-select-label { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 2px; color: var(--muted); margin-bottom: 8px; display: block; }
+  .iv-select { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; color: var(--text); font-family: var(--font-display); font-size: 14px; outline: none; cursor: pointer; transition: border-color 0.2s; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235A6070' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 16px center; }
+  .iv-select:focus { border-color: var(--green-border); }
+  .iv-select option { background: var(--surface2); }
+  .iv-modal-actions { display: flex; gap: 12px; }
+
+  /* Toast */
+  .iv-toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%); padding: 12px 20px; border-radius: 10px; font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.5px; z-index: 200; animation: slideUp 0.3s ease; }
+  .iv-toast.error { background: rgba(255,71,87,0.12); border: 1px solid rgba(255,71,87,0.3); color: var(--red); }
+  .iv-toast.success { background: var(--green-dim); border: 1px solid var(--green-border); color: var(--green); }
+
+  /* Animations */
+  @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+  @keyframes pulse { 0%,100% { opacity: 1; box-shadow: 0 0 0 0 rgba(0,242,156,0.4); } 50% { opacity: 0.8; box-shadow: 0 0 0 6px rgba(0,242,156,0); } }
+  @keyframes slideUp { from { opacity: 0; transform: translateX(-50%) translateY(12px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .iv-stage, .iv-chat, .iv-sidebar { animation: fadeIn 0.4s ease; }
+
+  /* Responsive */
+  @media (max-width: 1100px) {
+    .iv-layout { grid-template-columns: 260px 1fr; }
+    .iv-chat { display: none; }
+  }
+  @media (max-width: 700px) {
+    .iv-layout { grid-template-columns: 1fr; }
+    .iv-sidebar { display: none; }
+  }
+`;
 
 export default function InterviewsPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [interviews, setInterviews] = useState<Interview[]>([]);
-  const [selectedInterview, setSelectedInterview] = useState<Interview | null>(
-    null,
-  );
+  const [selectedInterview, setSelectedInterview] = useState<Interview | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [boards, setBoards] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -35,8 +179,8 @@ export default function InterviewsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string>("");
   const [hideAIMessages, setHideAIMessages] = useState(false);
+  const [isInterviewActive, setIsInterviewActive] = useState(false);
 
-  // Video WebSocket
   const {
     isConnected,
     isStreaming,
@@ -48,60 +192,37 @@ export default function InterviewsPage() {
     stopVideoStream,
   } = useInterviewWebSocket(selectedInterview?.id || null);
 
-  // Update message from video transcript
-  useEffect(() => {
-    if (transcript) {
-      setNewMessage(transcript);
-    }
-  }, [transcript]);
+  useEffect(() => { if (transcript) setNewMessage(transcript); }, [transcript]);
 
-  const [isInterviewActive, setIsInterviewActive] = useState(false);
+  const showToast = (msg: string, type: "error" | "success") => {
+    if (type === "error") { setError(msg); setTimeout(() => setError(null), 4000); }
+    else { setSuccess(msg); setTimeout(() => setSuccess(null), 4000); }
+  };
 
   const fetchData = useCallback(async () => {
     try {
       setIsLoading(true);
-      setError(null);
       const [interviewsData, jobsData, boardsData] = await Promise.all([
-        interviewApi.list(),
-        jobApi.search({ limit: 50 }),
-        kanbanApi.listBoards(),
+        interviewApi.list(), jobApi.search({ limit: 50 }), kanbanApi.listBoards(),
       ]);
       setInterviews(interviewsData);
       setJobs(jobsData);
       setBoards(boardsData);
-    } catch (err) {
-      console.error("Failed to fetch data:", err);
-      setError("Failed to load interviews. Backend required.");
-    } finally {
-      setIsLoading(false);
-    }
+    } catch { showToast("Failed to load interviews.", "error"); }
+    finally { setIsLoading(false); }
   }, []);
 
-  const fetchInterviewMessages = useCallback(
-    async (interviewId: number) => {
-      try {
-        const messages = await interviewApi.getMessages(interviewId);
-        setInterviews((prev) =>
-          prev.map((int) =>
-            int.id === interviewId ? { ...int, messages } : int,
-          ),
-        );
-        if (selectedInterview?.id === interviewId) {
-          setSelectedInterview((prev) => (prev ? { ...prev, messages } : null));
-        }
-      } catch (err) {
-        console.error("Failed to fetch messages:", err);
-      }
-    },
-    [selectedInterview],
-  );
+  const fetchInterviewMessages = useCallback(async (interviewId: number) => {
+    try {
+      const messages = await interviewApi.getMessages(interviewId);
+      setInterviews((prev) => prev.map((int) => int.id === interviewId ? { ...int, messages } : int));
+      setSelectedInterview((prev) => prev?.id === interviewId ? { ...prev, messages } : prev);
+    } catch {}
+  }, []);
 
   useEffect(() => {
     if (authLoading) return;
-    if (!isAuthenticated || !getAuthToken()) {
-      router.push("/login");
-      return;
-    }
+    if (!isAuthenticated || !getAuthToken()) { router.push("/login"); return; }
     fetchData();
   }, [authLoading, isAuthenticated, router, fetchData]);
 
@@ -113,29 +234,22 @@ export default function InterviewsPage() {
     }
   }, [interviews, fetchInterviewMessages]);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [selectedInterview?.messages]);
+  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [selectedInterview?.messages]);
 
   const handleCreateInterview = async () => {
     if (!selectedJobId) return;
     try {
       setIsCreating(true);
-      setError(null);
-      if (boards.length > 0)
-        await jobApi.addToKanban(selectedJobId, boards[0].id, "review");
+      if (boards.length > 0) await jobApi.addToKanban(selectedJobId, boards[0].id, "review");
       const newInterview = await interviewApi.create({ job_id: selectedJobId });
       setInterviews((prev) => [newInterview, ...prev]);
       setSelectedInterview(newInterview);
       setShowCreateModal(false);
       setSelectedJobId("");
-      setSuccess("Video interview created!");
-      setTimeout(() => setSuccess(null), 3000);
+      showToast("Interview session created!", "success");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to create");
-    } finally {
-      setIsCreating(false);
-    }
+      showToast(err instanceof ApiError ? err.message : "Failed to create", "error");
+    } finally { setIsCreating(false); }
   };
 
   const handleSendMessage = async () => {
@@ -143,92 +257,49 @@ export default function InterviewsPage() {
     try {
       setIsSending(true);
       const userMessage: InterviewMessage = {
-        id: Date.now(),
-        interview_id: selectedInterview.id,
-        role: "user",
-        content: newMessage.trim(),
-        created_at: new Date().toISOString(),
+        id: Date.now(), interview_id: selectedInterview.id, role: "user",
+        content: newMessage.trim(), created_at: new Date().toISOString(),
       };
-      const tempInterview = {
-        ...selectedInterview,
-        messages: [...(selectedInterview.messages || []), userMessage],
-      };
+      const tempInterview = { ...selectedInterview, messages: [...(selectedInterview.messages || []), userMessage] };
       setSelectedInterview(tempInterview);
       setNewMessage("");
-
-      const aiMessage = await interviewApi.sendMessage(selectedInterview.id, {
-        role: "user",
-        content: userMessage.content,
-      });
-
-      const finalInterview = {
-        ...tempInterview,
-        messages: [...tempInterview.messages, aiMessage],
-      };
+      const aiMessage = await interviewApi.sendMessage(selectedInterview.id, { role: "user", content: userMessage.content });
+      const finalInterview = { ...tempInterview, messages: [...tempInterview.messages, aiMessage] };
       setSelectedInterview(finalInterview);
-      setInterviews((prev) =>
-        prev.map((int) =>
-          int.id === selectedInterview.id ? finalInterview : int,
-        ),
-      );
-
+      setInterviews((prev) => prev.map((int) => int.id === selectedInterview.id ? finalInterview : int));
       if (aiMessage.content?.includes("[INTERVIEW_COMPLETE]")) {
         await interviewApi.complete(selectedInterview.id);
-        setSuccess("Interview completed!");
-        setTimeout(() => setSuccess(null), 3000);
+        showToast("Interview completed!", "success");
       }
-    } catch (err) {
-      setError("Failed to send message");
-    } finally {
-      setIsSending(false);
-    }
-  };
-
-  const handleCompleteInterview = async (interviewId: number) => {
-    try {
-      await interviewApi.complete(interviewId);
-      setInterviews((prev) =>
-        prev.map((int) =>
-          int.id === interviewId ? { ...int, status: "completed" } : int,
-        ),
-      );
-      setSuccess("Completed!");
-    } catch (err) {
-      setError("Failed to complete");
-    }
+    } catch { showToast("Failed to send message", "error"); }
+    finally { setIsSending(false); }
   };
 
   const handleDeleteInterview = async (interviewId: number) => {
-    if (!confirm("Delete?")) return;
+    if (!confirm("Delete this session?")) return;
     try {
       await interviewApi.delete(interviewId);
       setInterviews((prev) => prev.filter((int) => int.id !== interviewId));
-      setSelectedInterview(null);
-      setSuccess("Deleted!");
-    } catch (err) {
-      setError("Failed to delete");
-    }
+      if (selectedInterview?.id === interviewId) setSelectedInterview(null);
+      showToast("Session deleted", "success");
+    } catch { showToast("Failed to delete", "error"); }
   };
 
   const selectInterview = (interview: Interview) => {
     if (selectedInterview?.id === interview.id) return;
     disconnect();
+    setIsInterviewActive(false);
     setSelectedInterview(interview);
     if (!interview.messages) fetchInterviewMessages(interview.id);
   };
 
-  const startVideoInterview = async () => {
+  const startVideoInterview = () => {
     if (!selectedInterview || isInterviewActive) return;
-    try {
-      connect();
-      setTimeout(() => startVideoStream(), 1000); // Wait for WS ready
-      setIsInterviewActive(true);
-      setNewMessage("");
-      setSuccess("Video interview started! Look at camera to speak.");
-      setTimeout(() => setSuccess(null), 4000);
-    } catch (err) {
-      setError("Failed to start video");
-    }
+    connect();
+    setTimeout(() => startVideoStream(), 1000);
+    setIsInterviewActive(true);
+    setNewMessage("");
+    showToast("Video interview started — speak to respond", "success");
   };
 
   const stopVideoInterview = () => {
@@ -237,333 +308,225 @@ export default function InterviewsPage() {
     setIsInterviewActive(false);
   };
 
-  const getJobDetails = (jobId: number) =>
-    jobs.find((job) => job.id === jobId.toString());
-
-  const formatDate = (dateStr: string) => new Date(dateStr).toLocaleString();
+  const getJobDetails = (jobId: number) => jobs.find((job) => job.id === jobId.toString());
+  const formatTime = (d: string) => new Date(d).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const formatDate = (d: string) => new Date(d).toLocaleDateString([], { month: "short", day: "numeric" });
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00F29C]" />
+      <div style={{ background: "#080A0E", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ textAlign: "center", color: "#5A6070", fontFamily: "monospace" }}>
+          <div style={{ width: 40, height: 40, border: "2px solid #00F29C", borderTopColor: "transparent", borderRadius: "50%", margin: "0 auto 16px", animation: "spin 0.8s linear infinite" }} />
+          <p style={{ fontSize: 12, letterSpacing: 2, textTransform: "uppercase" }}>Loading sessions...</p>
+        </div>
+        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       </div>
     );
   }
 
+  const job = selectedInterview ? getJobDetails(selectedInterview.job_id) : null;
+  const messages = selectedInterview?.messages || [];
+  const visibleMessages = hideAIMessages ? messages.filter((m) => m.role === "user") : messages;
+
   return (
     <>
-      <div className="noise-overlay" />
-      <div className="interview-page min-h-screen p-8 text-white">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex justify-between mb-10">
-            <h1 className="text-3xl font-bold">Video AI Interviews</h1>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="glow-btn px-6 py-3 bg-[#00F29C] text-black font-bold rounded-xl"
-            >
-              NEW INTERVIEW
-            </button>
-          </div>
+      <style>{css}</style>
+      <div className="iv-root">
+        <div className="iv-orb" />
+        <div className="iv-layout">
 
-          {(error || success) && (
-            <div className="mb-6 space-y-2">
-              {error && (
-                <div className="p-4 bg-red-500/10 border border-red-500/25 rounded-xl">
-                  <p className="text-red-400">{error}</p>
-                </div>
-              )}
-              {success && (
-                <div className="p-4 bg-[#00F29C]/10 border border-[#00F29C]/25 rounded-xl">
-                  <p className="text-[#00F29C]">{success}</p>
-                </div>
-              )}
+          {/* ── Top bar ── */}
+          <header className="iv-topbar">
+            <span className="iv-topbar-logo">inter<span>view</span>.ai</span>
+            <span className="iv-topbar-badge">Video AI</span>
+            {isConnected && <span className="iv-topbar-badge" style={{ borderColor: "rgba(0,242,156,0.4)", color: "#00F29C" }}>● WS Connected</span>}
+            <div className="iv-topbar-actions">
+              <button className="iv-btn-primary" onClick={() => setShowCreateModal(true)} style={{ padding: "8px 20px", fontSize: 13 }}>
+                + New Session
+              </button>
             </div>
-          )}
+          </header>
 
-          <div className="grid lg:grid-cols-[320px_1fr] gap-8">
-            {/* Sessions */}
-            <div className="space-y-4">
-              <h3 className="mono text-xs uppercase tracking-wider text-zinc-500">
-                Sessions
-              </h3>
-              {interviews.map((interview) => {
-                const job = getJobDetails(interview.job_id);
-                const active = selectedInterview?.id === interview.id;
-                return (
-                  <div
-                    key={interview.id}
-                    onClick={() => selectInterview(interview)}
-                    className={`p-6 rounded-2xl border cursor-pointer transition-all ${
-                      active
-                        ? "bg-[#00F29C]/5 border-[#00F29C]/30 ring-2 ring-[#00F29C]/20"
-                        : "border-zinc-800 hover:border-zinc-700 bg-zinc-900/30"
-                    }`}
-                  >
-                    <div className="flex justify-between mb-2">
-                      <div>
-                        <h4 className="font-bold">
-                          {job?.title || "Practice"}
-                        </h4>
-                        <p className="text-zinc-500 text-sm">{job?.company}</p>
-                      </div>
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-bold ${
-                          interview.status === "completed"
-                            ? "bg-zinc-800 text-zinc-400"
-                            : "bg-[#00F29C]/20 text-[#00F29C]"
-                        }`}
-                      >
-                        {interview.status}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-xs text-zinc-500">
-                      <span>{formatDate(interview.created_at)}</span>
-                      <div className="flex gap-1">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteInterview(interview.id);
-                          }}
-                          className="p-1 hover:text-red-400"
-                        >
-                          ×
-                        </button>
-                      </div>
+          {/* ── Sessions Sidebar ── */}
+          <aside className="iv-sidebar">
+            <div className="iv-sidebar-header">Sessions · {interviews.length}</div>
+            {interviews.length === 0 && (
+              <div style={{ textAlign: "center", padding: "32px 8px", color: "#5A6070", fontFamily: "monospace", fontSize: 11 }}>
+                No sessions yet
+              </div>
+            )}
+            {interviews.map((iv) => {
+              const j = getJobDetails(iv.job_id);
+              const active = selectedInterview?.id === iv.id;
+              return (
+                <div key={iv.id} className={`iv-session ${active ? "active" : ""}`} onClick={() => selectInterview(iv)}>
+                  <div className="iv-session-title">{j?.title || "Practice Session"}</div>
+                  <div className="iv-session-company">{j?.company || "—"}</div>
+                  <div className="iv-session-meta">
+                    <span className={`iv-pill ${iv.status === "completed" ? "done" : "active"}`}>
+                      {iv.status}
+                    </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      <span style={{ fontFamily: "monospace", fontSize: 9, color: "#5A6070" }}>{formatDate(iv.created_at)}</span>
+                      <button
+                        className="iv-session-del"
+                        onClick={(e) => { e.stopPropagation(); handleDeleteInterview(iv.id); }}
+                        title="Delete"
+                      >×</button>
                     </div>
                   </div>
-                );
-              })}
-            </div>
+                </div>
+              );
+            })}
+          </aside>
 
-            {/* Main Panel */}
+          {/* ── Video Stage ── */}
+          <main className="iv-stage">
             {selectedInterview ? (
-              <div className="space-y-6">
-                {/* Video Preview */}
-                <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-2xl p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-bold">Camera Preview</h3>
-                    <div className="flex gap-2">
-                      <div
-                        className={`w-3 h-3 rounded-full ${isStreaming ? "bg-red-500 animate-pulse" : "bg-zinc-600"}`}
-                      />
-                      <span className="text-sm mono uppercase tracking-wider">
-                        {videoCapture.error ||
-                          (isStreaming ? "RECORDING" : "READY")}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="relative">
-                    <video
-                      ref={videoCapture.videoRef}
-                      className="w-full max-w-md rounded-xl bg-black border-4 border-zinc-800 object-cover video-preview"
-                      muted
-                      playsInline
-                    />
-                    <canvas
-                      ref={videoCapture.canvasRef}
-                      className="hidden"
-                      width="640"
-                      height="480"
-                    />
-                    {isStreaming && (
-                      <div className="absolute top-4 right-4 w-4 h-4 bg-red-500 rounded-full rec-dot" />
-                    )}
-                  </div>
-                </div>
-
-                {/* Chat */}
-                <div className="bg-zinc-900/30 border border-zinc-800/50 rounded-2xl h-[500px] flex flex-col overflow-hidden">
-                  <div className="p-6 border-b border-zinc-800 bg-zinc-900/50">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-[#00F29C]/10 rounded-xl border border-[#00F29C]/20 flex items-center justify-center">
-                        <div className="w-5 h-5 bg-[#00F29C] rounded-full animate-ping" />
-                      </div>
-                      <div>
-                        <h4 className="font-bold">
-                          {getJobDetails(selectedInterview.job_id)?.title}
-                        </h4>
-                        <p className="text-zinc-500 text-sm">
-                          Video AI Interview
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => setHideAIMessages(!hideAIMessages)}
-                        className="ml-auto px-3 py-1 bg-zinc-800 text-xs rounded-lg hover:bg-zinc-700"
-                      >
-                        {hideAIMessages ? "Show AI" : "Hide AI"}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="flex-1 p-6 overflow-y-auto space-y-4">
-                    {!selectedInterview.messages ||
-                    selectedInterview.messages.length === 0 ? (
-                      <div className="h-full flex flex-col items-center justify-center text-zinc-500">
-                        <div className="w-16 h-16 bg-zinc-800 rounded-full flex items-center justify-center mb-4">
-                          <svg
-                            className="w-8 h-8"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                            />
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                            />
-                          </svg>
-                        </div>
-                        <p>Start your video interview</p>
-                      </div>
-                    ) : (
-                      selectedInterview.messages
-                        .filter((m) => !hideAIMessages || m.role === "user")
-                        .map((message) => (
-                          <div
-                            key={message.id}
-                            className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-                          >
-                            <div
-                              className={`max-w-md p-4 rounded-2xl ${
-                                message.role === "user"
-                                  ? "bg-[#00F29C] text-black rounded-tr-sm"
-                                  : "bg-zinc-800 border rounded-tl-sm"
-                              }`}
-                            >
-                              <p>{message.content}</p>
-                              <p className="text-xs opacity-75 mt-1">
-                                {formatDate(message.created_at)}
-                              </p>
-                            </div>
-                          </div>
-                        ))
-                    )}
-                    <div ref={messagesEndRef} />
-                  </div>
-
-                  {/* Controls */}
-                  {!isInterviewActive ? (
-                    <div className="p-6 border-t border-zinc-800 bg-gradient-to-r from-zinc-900/50 to-transparent">
-                      <button
-                        onClick={startVideoInterview}
-                        disabled={!isConnected || !!videoCapture.error}
-                        className="w-full py-4 px-8 bg-gradient-to-r from-[#00F29C] to-green-500 text-black font-bold rounded-2xl text-lg shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50"
-                      >
-                        🎥 Start Video Interview
-                      </button>
-                      {videoCapture.error && (
-                        <p className="text-red-400 text-xs mt-2 text-center">
-                          {videoCapture.error}
-                        </p>
-                      )}
+              <>
+                {/* Video */}
+                <div className="iv-video-area">
+                  {videoCapture.error ? (
+                    <div className="iv-video-placeholder">
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                      <p>{videoCapture.error}</p>
                     </div>
                   ) : (
-                    <div className="p-6 border-t border-zinc-800">
-                      <div className="flex gap-3">
-                        <button
-                          onClick={handleSendMessage}
-                          disabled={isSending || !newMessage.trim()}
-                          className="flex-1 bg-zinc-800 hover:bg-zinc-700 px-4 py-3 rounded-xl transition-all disabled:opacity-50"
-                        >
-                          {isSending ? "Sending..." : "Send Response"}
-                        </button>
-                        <button
-                          onClick={stopVideoInterview}
-                          className="px-4 py-3 bg-red-500/80 hover:bg-red-500 text-white rounded-xl transition-all"
-                        >
-                          Stop Video
-                        </button>
-                      </div>
-                      <textarea
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        placeholder="Type response or speak to camera..."
-                        className="w-full mt-3 p-4 bg-zinc-950 border border-zinc-700 rounded-xl resize-none h-20 focus:border-[#00F29C] focus:outline-none"
-                        disabled={isSending}
-                      />
+                    <video ref={videoCapture.videoRef} muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  )}
+                  <canvas ref={videoCapture.canvasRef} className="hidden" width="640" height="480" style={{ display: "none" }} />
+
+                  {isStreaming && (
+                    <div className="iv-rec-badge">
+                      <div className="iv-rec-dot" /> REC
+                    </div>
+                  )}
+                  <div className="iv-status-badge">
+                    <div className={`iv-status-dot ${isInterviewActive ? "pulse" : ""}`} style={{ background: isInterviewActive ? "#00F29C" : "#5A6070" }} />
+                    <span>{isInterviewActive ? "LIVE" : "STANDBY"}</span>
+                  </div>
+
+                  {/* Job overlay */}
+                  {job && (
+                    <div style={{ position: "absolute", bottom: 20, left: 20, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "10px 16px" }}>
+                      <div style={{ fontWeight: 700, fontSize: 14 }}>{job.title}</div>
+                      <div style={{ fontFamily: "monospace", fontSize: 11, color: "#5A6070", marginTop: 2 }}>{job.company}</div>
+                    </div>
+                  )}
+
+                  {/* "No session" inner */}
+                  {!isInterviewActive && !isStreaming && (
+                    <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.5)", gap: 16 }}>
+                      <div style={{ fontFamily: "monospace", fontSize: 11, color: "#5A6070", letterSpacing: 2, textTransform: "uppercase", marginBottom: 8 }}>Camera Preview</div>
                     </div>
                   )}
                 </div>
-              </div>
-            ) : (
-              <div className="border-2 border-dashed border-zinc-800 rounded-3xl p-12 text-center h-[600px] flex flex-col items-center justify-center">
-                <div className="w-24 h-24 bg-zinc-800 rounded-2xl flex items-center justify-center mb-6">
-                  <svg
-                    className="w-12 h-12 text-zinc-500"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                    />
-                  </svg>
+
+                {/* Controls bar */}
+                <div className="iv-controls">
+                  {isInterviewActive ? (
+                    <>
+                      <textarea
+                        className="iv-transcript-input"
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        placeholder="Speak or type your response…"
+                        disabled={isSending}
+                        rows={1}
+                        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
+                      />
+                      <button className="iv-send-btn" onClick={handleSendMessage} disabled={isSending || !newMessage.trim()}>
+                        {isSending ? "Sending…" : "Send"}
+                      </button>
+                      <button className="iv-ctrl-btn danger" onClick={stopVideoInterview} title="Stop interview">
+                        ◼
+                      </button>
+                    </>
+                  ) : (
+                    <div style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 16 }}>
+                      <button className="iv-start-btn" onClick={startVideoInterview} disabled={!!videoCapture.error}>
+                        <span>🎥</span> Start Video Interview
+                      </button>
+                      {videoCapture.error && (
+                        <span style={{ fontFamily: "monospace", fontSize: 11, color: "#FF4757" }}>{videoCapture.error}</span>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <h3 className="text-xl font-bold mb-2">
-                  No Interview Selected
-                </h3>
-                <p className="text-zinc-500">
-                  Choose from your sessions or create new
-                </p>
+              </>
+            ) : (
+              <div className="iv-empty">
+                <div className="iv-empty-icon">🎬</div>
+                <h3>No Session Selected</h3>
+                <p>Pick a session from the left or create one</p>
+                <button className="iv-btn-primary" onClick={() => setShowCreateModal(true)}>New Interview</button>
               </div>
             )}
-          </div>
+          </main>
+
+          {/* ── Chat Transcript ── */}
+          <aside className="iv-chat">
+            <div className="iv-chat-header">
+              <div>
+                <div className="iv-chat-title">Transcript</div>
+                <div className="iv-chat-sub">REAL-TIME LOG</div>
+              </div>
+              <button className="iv-chat-toggle" onClick={() => setHideAIMessages(!hideAIMessages)}>
+                {hideAIMessages ? "Show AI" : "Hide AI"}
+              </button>
+            </div>
+            <div className="iv-chat-messages">
+              {visibleMessages.length === 0 ? (
+                <div className="iv-chat-empty">
+                  <div className="iv-chat-empty-icon">💬</div>
+                  <span style={{ fontFamily: "monospace", fontSize: 11, color: "#5A6070", letterSpacing: 0.5 }}>No messages yet</span>
+                </div>
+              ) : (
+                visibleMessages.map((msg) => (
+                  <div key={msg.id} className={`iv-msg ${msg.role === "user" ? "user" : "ai"}`}>
+                    <div className="iv-msg-bubble">{msg.content}</div>
+                    <div className="iv-msg-time">{formatTime(msg.created_at)}</div>
+                  </div>
+                ))
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+          </aside>
+
         </div>
 
-        {/* Create Modal */}
+        {/* ── Create Modal ── */}
         {showCreateModal && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-              <div className="p-8 border-b border-zinc-800">
-                <h3 className="text-2xl font-bold">New Video Interview</h3>
+          <div className="iv-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowCreateModal(false); }}>
+            <div className="iv-modal">
+              <div className="iv-modal-header">
+                <h3>New Interview Session</h3>
+                <p>SELECT A JOB POSITION TO PRACTICE</p>
               </div>
-              <div className="p-8 space-y-6">
+              <div className="iv-modal-body">
                 <div>
-                  <label className="block text-sm font-bold mb-3 mono uppercase tracking-wider text-zinc-400">
-                    Job Position
-                  </label>
-                  <select
-                    value={selectedJobId}
-                    onChange={(e) => setSelectedJobId(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-700 rounded-xl p-4 text-white focus:border-[#00F29C] focus:outline-none"
-                  >
-                    <option value="">Select job...</option>
+                  <label className="iv-select-label">Job Position</label>
+                  <select className="iv-select" value={selectedJobId} onChange={(e) => setSelectedJobId(e.target.value)}>
+                    <option value="">Choose a role…</option>
                     {jobs.map((job) => (
-                      <option key={job.id} value={job.id}>
-                        {job.title} @ {job.company}
-                      </option>
+                      <option key={job.id} value={job.id}>{job.title} @ {job.company}</option>
                     ))}
                   </select>
                 </div>
-                <div className="flex gap-4 pt-4">
-                  <button
-                    className="flex-1 py-3 px-6 border border-zinc-700 hover:border-zinc-600 rounded-xl transition-all"
-                    onClick={() => setShowCreateModal(false)}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    className="flex-1 py-3 px-6 bg-[#00F29C] text-black font-bold rounded-xl hover:scale-105 transition-all glow-btn disabled:opacity-50"
-                    onClick={handleCreateInterview}
-                    disabled={!selectedJobId || isCreating}
-                  >
-                    {isCreating ? "Creating..." : "Create"}
+                <div className="iv-modal-actions">
+                  <button className="iv-btn-ghost" style={{ flex: 1 }} onClick={() => setShowCreateModal(false)}>Cancel</button>
+                  <button className="iv-btn-primary" style={{ flex: 1 }} onClick={handleCreateInterview} disabled={!selectedJobId || isCreating}>
+                    {isCreating ? "Creating…" : "Create Session"}
                   </button>
                 </div>
               </div>
             </div>
           </div>
         )}
+
+        {/* ── Toasts ── */}
+        {error && <div className="iv-toast error">⚠ {error}</div>}
+        {success && <div className="iv-toast success">✓ {success}</div>}
       </div>
     </>
   );

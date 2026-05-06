@@ -9,21 +9,18 @@ function getApiUrl(): string {
       console.warn('[api.ts] NEXT_PUBLIC_API_URL not set, using default production URL');
     }
   } else {
-    // Force HTTPS to prevent mixed content errors
-    if (apiUrl.startsWith('http://')) {
+    // If user provided an explicit protocol, keep it.
+    // For local development it's often http://127.0.0.1:8000 (no TLS).
+    // For production, we still prefer https.
+
+    // Validate URL format (allow http:// and https://)
+    if (!/^https?:\/\//.test(apiUrl)) {
       if (typeof window !== 'undefined') {
-        console.warn('[api.ts] WARNING: NEXT_PUBLIC_API_URL uses HTTP. Changing to HTTPS for security.');
-      }
-      apiUrl = apiUrl.replace(/^http:/, 'https:');
-    }
-    
-    // Validate URL format
-    if (!apiUrl.startsWith('https://')) {
-      if (typeof window !== 'undefined') {
-        console.error('[api.ts] ERROR: NEXT_PUBLIC_API_URL must start with https://');
+        console.error('[api.ts] ERROR: NEXT_PUBLIC_API_URL must start with http:// or https://');
       }
       apiUrl = 'https://genius-backen-production.up.railway.app';
     }
+
   }
   
   if (typeof window !== 'undefined') {

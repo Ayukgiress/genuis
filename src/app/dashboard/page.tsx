@@ -109,92 +109,95 @@ export default function DashboardPage() {
 
     const loadInterviewData = async () => {
       try {
+        // Fetch once (avoid repeated calls inside loops)
         const interviewsData = await interviewApi.list();
-        setInterviews(interviewsData.filter(i => i.status === 'active'));
+        const activeInterviews = interviewsData.filter((i) => i.status === 'active');
+        setInterviews(activeInterviews);
+
+        const activeJobIdSet = new Set<number>(
+          activeInterviews.map((i) => i.job_id).filter((id) => Number.isFinite(id))
+        );
+
+        // Derive applied jobs from kanban cards (reliable mapping should use card.title as job id)
+        // NOTE: If your backend stores job id somewhere else, update the mapping here.
+        const appliedJobList: Job[] = [];
+        const appliedJobIdSet = new Set<string>();
+
+        const completedAnalysesList = analyses.filter((a) => a.status === 'completed');
+
+        // Collect candidate cards first
+        for (const board of boards) {
+          try {
+            const cards = await kanbanApi.listCards(board.id);
+            for (const card of cards) {
+              const isAppliedColumn =
+                card.column_id === 'in_progress' ||
+                card.column_id === 'review' ||
+                card.column_id === 'done';
+
+              if (!isAppliedColumn) continue;
+
+              // Keep the existing assumption that card.title is job id.
+              // This fixes the previous parseInt(card.title) comparison issue by normalizing types.
+              const jobIdStr = String(card.title);
+              if (!jobIdStr) continue;
+
+              try {
+                const job = await jobApi.getById(jobIdStr);
+                if (!appliedJobIdSet.has(job.id)) {
+                  appliedJobIdSet.add(job.id);
+                  appliedJobList.push(job);
+                }
+              } catch {
+                // If card.title is not a job id in your system, update mapping here.
+              }
+            }
+          } catch {
+            // Skip boards without cards
+          }
+        }
+
+        // Filter applied jobs to only those related to completed analyses (if needed)
+        // (Current UI previously tried to use analyses, but without a stable mapping.
+        //  Keeping appliedJobList as derived from kanban cards ensures alerts work.)
+        setAppliedJobs(appliedJobList);
+
+        // Create missing prep sessions for applied jobs without active interviews
+        for (const job of appliedJobList) {
+          const jobIdNum = parseInt(job.id, 10);
+          const hasInterview = activeJobIdSet.has(jobIdNum);
+
+          if (hasInterview || !Number.isFinite(jobIdNum)) continue;
+
+          try {
+            const interview = await interviewApi.create({
+              job_id: jobIdNum.toString(),
+              status: 'active',
+            });
+
+            setTimeout(() => {
+              toast.info(
+                "Ready to practice for your interview? I've prepared behavioral questions for this application!",
+                {
+                  autoClose: 6000,
+                  onClick: () => router.push(`/interview/${interview.id}`),
+                }
+              );
+            }, 1000);
+
+            activeJobIdSet.add(jobIdNum);
+          } catch {
+            // Skip silently
+          }
+        }
       } catch (err) {
-        console.error('Failed to load interviews:', err);
-      }
-
-      // Check applied jobs from analyses (jobs that have been analyzed)
-      const appliedJobList: Job[] = [];
-      const completedAnalysesList = analyses.filter(a => a.status === 'completed');
-      
-      for (const analysis of completedAnalysesList) {
-        try {
-          // Try to get the associated job - we can check kanban cards for this
-          // Or we can look for jobs that match this analysis
-          if (analysis.resume_id) {
-            // Check kanban cards for this user's boards
-            for (const board of boards) {
-              try {
-                const cards = await kanbanApi.listCards(board.id);
-                for (const card of cards) {
-                  // Check cards in "in_progress" or further (considered as applied)
-                  if (card.column_id === 'in_progress' || 
-                      card.column_id === 'review' || 
-                      card.column_id === 'done') {
-                    try {
-                      const job = await jobApi.getById(card.title);
-                      // Check if not already in list
-                      if (!appliedJobList.find(j => j.id === job.id)) {
-                        appliedJobList.push(job);
-                      }
-                    } catch (err) {
-                      // Job not found - skip silently
-                    }
-                  }
-                }
-              } catch (err) {
-                // Skip boards without cards
-              }
-            }
-          }
-        } catch (err) {
-          // Skip
-        }
-      }
-      setAppliedJobs(appliedJobList);
-
-      // Check for applied jobs without interviews and create prep sessions
-      for (const board of boards) {
-        try {
-          const cards = await kanbanApi.listCards(board.id);
-          for (const card of cards) {
-            if (card.column_id === 'in_progress' || card.column_id === 'review' || card.column_id === 'done') {
-              try {
-                const interviewsList = await interviewApi.list();
-                const hasInterview = interviewsList.some(i => i.job_id === parseInt(card.title));
-                const job = await jobApi.getById(card.title).catch(() => null);
-                
-                if (!hasInterview && job) {
-                    const interview = await interviewApi.create({
-                      job_id: parseInt(card.title).toString(),
-                      status: 'active'
-                    });
-                  setTimeout(() => {
-                      toast.info(
-                        "Ready to practice for your interview? I've prepared behavioral questions for this application!",
-                        {
-                          autoClose: 6000,
-                          onClick: () => router.push(`/interview/${interview.id}`)
-                        }
-                      );
-                  }, 1000);
-                }
-              } catch (err) {
-                // Skip silently
-              }
-            }
-          }
-        } catch (err) {
-          // Skip boards without cards
-        }
+        console.error('Failed to load interviews/applied jobs:', err);
       }
     };
 
     const timeoutId = setTimeout(() => {
       loadInterviewData();
-    }, 1500);
+    }, 800);
 
     return () => clearTimeout(timeoutId);
   }, [isAuthenticated, boards, router, analyses]);
