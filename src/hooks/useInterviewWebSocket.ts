@@ -42,12 +42,19 @@ export const useInterviewWebSocket = (interviewId: number | null) => {
 
     setConnectionAttempted(true);
     const token = getAuthToken();
-    const url = `${interviewApi.getTalkUrl(interviewId)}?token=${token}`;
+    const url = interviewApi.getTalkUrl(interviewId);
 
     const socket = new WebSocket(url);
     socketRef.current = socket;
 
     socket.onopen = () => {
+      // Send authentication message as first message
+      if (token) {
+        socket.send(JSON.stringify({
+          type: 'auth',
+          token: token
+        }));
+      }
       setIsConnected(true);
       setError(null);
       console.log('Audio Interview WS connected');
