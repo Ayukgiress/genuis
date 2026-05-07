@@ -446,11 +446,11 @@ export default function EditMasterPage({ params }: EditPageProps) {
                     </div>
                   )}
 
-                  {analysis.result?.keywords && analysis.result.keywords.length > 0 && (
+                  {analysis.result?.keywords_missing && analysis.result.keywords_missing.length > 0 && (
                     <div className="space-y-3">
-                      <h4 className="text-sm font-bold text-zinc-400 uppercase tracking-wider">Detected Keywords</h4>
+                      <h4 className="text-sm font-bold text-zinc-400 uppercase tracking-wider">Missing Keywords</h4>
                       <div className="flex flex-wrap gap-2">
-                        {analysis.result.keywords.map((keyword, i) => (
+                        {analysis.result.keywords_missing.map((keyword, i) => (
                           <span key={i} className="px-3 py-1.5 bg-zinc-900 border border-zinc-800 text-zinc-400 text-xs rounded-lg">
                             {keyword}
                           </span>
