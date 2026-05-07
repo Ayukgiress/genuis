@@ -365,6 +365,8 @@ export interface InterviewMessage {
   role: "user" | "assistant";
   content: string;
   created_at: string;
+  audio_data?: string; // base64 encoded audio data
+  transcript?: string; // speech-to-text transcript
 }
 
 export interface InterviewMessageCreate {

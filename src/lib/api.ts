@@ -334,6 +334,8 @@ export const interviewApi = {
   complete: (interviewId: number) => api.post<{ message: string; interview: Interview }>(`/api/interviews/${interviewId}/complete`, {}),
   sendMessage: (interviewId: number, data: InterviewMessageCreate) =>
     api.post<InterviewMessage>(`/api/interviews/${interviewId}/messages`, data),
+  sendAudioMessage: (interviewId: number, data: { base64_audio: string }) =>
+    api.post<InterviewMessage>(`/api/interviews/${interviewId}/audio`, data),
   getMessages: (interviewId: number) => api.get<InterviewMessage[]>(`/api/interviews/${interviewId}/messages`),
   getTalkUrl: (interviewId: number) => `${WS_BASE_URL}/api/interviews/${interviewId}/talk`,
 };

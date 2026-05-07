@@ -1,99 +1,62 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { getAuthToken, interviewApi } from '@/lib/api';
+import { useState, useEffect, useCallback } from 'react';
+import { interviewApi } from '@/lib/api';
 import { useAudioCapture } from './useAudioCapture';
 import { useAudioPlayback } from './useAudioPlayback';
+import type { InterviewMessage } from '@/types';
 
-interface SocketResponse {
-  transcript?: string;
-  ai_text?: string;
-  ai_audio?: string; // base64 audio response
-  status?: 'analyzing' | 'responding' | 'waiting';
-}
+// Note: Now using HTTP-based audio processing instead of WebSocket
 
 export const useInterviewWebSocket = (interviewId: number | null) => {
-  const [isConnected, setIsConnected] = useState(false);
+  const [isConnected, setIsConnected] = useState(true); // Always "connected" for HTTP approach
   const [isStreaming, setIsStreaming] = useState(false);
-  const [transcript, setTranscript] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [connectionAttempted, setConnectionAttempted] = useState(false);
 
-  const socketRef = useRef<WebSocket | null>(null);
-
   // Audio capture integration
-  const audioCapture = useAudioCapture((base64Audio: string) => {
-    // Send audio chunk to WebSocket
-    if (socketRef.current?.readyState === WebSocket.OPEN) {
-      socketRef.current.send(JSON.stringify({
-        type: 'audio_chunk',
-        data: base64Audio,
-        timestamp: Date.now()
-      }));
+  const audioPlayback = useAudioPlayback();
+
+  const audioCapture = useAudioCapture(async (base64Audio: string) => {
+    if (!interviewId) return;
+
+    try {
+      setIsStreaming(true);
+      console.log('Sending audio via HTTP to interview:', interviewId);
+
+      // Send audio via HTTP POST
+      const response: InterviewMessage = await interviewApi.sendAudioMessage(interviewId, {
+        base64_audio: base64Audio
+      });
+
+      console.log('Received AI response:', response);
+
+      // Handle AI text response
+      if (response.content) {
+        console.log('AI Response:', response.content);
+      }
+
+      // Handle AI audio response (stored in the message)
+      // Note: The backend might store audio data differently - adjust based on actual response
+      if (response.audio_data) {
+        console.log('AI audio received, playing...');
+        audioPlayback.playAudio(response.audio_data);
+      }
+
+      setIsStreaming(false);
+    } catch (error) {
+      console.error('Error sending audio:', error);
+      setError('Failed to process audio. Please try again.');
+      setIsStreaming(false);
     }
   });
 
-  const audioPlayback = useAudioPlayback();
-
   const connect = useCallback(() => {
     if (!interviewId) return;
-    if (!('WebSocket' in window)) {
-      setError('WebSocket not supported in this browser');
-      return;
-    }
 
     setConnectionAttempted(true);
-    const token = getAuthToken();
-    const url = interviewApi.getTalkUrl(interviewId);
-
-    const socket = new WebSocket(url);
-    socketRef.current = socket;
-
-    socket.onopen = () => {
-      // Send authentication message as first message
-      if (token) {
-        socket.send(JSON.stringify({
-          type: 'auth',
-          token: token
-        }));
-      }
-      setIsConnected(true);
-      setError(null);
-      console.log('Audio Interview WS connected');
-    };
-
-    socket.onmessage = (event) => {
-      try {
-        const data: SocketResponse = JSON.parse(event.data);
-        if (data.transcript) {
-          setTranscript(data.transcript);
-        }
-        if (data.ai_text) {
-          // Emit AI response event or use callback
-          console.log('AI Response:', data.ai_text);
-        }
-        if (data.ai_audio) {
-          // Play AI audio response
-          console.log('AI audio received, playing...');
-          audioPlayback.playAudio(data.ai_audio);
-        }
-        if (data.status === 'responding') {
-          setIsStreaming(false);
-        }
-      } catch (e) {
-        console.error('Socket message error:', e);
-      }
-    };
-
-    socket.onclose = () => {
-      setIsConnected(false);
-      audioCapture.stopCapture();
-      audioPlayback.stopAudio();
-    };
-
-    socket.onerror = (err) => {
-      console.error('WS error:', err);
-      setError('WebSocket connection failed. Audio interviews require backend WebSocket support. Please implement the WebSocket endpoint for real-time audio streaming.');
-    };
-  }, [interviewId, audioPlayback]);
+    setIsConnected(true);
+    setError(null);
+    console.log('Audio Interview HTTP mode ready for interview:', interviewId);
+  }, [interviewId]);
 
   const startAudioStream = useCallback(() => {
     audioCapture.startCapture();
@@ -108,9 +71,7 @@ export const useInterviewWebSocket = (interviewId: number | null) => {
 
   const disconnect = useCallback(() => {
     stopAudioStream();
-    if (socketRef.current) {
-      socketRef.current.close();
-    }
+    setIsConnected(true); // Stay "connected" for HTTP approach
   }, [stopAudioStream]);
 
   useEffect(() => {
@@ -120,11 +81,10 @@ export const useInterviewWebSocket = (interviewId: number | null) => {
   }, [disconnect]);
 
   return {
-    isConnected,
+    isConnected, // Always true in HTTP mode
     isStreaming,
     connectionAttempted,
     audioCapture,
-    transcript,
     error,
     connect,
     disconnect,

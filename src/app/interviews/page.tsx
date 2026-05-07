@@ -204,14 +204,12 @@ export default function InterviewsPage() {
     isStreaming,
     connectionAttempted,
     audioCapture,
-    transcript,
+    error: audioError,
     connect,
     disconnect,
     startAudioStream,
-    stopAudioStream,
+    stopAudioStream
   } = useInterviewWebSocket(selectedInterview?.id || null);
-
-  useEffect(() => { if (transcript) setNewMessage(transcript); }, [transcript]);
 
   const showToast = (msg: string, type: "error" | "success") => {
     if (type === "error") { setError(msg); setTimeout(() => setError(null), 4000); }
@@ -504,7 +502,7 @@ export default function InterviewsPage() {
                       )}
                       {connectionAttempted && !isConnected && (
                         <div style={{ fontFamily: "monospace", fontSize: 11, color: "#FFA500", marginTop: 8 }}>
-                          ⚠ WebSocket required for audio interviews. Backend needs WebSocket support.
+                          ⚠ HTTP audio processing unavailable. Backend needs audio endpoint support.
                         </div>
                       )}
                     </div>
