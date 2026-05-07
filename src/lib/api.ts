@@ -4,7 +4,7 @@ function getApiUrl(): string {
   
   if (!apiUrl) {
     // Fallback to production URL
-    apiUrl = 'https://genius-backen-production.up.railway.app';
+    apiUrl = 'https://genius-backen.onrender.com';
     if (typeof window !== 'undefined') {
       console.warn('[api.ts] NEXT_PUBLIC_API_URL not set, using default production URL');
     }
@@ -18,7 +18,7 @@ function getApiUrl(): string {
       if (typeof window !== 'undefined') {
         console.error('[api.ts] ERROR: NEXT_PUBLIC_API_URL must start with http:// or https://');
       }
-      apiUrl = 'https://genius-backen-production.up.railway.app';
+      apiUrl = 'https://genius-backen.onrender.com';
     }
 
   }
