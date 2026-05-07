@@ -15,6 +15,7 @@ export const useInterviewWebSocket = (interviewId: number | null) => {
   const [isStreaming, setIsStreaming] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [connectionAttempted, setConnectionAttempted] = useState(false);
 
   const socketRef = useRef<WebSocket | null>(null);
 
@@ -34,17 +35,22 @@ export const useInterviewWebSocket = (interviewId: number | null) => {
 
   const connect = useCallback(() => {
     if (!interviewId) return;
+    if (!('WebSocket' in window)) {
+      setError('WebSocket not supported in this browser');
+      return;
+    }
 
+    setConnectionAttempted(true);
     const token = getAuthToken();
     const url = `${interviewApi.getTalkUrl(interviewId)}?token=${token}`;
-    
+
     const socket = new WebSocket(url);
     socketRef.current = socket;
 
     socket.onopen = () => {
       setIsConnected(true);
       setError(null);
-      console.log('Video WS connected');
+      console.log('Audio Interview WS connected');
     };
 
     socket.onmessage = (event) => {
@@ -78,7 +84,7 @@ export const useInterviewWebSocket = (interviewId: number | null) => {
 
     socket.onerror = (err) => {
       console.error('WS error:', err);
-      setError('WebSocket connection failed');
+      setError('WebSocket connection failed. Audio interviews require backend WebSocket support. Please implement the WebSocket endpoint for real-time audio streaming.');
     };
   }, [interviewId, audioPlayback]);
 
@@ -109,6 +115,7 @@ export const useInterviewWebSocket = (interviewId: number | null) => {
   return {
     isConnected,
     isStreaming,
+    connectionAttempted,
     audioCapture,
     transcript,
     error,

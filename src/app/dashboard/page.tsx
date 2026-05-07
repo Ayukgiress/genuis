@@ -180,7 +180,7 @@ export default function DashboardPage() {
                 "Ready to practice for your interview? I've prepared behavioral questions for this application!",
                 {
                   autoClose: 6000,
-                  onClick: () => router.push(`/interview/${interview.id}`),
+                  onClick: () => router.push(`/interviews?id=${interview.id}`),
                 }
               );
             }, 1000);
@@ -513,7 +513,12 @@ export default function DashboardPage() {
                         </svg>
                       </div>
                       <div>
-                        <p className="text-sm font-bold text-white group-hover:text-primary transition-colors">{job.title}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-bold text-white group-hover:text-primary transition-colors">{job.title}</p>
+                          <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-primary/20 text-primary border border-primary/20 uppercase tracking-tighter">
+                            Interview Alert
+                          </span>
+                        </div>
                         <p className="text-xs text-zinc-500">{job.company}</p>
                       </div>
                     </div>
@@ -521,13 +526,13 @@ export default function DashboardPage() {
                       onClick={() => {
                         const interview = interviews.find(i => i.job_id === parseInt(job.id));
                         if (interview) {
-                          router.push(`/interview/${interview.id}`);
+                          router.push(`/interviews?id=${interview.id}`);
                         } else {
                            interviewApi.create({
                              job_id: parseInt(job.id).toString(),
                              status: 'active'
                            }).then(interview => {
-                            router.push(`/interview/${interview.id}`);
+                            router.push(`/interviews?id=${interview.id}`);
                           });
                         }
                       }}
@@ -550,7 +555,7 @@ export default function DashboardPage() {
                     <li>Describe a time you took initiative to improve a process or system</li>
                   </ul>
                   <button
-                    onClick={() => router.push('/interview/new')}
+                    onClick={() => router.push('/interviews?action=new')}
                     className="w-full mt-4 px-4 py-2 bg-primary text-black font-bold rounded-lg hover:opacity-90 transition-all text-[10px]"
                   >
                     Start Stripe Prep Session

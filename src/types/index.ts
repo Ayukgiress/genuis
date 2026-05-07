@@ -133,13 +133,14 @@ export interface DashboardStats {
 export type FocusArea = "summary" | "experience" | "skills" | "education";
 
 export interface AnalysisResult {
-  score?: number;
-  summary?: string;
+  score?: number;          // ← frontend key
+  overall_score?: number;  // ← backend key (keep both)
   strengths?: string[];
   weaknesses?: string[];
   suggestions?: string[];
-  keywords?: string[];
-  [key: string]: unknown;
+  ats_compatibility?: string;
+  keywords_missing?: string[];
+  summary?: string;
 }
 
 export interface Analysis {

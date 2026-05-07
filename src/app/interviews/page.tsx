@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   interviewApi,
   jobApi,
@@ -180,6 +180,8 @@ const css = `
 
 export default function InterviewsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const interviewIdParam = searchParams.get("id");
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [interviews, setInterviews] = useState<Interview[]>([]);
   const [selectedInterview, setSelectedInterview] = useState<Interview | null>(null);
@@ -200,6 +202,7 @@ export default function InterviewsPage() {
   const {
     isConnected,
     isStreaming,
+    connectionAttempted,
     audioCapture,
     transcript,
     connect,
@@ -243,12 +246,26 @@ export default function InterviewsPage() {
   }, [authLoading, isAuthenticated, router, fetchData]);
 
   useEffect(() => {
+    if (searchParams.get("action") === "new") {
+      setShowCreateModal(true);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
     if (interviews.length > 0 && !selectedInterview) {
+      if (interviewIdParam) {
+        const interview = interviews.find((i) => i.id === parseInt(interviewIdParam));
+        if (interview) {
+          fetchInterviewMessages(interview.id);
+          setSelectedInterview(interview);
+          return;
+        }
+      }
       const first = interviews[0];
       fetchInterviewMessages(first.id);
       setSelectedInterview(first);
     }
-  }, [interviews, fetchInterviewMessages]);
+  }, [interviews, fetchInterviewMessages, interviewIdParam, selectedInterview]);
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [selectedInterview?.messages]);
 
@@ -483,6 +500,11 @@ export default function InterviewsPage() {
                       {audioCapture.error && (
                         <div style={{ fontFamily: "monospace", fontSize: 11, color: "#FF4757" }}>
                           Audio: {audioCapture.error}
+                        </div>
+                      )}
+                      {connectionAttempted && !isConnected && (
+                        <div style={{ fontFamily: "monospace", fontSize: 11, color: "#FFA500", marginTop: 8 }}>
+                          ⚠ WebSocket required for audio interviews. Backend needs WebSocket support.
                         </div>
                       )}
                     </div>

@@ -6,13 +6,19 @@ interface OptimizationPreviewProps {
 }
 
 export function OptimizationPreview({ result }: OptimizationPreviewProps) {
+  const score = result.score ?? result.overall_score ?? 0;
   const beforeIssues = result.weaknesses || [];
   const afterImprovements = result.suggestions || [];
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-xl font-bold">Optimization Preview</h3>
+        <div className="flex items-center gap-3">
+          <h3 className="text-xl font-bold">Optimization Preview</h3>
+          <div className="px-2 py-1 rounded bg-zinc-800 border border-zinc-700 text-sm font-mono text-green-400">
+            Score: {score}%
+          </div>
+        </div>
         <span className="text-xs text-zinc-500">Before → After transformation</span>
       </div>
       
