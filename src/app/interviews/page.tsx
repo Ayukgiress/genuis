@@ -62,13 +62,22 @@ const css = `
   .iv-session-del { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; border-radius: 6px; font-size: 16px; color: var(--muted); hover: color: var(--red); transition: all 0.15s; }
   .iv-session-del:hover { background: rgba(255,71,87,0.1); color: var(--red); }
 
-  /* Center — video stage */
+  /* Center — audio stage */
   .iv-stage { grid-row: 2; display: flex; flex-direction: column; overflow: hidden; }
-  .iv-video-area { flex: 1; position: relative; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-  .iv-video-area video { width: 100%; height: 100%; object-fit: cover; }
-  .iv-video-placeholder { display: flex; flex-direction: column; align-items: center; gap: 16px; color: var(--muted); }
-  .iv-video-placeholder svg { width: 56px; height: 56px; opacity: 0.3; }
-  .iv-video-placeholder p { font-family: var(--font-mono); font-size: 12px; letter-spacing: 1px; }
+  .iv-audio-area { flex: 1; position: relative; background: linear-gradient(135deg, #0a0e14 0%, #0e1117 100%); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .iv-audio-visualizer { display: flex; flex-direction: column; align-items: center; gap: 24px; color: var(--text); }
+  .iv-audio-icon { width: 120px; height: 120px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: rgba(0,242,156,0.1); border: 2px solid rgba(0,242,156,0.3); transition: all 0.3s ease; }
+  .iv-audio-icon svg { width: 48px; height: 48px; color: var(--green); opacity: 0.7; }
+  .iv-waveform { display: flex; align-items: center; gap: 4px; animation: pulse 2s ease-in-out infinite; }
+  .iv-wave-bar { width: 4px; height: 20px; background: var(--green); border-radius: 2px; animation: wave 1.5s ease-in-out infinite; }
+  .iv-wave-bar:nth-child(1) { animation-delay: 0s; }
+  .iv-wave-bar:nth-child(2) { animation-delay: 0.1s; }
+  .iv-wave-bar:nth-child(3) { animation-delay: 0.2s; }
+  .iv-wave-bar:nth-child(4) { animation-delay: 0.3s; }
+  .iv-wave-bar:nth-child(5) { animation-delay: 0.4s; }
+  .iv-audio-status { font-family: var(--font-mono); font-size: 14px; letter-spacing: 1px; color: var(--muted); text-transform: uppercase; }
+  .iv-audio-error { position: absolute; top: 20px; right: 20px; display: flex; align-items: center; gap: 8px; background: rgba(255,71,87,0.1); border: 1px solid rgba(255,71,87,0.3); border-radius: 8px; padding: 8px 12px; font-family: var(--font-mono); font-size: 12px; color: var(--red); }
+  .iv-audio-error svg { width: 16px; height: 16px; }
   .iv-rec-badge { position: absolute; top: 20px; left: 20px; display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); border: 1px solid rgba(255,71,87,0.3); border-radius: 8px; padding: 6px 12px; font-family: var(--font-mono); font-size: 11px; color: var(--red); }
   .iv-rec-dot { width: 8px; height: 8px; background: var(--red); border-radius: 50%; animation: blink 1s ease-in-out infinite; }
   .iv-status-badge { position: absolute; top: 20px; right: 20px; display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); border: 1px solid var(--green-border); border-radius: 8px; padding: 6px 12px; font-family: var(--font-mono); font-size: 11px; color: var(--green); }
@@ -149,16 +158,23 @@ const css = `
   @keyframes pulse { 0%,100% { opacity: 1; box-shadow: 0 0 0 0 rgba(0,242,156,0.4); } 50% { opacity: 0.8; box-shadow: 0 0 0 6px rgba(0,242,156,0); } }
   @keyframes slideUp { from { opacity: 0; transform: translateX(-50%) translateY(12px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
   @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes wave { 0%,100% { height: 20px; opacity: 0.7; } 50% { height: 40px; opacity: 1; } }
   .iv-stage, .iv-chat, .iv-sidebar { animation: fadeIn 0.4s ease; }
 
-  /* Responsive */
+  /* Audio responsive adjustments */
   @media (max-width: 1100px) {
     .iv-layout { grid-template-columns: 260px 1fr; }
     .iv-chat { display: none; }
+    .iv-audio-visualizer { gap: 16px; }
+    .iv-audio-icon { width: 100px; height: 100px; }
+    .iv-audio-icon svg { width: 40px; height: 40px; }
   }
   @media (max-width: 700px) {
     .iv-layout { grid-template-columns: 1fr; }
     .iv-sidebar { display: none; }
+    .iv-audio-visualizer { gap: 12px; }
+    .iv-audio-icon { width: 80px; height: 80px; }
+    .iv-audio-icon svg { width: 32px; height: 32px; }
   }
 `;
 
@@ -184,12 +200,12 @@ export default function InterviewsPage() {
   const {
     isConnected,
     isStreaming,
-    videoCapture,
+    audioCapture,
     transcript,
     connect,
     disconnect,
-    startVideoStream,
-    stopVideoStream,
+    startAudioStream,
+    stopAudioStream,
   } = useInterviewWebSocket(selectedInterview?.id || null);
 
   useEffect(() => { if (transcript) setNewMessage(transcript); }, [transcript]);
@@ -287,23 +303,24 @@ export default function InterviewsPage() {
 
   const selectInterview = (interview: Interview) => {
     if (selectedInterview?.id === interview.id) return;
+    stopAudioInterview();
     disconnect();
     setIsInterviewActive(false);
     setSelectedInterview(interview);
     if (!interview.messages) fetchInterviewMessages(interview.id);
   };
 
-  const startVideoInterview = () => {
+  const startAudioInterview = () => {
     if (!selectedInterview || isInterviewActive) return;
     connect();
-    setTimeout(() => startVideoStream(), 1000);
+    setTimeout(() => startAudioStream(), 1000);
     setIsInterviewActive(true);
     setNewMessage("");
-    showToast("Video interview started — speak to respond", "success");
+    showToast("Audio interview started — speak to respond", "success");
   };
 
-  const stopVideoInterview = () => {
-    stopVideoStream();
+  const stopAudioInterview = () => {
+    stopAudioStream();
     disconnect();
     setIsInterviewActive(false);
   };
@@ -338,7 +355,7 @@ export default function InterviewsPage() {
           {/* ── Top bar ── */}
           <header className="iv-topbar">
             <span className="iv-topbar-logo">inter<span>view</span>.ai</span>
-            <span className="iv-topbar-badge">Video AI</span>
+            <span className="iv-topbar-badge">Voice AI</span>
             {isConnected && <span className="iv-topbar-badge" style={{ borderColor: "rgba(0,242,156,0.4)", color: "#00F29C" }}>● WS Connected</span>}
             <div className="iv-topbar-actions">
               <button className="iv-btn-primary" onClick={() => setShowCreateModal(true)} style={{ padding: "8px 20px", fontSize: 13 }}>
@@ -384,26 +401,49 @@ export default function InterviewsPage() {
           <main className="iv-stage">
             {selectedInterview ? (
               <>
-                {/* Video */}
-                <div className="iv-video-area">
-                  {videoCapture.error ? (
-                    <div className="iv-video-placeholder">
-                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
-                      <p>{videoCapture.error}</p>
+                {/* Audio Interview Area */}
+                <div className="iv-audio-area">
+                  <div className="iv-audio-visualizer">
+                    <div className="iv-audio-icon">
+                      {isStreaming ? (
+                        <div className="iv-waveform">
+                          <div className="iv-wave-bar"></div>
+                          <div className="iv-wave-bar"></div>
+                          <div className="iv-wave-bar"></div>
+                          <div className="iv-wave-bar"></div>
+                          <div className="iv-wave-bar"></div>
+                        </div>
+                      ) : (
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                          <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
+                          <line x1="12" y1="19" x2="12" y2="23"/>
+                          <line x1="8" y1="23" x2="16" y2="23"/>
+                        </svg>
+                      )}
                     </div>
-                  ) : (
-                    <video ref={videoCapture.videoRef} muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    <div className="iv-audio-status">
+                      {isStreaming ? "Listening..." : "Ready to Start"}
+                    </div>
+                  </div>
+
+                  {audioCapture.error && (
+                    <div className="iv-audio-error">
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="24" height="24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                      </svg>
+                      <p>{audioCapture.error}</p>
+                    </div>
                   )}
-                  <canvas ref={videoCapture.canvasRef} className="hidden" width="640" height="480" style={{ display: "none" }} />
 
                   {isStreaming && (
                     <div className="iv-rec-badge">
-                      <div className="iv-rec-dot" /> REC
+                      <div className="iv-rec-dot" /> 🎤 REC
                     </div>
                   )}
                   <div className="iv-status-badge">
                     <div className={`iv-status-dot ${isInterviewActive ? "pulse" : ""}`} style={{ background: isInterviewActive ? "#00F29C" : "#5A6070" }} />
-                    <span>{isInterviewActive ? "LIVE" : "STANDBY"}</span>
+                    <span>{isInterviewActive ? "AUDIO LIVE" : "STANDBY"}</span>
                   </div>
 
                   {/* Job overlay */}
@@ -411,13 +451,6 @@ export default function InterviewsPage() {
                     <div style={{ position: "absolute", bottom: 20, left: 20, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "10px 16px" }}>
                       <div style={{ fontWeight: 700, fontSize: 14 }}>{job.title}</div>
                       <div style={{ fontFamily: "monospace", fontSize: 11, color: "#5A6070", marginTop: 2 }}>{job.company}</div>
-                    </div>
-                  )}
-
-                  {/* "No session" inner */}
-                  {!isInterviewActive && !isStreaming && (
-                    <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.5)", gap: 16 }}>
-                      <div style={{ fontFamily: "monospace", fontSize: 11, color: "#5A6070", letterSpacing: 2, textTransform: "uppercase", marginBottom: 8 }}>Camera Preview</div>
                     </div>
                   )}
                 </div>
@@ -438,17 +471,19 @@ export default function InterviewsPage() {
                       <button className="iv-send-btn" onClick={handleSendMessage} disabled={isSending || !newMessage.trim()}>
                         {isSending ? "Sending…" : "Send"}
                       </button>
-                      <button className="iv-ctrl-btn danger" onClick={stopVideoInterview} title="Stop interview">
+                      <button className="iv-ctrl-btn danger" onClick={stopAudioInterview} title="Stop interview">
                         ◼
                       </button>
                     </>
                   ) : (
                     <div style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 16 }}>
-                      <button className="iv-start-btn" onClick={startVideoInterview} disabled={!!videoCapture.error}>
-                        <span>🎥</span> Start Video Interview
+                      <button className="iv-start-btn" onClick={startAudioInterview} disabled={!!audioCapture.error}>
+                        <span>🎤</span> Start Audio Interview
                       </button>
-                      {videoCapture.error && (
-                        <span style={{ fontFamily: "monospace", fontSize: 11, color: "#FF4757" }}>{videoCapture.error}</span>
+                      {audioCapture.error && (
+                        <div style={{ fontFamily: "monospace", fontSize: 11, color: "#FF4757" }}>
+                          Audio: {audioCapture.error}
+                        </div>
                       )}
                     </div>
                   )}
@@ -456,7 +491,7 @@ export default function InterviewsPage() {
               </>
             ) : (
               <div className="iv-empty">
-                <div className="iv-empty-icon">🎬</div>
+                <div className="iv-empty-icon">🎤</div>
                 <h3>No Session Selected</h3>
                 <p>Pick a session from the left or create one</p>
                 <button className="iv-btn-primary" onClick={() => setShowCreateModal(true)}>New Interview</button>

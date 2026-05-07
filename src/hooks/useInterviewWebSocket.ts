@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getAuthToken, interviewApi } from '@/lib/api';
-import { useVideoCapture } from './useVideoCapture';
+import { useAudioCapture } from './useAudioCapture';
+import { useAudioPlayback } from './useAudioPlayback';
 
 interface SocketResponse {
   transcript?: string;
   ai_text?: string;
-  ai_video?: string; // base64 video chunk
+  ai_audio?: string; // base64 audio response
   status?: 'analyzing' | 'responding' | 'waiting';
 }
 
@@ -14,12 +15,22 @@ export const useInterviewWebSocket = (interviewId: number | null) => {
   const [isStreaming, setIsStreaming] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [error, setError] = useState<string | null>(null);
-  
-  const socketRef = useRef<WebSocket | null>(null);
-  const chunkIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Video capture integration
-  const videoCapture = useVideoCapture();
+  const socketRef = useRef<WebSocket | null>(null);
+
+  // Audio capture integration
+  const audioCapture = useAudioCapture((base64Audio: string) => {
+    // Send audio chunk to WebSocket
+    if (socketRef.current?.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({
+        type: 'audio_chunk',
+        data: base64Audio,
+        timestamp: Date.now()
+      }));
+    }
+  });
+
+  const audioPlayback = useAudioPlayback();
 
   const connect = useCallback(() => {
     if (!interviewId) return;
@@ -46,9 +57,10 @@ export const useInterviewWebSocket = (interviewId: number | null) => {
           // Emit AI response event or use callback
           console.log('AI Response:', data.ai_text);
         }
-        if (data.ai_video) {
-          // Handle AI avatar video if provided
-          console.log('AI video received');
+        if (data.ai_audio) {
+          // Play AI audio response
+          console.log('AI audio received, playing...');
+          audioPlayback.playAudio(data.ai_audio);
         }
         if (data.status === 'responding') {
           setIsStreaming(false);
@@ -60,52 +72,33 @@ export const useInterviewWebSocket = (interviewId: number | null) => {
 
     socket.onclose = () => {
       setIsConnected(false);
-      if (chunkIntervalRef.current) {
-        clearInterval(chunkIntervalRef.current);
-      }
-      videoCapture.stopCapture();
+      audioCapture.stopCapture();
+      audioPlayback.stopAudio();
     };
 
     socket.onerror = (err) => {
       console.error('WS error:', err);
       setError('WebSocket connection failed');
     };
-  }, [interviewId, videoCapture]);
+  }, [interviewId, audioPlayback]);
 
-  const startVideoStream = useCallback(() => {
-    videoCapture.startCapture();
+  const startAudioStream = useCallback(() => {
+    audioCapture.startCapture();
     setIsStreaming(true);
+  }, [audioCapture]);
 
-    // Send video chunks periodically
-    chunkIntervalRef.current = setInterval(() => {
-      if (socketRef.current?.readyState === WebSocket.OPEN && videoCapture.isStreaming) {
-        const chunk = videoCapture.getVideoChunk();
-        if (chunk) {
-          socketRef.current.send(JSON.stringify({ 
-            type: 'video_chunk', 
-            data: chunk,
-            timestamp: Date.now()
-          }));
-        }
-      }
-    }, 1000); // 1fps for analysis
-  }, [videoCapture]);
-
-  const stopVideoStream = useCallback(() => {
+  const stopAudioStream = useCallback(() => {
     setIsStreaming(false);
-    if (chunkIntervalRef.current) {
-      clearInterval(chunkIntervalRef.current);
-      chunkIntervalRef.current = null;
-    }
-    videoCapture.stopCapture();
-  }, [videoCapture]);
+    audioCapture.stopCapture();
+    audioPlayback.stopAudio();
+  }, [audioCapture, audioPlayback]);
 
   const disconnect = useCallback(() => {
-    stopVideoStream();
+    stopAudioStream();
     if (socketRef.current) {
       socketRef.current.close();
     }
-  }, [stopVideoStream]);
+  }, [stopAudioStream]);
 
   useEffect(() => {
     return () => {
@@ -116,13 +109,13 @@ export const useInterviewWebSocket = (interviewId: number | null) => {
   return {
     isConnected,
     isStreaming,
-    videoCapture, // Expose video refs/states
+    audioCapture,
     transcript,
     error,
     connect,
     disconnect,
-    startVideoStream,
-    stopVideoStream
+    startAudioStream,
+    stopAudioStream
   };
 };
 
