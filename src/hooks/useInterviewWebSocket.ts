@@ -40,9 +40,26 @@ export const useInterviewWebSocket = (interviewId: number | null) => {
       }
 
       // Handle AI audio response
-      if (response.audio_data) {
+      console.log('🔎 AI audio fields present on response:', {
+        keys: Object.keys(response as any),
+        audio_data: (response as any).audio_data,
+        audio: (response as any).audio,
+        audioData: (response as any).audioData,
+        ai_audio_base64: (response as any).ai_audio_base64,
+        aiAudioBase64: (response as any).aiAudioBase64,
+      });
+
+      const audioData =
+        (response as any).audio_data ??
+        (response as any).audio ??
+        (response as any).audioData ??
+        (response as any).ai_audio_base64 ??
+        (response as any).aiAudioBase64 ??
+        null;
+
+      if (audioData) {
         console.log('🔊 Playing AI response...');
-        audioPlayback.playAudio(response.audio_data);
+        audioPlayback.playAudio(audioData as string);
 
         // Wait for audio to finish playing before allowing new speech
         setTimeout(() => {
@@ -97,4 +114,3 @@ export const useInterviewWebSocket = (interviewId: number | null) => {
     stopAudioStream
   };
 };
-
