@@ -28,11 +28,8 @@ export default function InterviewsPage() {
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [newMessage, setNewMessage] = useState("");
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string>("");
-  const [hideAIMessages, setHideAIMessages] = useState(false);
   const [isInterviewActive, setIsInterviewActive] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -103,8 +100,6 @@ export default function InterviewsPage() {
     }
   }, [interviews, fetchInterviewMessages, interviewIdParam, selectedInterview]);
 
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [selectedInterview?.messages]);
-
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -145,29 +140,6 @@ export default function InterviewsPage() {
     } finally { setIsCreating(false); }
   };
 
-  const handleSendMessage = async () => {
-    if (!selectedInterview || !newMessage.trim()) return;
-    try {
-      setIsSending(true);
-      const userMessage: InterviewMessage = {
-        id: Date.now(), interview_id: selectedInterview.id, role: "user",
-        content: newMessage.trim(), created_at: new Date().toISOString(),
-      };
-      const tempInterview = { ...selectedInterview, messages: [...(selectedInterview.messages || []), userMessage] };
-      setSelectedInterview(tempInterview);
-      setNewMessage("");
-      const aiMessage = await interviewApi.sendMessage(selectedInterview.id, { role: "user", content: userMessage.content });
-      const finalInterview = { ...tempInterview, messages: [...tempInterview.messages, aiMessage] };
-      setSelectedInterview(finalInterview);
-      setInterviews((prev) => prev.map((int) => int.id === selectedInterview.id ? finalInterview : int));
-      if (aiMessage.content?.includes("[INTERVIEW_COMPLETE]")) {
-        await interviewApi.complete(selectedInterview.id);
-        showToast("Interview completed!", "success");
-      }
-    } catch { showToast("Failed to send message", "error"); }
-    finally { setIsSending(false); }
-  };
-
   const handleDeleteInterview = async (interviewId: number) => {
     if (!confirm("Delete this session?")) return;
     try {
@@ -204,7 +176,6 @@ export default function InterviewsPage() {
   const startAudioInterview = async () => {
     if (!selectedInterview || isInterviewActive) return;
     setIsInterviewActive(true);
-    setNewMessage("");
     showToast("🎤 Starting conversational interview...", "success");
     try {
       const initialMessage: InterviewMessage = {
@@ -255,6 +226,72 @@ export default function InterviewsPage() {
   const formatTime = (d: string) => new Date(d).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   const formatDate = (d: string) => new Date(d).toLocaleDateString([], { month: "short", day: "numeric" });
 
+  const WaveIndicator = ({ isActive, isSpeaking, label, isAi = false }: { isActive: boolean; isSpeaking: boolean; label: string; isAi?: boolean }) => (
+    <div className="flex flex-col items-center justify-center gap-6 py-6 transition-all duration-700">
+      <div className="relative flex items-center justify-center h-48 w-48">
+        {/* Animated circles for waves */}
+        {isActive && isSpeaking && (
+          <>
+            <div className="absolute inset-0 rounded-full border-2 border-primary/40 animate-[ping_2s_cubic-bezier(0,0,0.2,1)_infinite] opacity-75" />
+            <div className="absolute inset-[-10%] rounded-full border border-primary/20 animate-[ping_2.5s_cubic-bezier(0,0,0.2,1)_infinite] opacity-50" />
+            <div className="absolute inset-[-20%] rounded-full border border-primary/10 animate-[ping_3s_cubic-bezier(0,0,0.2,1)_infinite] opacity-25" />
+            
+            {/* Dynamic glow */}
+            <div className="absolute inset-0 rounded-full bg-primary/20 blur-2xl animate-pulse" />
+          </>
+        )}
+        
+        {/* Core indicator */}
+        <div className={`relative z-10 w-32 h-32 rounded-full flex items-center justify-center transition-all duration-500 ${
+          isActive 
+            ? isSpeaking 
+              ? 'bg-primary shadow-[0_0_60px_rgba(var(--primary-rgb),0.6)] scale-110' 
+              : 'bg-zinc-800 border-2 border-primary/30'
+            : 'bg-zinc-900 border border-zinc-800'
+        }`}>
+          {isAi ? (
+            <div className={`transition-colors duration-500 ${isActive && isSpeaking ? 'text-black' : 'text-zinc-500'}`}>
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"/>
+                <circle cx="12" cy="12" r="3" fill="currentColor" className={isActive && isSpeaking ? 'animate-pulse' : ''} />
+              </svg>
+            </div>
+          ) : (
+            <div className={`transition-colors duration-500 ${isActive && isSpeaking ? 'text-black' : 'text-zinc-500'}`}>
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
+              </svg>
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="text-center">
+        <p className={`text-[10px] font-black uppercase tracking-[0.4em] transition-colors duration-500 ${isActive && isSpeaking ? 'text-primary' : 'text-zinc-500'}`}>
+          {label}
+        </p>
+        <div className="flex items-center justify-center gap-1.5 mt-3 h-4">
+          {isActive && isSpeaking ? (
+            <div className="flex gap-1 items-end h-full">
+              {[0.5, 0.8, 0.6, 1, 0.7, 0.9].map((delay, i) => (
+                <div 
+                  key={i} 
+                  className="w-1 bg-primary rounded-full animate-[bounce_1s_infinite]" 
+                  style={{ 
+                    height: `${20 + Math.random() * 80}%`,
+                    animationDelay: `${delay}s` 
+                  }} 
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="h-0.5 w-8 bg-zinc-800 rounded-full transition-all duration-500" />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
   // ── Loading skeleton ──────────────────────────────────────────────────────
   if (isLoading) {
     return (
@@ -299,7 +336,6 @@ export default function InterviewsPage() {
 
   const job = selectedInterview ? getJobDetails(selectedInterview.job_id) : null;
   const messages = selectedInterview?.messages || [];
-  const visibleMessages = hideAIMessages ? messages.filter((m) => m.role === "user") : messages;
 
   // ── Status indicator helpers ─────────────────────────────────────────────
   const statusLabel = isInterviewActive
@@ -495,16 +531,6 @@ export default function InterviewsPage() {
                            </div>
                         </div>
 
-                        {/* Last message preview */}
-                        {lastMsg && (
-                          <div className="mt-2 ml-[42px]">
-                            <p className="text-[11px] text-zinc-600 leading-snug truncate">
-                              <span className="text-zinc-500">{lastMsg.role === "user" ? "You: " : "AI: "}</span>
-                              {lastMsg.content?.replace(/\[INTERVIEW_COMPLETE\]/g, "").trim().slice(0, 55)}…
-                            </p>
-                          </div>
-                        )}
-
                         {/* Bottom row: status + meta */}
                         <div className="flex items-center gap-2 mt-2.5 ml-[42px]">
                           <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-md ${
@@ -523,14 +549,6 @@ export default function InterviewsPage() {
                             }`} />
                             {isCompleted ? "Completed" : (iv.messages?.length ?? 0) > 0 ? "In Progress" : "Ready"}
                           </span>
-                          {msgCount > 0 && (
-                            <span className="text-[9px] font-mono text-zinc-600 flex items-center gap-1">
-                              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                              </svg>
-                              {msgCount}
-                            </span>
-                          )}
                           <span className="text-[9px] font-mono text-zinc-700 ml-auto">{formatDate(iv.created_at)}</span>
                         </div>
                       </div>
@@ -580,195 +598,83 @@ export default function InterviewsPage() {
                   </div>
                 )}
 
-                {/* Main content area with chat and audio */}
-                <div className="flex flex-1 overflow-hidden">
-                  {/* Chat interface */}
-                  <div className="flex-1 flex flex-col border-r border-zinc-800/50">
-                    {/* Messages area */}
-                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                      {visibleMessages.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-full text-center py-12">
-                          <div className="w-16 h-16 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center mb-4">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-primary">
-                              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                            </svg>
-                          </div>
-                          <h3 className="text-sm font-semibold text-zinc-300 mb-2">Start the conversation</h3>
-                          <p className="text-xs text-zinc-500 max-w-sm">
-                            Begin with audio interview or send a text message to start practicing for this role.
-                          </p>
-                        </div>
-                      ) : (
-                        visibleMessages.map((message, index) => (
-                          <div key={message.id || index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${
-                              message.role === 'user'
-                                ? 'bg-primary text-black'
-                                : 'bg-zinc-800/60 border border-zinc-700/50 text-zinc-100'
-                            }`}>
-                              <div className="text-sm leading-relaxed whitespace-pre-wrap">
-                                {message.content}
-                              </div>
-                              <div className={`text-[10px] mt-2 font-mono ${
-                                message.role === 'user' ? 'text-black/60' : 'text-zinc-500'
-                              }`}>
-                                {formatTime(message.created_at)}
-                              </div>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                      <div ref={messagesEndRef} />
+                {/* Main content area - Audio Only */}
+                <div className="flex-1 flex flex-col items-center justify-center p-6 space-y-12">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-12 w-full max-w-4xl px-4">
+                    {/* AI Wave */}
+                    <div className="flex flex-col items-center">
+                      <WaveIndicator 
+                        isActive={isInterviewActive} 
+                        isSpeaking={isAiResponding} 
+                        label="AI Interviewer" 
+                        isAi={true} 
+                      />
                     </div>
 
-                    {/* Message input */}
-                    <div className="border-t border-zinc-800/50 p-4 bg-zinc-900/20">
-                      <div className="flex gap-3">
-                        <div className="flex-1 relative">
-                          <input
-                            type="text"
-                            value={newMessage}
-                            onChange={(e) => setNewMessage(e.target.value)}
-                            onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                            placeholder="Type your message..."
-                            className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
-                            disabled={isSending}
-                          />
-                          {isSending && (
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                              <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                            </div>
-                          )}
-                        </div>
-                        <button
-                          onClick={handleSendMessage}
-                          disabled={!newMessage.trim() || isSending}
-                          className="px-4 py-3 bg-primary text-black font-semibold rounded-xl hover:opacity-90 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <line x1="22" y1="2" x2="11" y2="13"/>
-                            <polygon points="22,2 15,22 11,13 2,9"/>
-                          </svg>
-                        </button>
-                      </div>
+                    {/* User Wave */}
+                    <div className="flex flex-col items-center">
+                      <WaveIndicator 
+                        isActive={isInterviewActive} 
+                        isSpeaking={isStreaming && audioCapture.isListening} 
+                        label="You (Speaking)" 
+                      />
                     </div>
                   </div>
 
-                  {/* Audio control panel */}
-                  <div className="w-80 shrink-0 bg-zinc-900/30 border-l border-zinc-800/50 flex flex-col">
-                    {/* Audio status header */}
-                    <div className="p-4 border-b border-zinc-800/50">
-                      <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-sm font-semibold text-zinc-200">Audio Interview</h3>
-                        {isInterviewActive && (
-                          <span className="px-2 py-1 bg-primary/10 border border-primary/20 text-primary text-[10px] font-bold uppercase tracking-wider rounded-md">
-                            Active
-                          </span>
+                  {/* Central Control */}
+                  <div className="flex flex-col items-center gap-6 w-full max-w-md">
+                    <div className="flex items-center gap-4">
+                      <button
+                        onClick={isInterviewActive ? stopAudioInterview : startAudioInterview}
+                        disabled={!!audioCapture.error}
+                        className={`group relative flex items-center justify-center w-20 h-20 rounded-full transition-all duration-300 ${
+                          isInterviewActive
+                            ? "bg-red-500/10 border-2 border-red-500/30 text-red-400 hover:bg-red-500/20"
+                            : "bg-primary border-2 border-primary text-black hover:scale-105 shadow-[0_0_30px_rgba(var(--primary-rgb),0.3)]"
+                        } disabled:opacity-40 disabled:cursor-not-allowed`}
+                      >
+                        {isInterviewActive ? (
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                            <rect x="6" y="6" width="12" height="12" rx="2" />
+                          </svg>
+                        ) : (
+                          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                            <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
+                          </svg>
                         )}
-                      </div>
-
-                      {/* Status indicator */}
-                      <div className="flex items-center gap-3 p-3 bg-zinc-800/30 border border-zinc-700/40 rounded-xl">
-                        <div className={`w-3 h-3 rounded-full ${statusDot}`} />
-                        <div>
-                          <div className={`text-sm font-medium ${statusColor}`}>{statusLabel}</div>
-                          <div className="text-xs text-zinc-500">
-                            {isStreaming && audioCapture.isListening
-                              ? "Speak naturally"
-                              : isAiResponding
-                              ? "AI is speaking"
-                              : isInterviewActive
-                              ? "Waiting for AI"
-                              : "Ready to begin"}
-                          </div>
-                        </div>
-                      </div>
+                      </button>
                     </div>
 
-                    {/* Audio visualization */}
-                    <div className="flex-1 flex items-center justify-center p-6">
-                      <div className="flex flex-col items-center gap-6">
-                        {/* Audio orb */}
-                        <div className={`relative w-24 h-24 rounded-full flex items-center justify-center transition-all duration-500 ${
-                          isInterviewActive
-                            ? "bg-primary/15 border-2 border-primary/40 shadow-lg shadow-primary/10"
-                            : "bg-zinc-800/40 border-2 border-zinc-700/50"
-                        }`}>
-                          {isStreaming && audioCapture.isListening ? (
-                            /* Waveform bars */
-                            <div className="flex items-center gap-0.5">
-                              {[3, 5, 3, 7, 4, 7, 3, 5, 3].map((h, i) => (
-                                <div
-                                  key={i}
-                                  className="w-0.5 rounded-full bg-primary animate-pulse"
-                                  style={{ height: `${h * 2}px`, animationDelay: `${i * 0.07}s` }}
-                                />
-                              ))}
-                            </div>
-                          ) : isAiResponding ? (
-                            <div className="flex items-center gap-1">
-                              {[1, 2, 3].map((i) => (
-                                <div key={i} className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
-                              ))}
-                            </div>
-                          ) : (
-                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"
-                              className={`transition-colors ${isInterviewActive ? "text-primary" : "text-zinc-500"}`}>
-                              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                              <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
-                              <line x1="12" y1="19" x2="12" y2="23"/>
-                              <line x1="8" y1="23" x2="16" y2="23"/>
-                            </svg>
-                          )}
+                    <div className="text-center">
+                      <h2 className={`text-lg font-bold transition-colors duration-300 ${isInterviewActive ? 'text-zinc-200' : 'text-zinc-500'}`}>
+                        {isInterviewActive ? "Interview in Progress" : "Ready to Start"}
+                      </h2>
+                      <p className="text-sm text-zinc-500 mt-1">
+                        {isInterviewActive 
+                          ? isAiResponding ? "Listen to the interviewer..." : "Speak your answer now."
+                          : "Click the microphone to begin your audio session."}
+                      </p>
+                    </div>
+
+                    {/* Connection/Error messages */}
+                    <div className="w-full space-y-2">
+                      {connectionAttempted && !isConnected && (
+                        <div className="flex items-center gap-2 text-xs text-orange-400 bg-orange-500/10 border border-orange-500/20 rounded-lg px-3 py-2 w-full justify-center">
+                          <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                          </svg>
+                          Audio endpoint unavailable
                         </div>
-
-                        {/* Audio controls */}
-                        <div className="flex flex-col items-center gap-3 w-full max-w-xs">
-                          {isInterviewActive ? (
-                            <button
-                              onClick={stopAudioInterview}
-                              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-red-500/30 bg-red-500/8 text-red-400 text-sm font-semibold hover:bg-red-500/15 active:scale-95 transition-all"
-                            >
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                                <rect x="6" y="6" width="12" height="12" rx="1"/>
-                              </svg>
-                              End Audio Interview
-                            </button>
-                          ) : (
-                            <button
-                              onClick={startAudioInterview}
-                              disabled={!!audioCapture.error}
-                              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary text-black font-bold rounded-xl hover:opacity-90 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed text-sm shadow-lg shadow-primary/20"
-                            >
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                                <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
-                              </svg>
-                              Start Audio Interview
-                            </button>
-                          )}
-
-                          {/* Connection status */}
-                          {connectionAttempted && !isConnected && (
-                            <div className="flex items-center gap-2 text-xs text-orange-400 bg-orange-500/10 border border-orange-500/20 rounded-lg px-3 py-2 w-full">
-                              <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                              </svg>
-                              Audio endpoint unavailable
-                            </div>
-                          )}
-
-                          {/* Audio error */}
-                          {audioCapture.error && (
-                            <div className="flex items-center gap-2 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 w-full">
-                              <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                              </svg>
-                              {audioCapture.error}
-                            </div>
-                          )}
+                      )}
+                      {audioCapture.error && (
+                        <div className="flex items-center gap-2 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 w-full justify-center">
+                          <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                          </svg>
+                          {audioCapture.error}
                         </div>
-                      </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -805,29 +711,6 @@ export default function InterviewsPage() {
                   </div>
                 </div>
 
-                {/* Tips section */}
-                <div className="w-full max-w-lg mt-8">
-                  <h4 className="text-sm font-semibold text-zinc-400 mb-3 text-center">💡 Interview Tips</h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="p-3 bg-zinc-800/30 border border-zinc-700/40 rounded-lg">
-                      <div className="text-xs font-medium text-zinc-300 mb-1">Practice Mode</div>
-                      <div className="text-[10px] text-zinc-500">Use audio interviews for realistic practice sessions</div>
-                    </div>
-                    <div className="p-3 bg-zinc-800/30 border border-zinc-700/40 rounded-lg">
-                      <div className="text-xs font-medium text-zinc-300 mb-1">Behavioral Questions</div>
-                      <div className="text-[10px] text-zinc-500">Focus on STAR method: Situation, Task, Action, Result</div>
-                    </div>
-                    <div className="p-3 bg-zinc-800/30 border border-zinc-700/40 rounded-lg">
-                      <div className="text-xs font-medium text-zinc-300 mb-1">Text Chat</div>
-                      <div className="text-[10px] text-zinc-500">Send text messages for quick practice or clarifications</div>
-                    </div>
-                    <div className="p-3 bg-zinc-800/30 border border-zinc-700/40 rounded-lg">
-                      <div className="text-xs font-medium text-zinc-300 mb-1">Track Progress</div>
-                      <div className="text-[10px] text-zinc-500">Complete sessions to mark your preparation progress</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
             )}
           </main>
 
