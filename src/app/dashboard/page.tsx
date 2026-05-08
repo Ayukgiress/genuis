@@ -433,7 +433,7 @@ export default function DashboardPage() {
 
 
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8" style={{ minWidth: 0 }}>
         <div className="lg:col-span-2 p-8 rounded-3xl bg-zinc-900/50 border border-zinc-800/50 space-y-6">
           <div className="flex justify-between items-center">
             <h3 className="font-bold">Weekly Activity</h3>
@@ -444,7 +444,7 @@ export default function DashboardPage() {
               </svg>
             </button>
           </div>
-          <div className="h-[300px] w-full min-h-[300px] min-w-0">
+          <div className="h-[300px] w-full min-h-[300px] min-w-0" style={{ minWidth: 0, minHeight: 300 }}>
             {mounted ? (
                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                 <AreaChart data={chartData}>
