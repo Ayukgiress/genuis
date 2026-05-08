@@ -11,74 +11,74 @@ export const useInterviewWebSocket = (interviewId: number | null) => {
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [connectionAttempted, setConnectionAttempted] = useState(false);
+  const [isAiResponding, setIsAiResponding] = useState(false);
 
   // Audio capture integration
   const audioPlayback = useAudioPlayback();
 
   const audioCapture = useAudioCapture(async (base64Audio: string) => {
-    if (!interviewId) return;
+    if (isAiResponding) {
+      console.log('🤖 AI is responding, ignoring user speech');
+      return;
+    }
+
+    console.log('🎤 User speech detected, sending automatically. Size:', base64Audio.length);
 
     try {
-      setIsStreaming(true);
-      console.log('Sending audio via HTTP to interview:', interviewId);
+      setIsAiResponding(true);
 
       // Send audio via HTTP POST
-      const response: InterviewMessage = await interviewApi.sendAudioMessage(interviewId, {
+      const response: InterviewMessage = await interviewApi.sendAudioMessage(interviewId!, {
         base64_audio: base64Audio
       });
 
-      console.log('Received AI response:', response);
+      console.log('✅ AI response received:', response);
 
       // Handle AI text response
       if (response.content) {
-        console.log('AI Response:', response.content);
+        console.log('💬 AI says:', response.content);
       }
 
-      // Handle AI audio response (stored in the message)
-      // Note: The backend might store audio data differently - adjust based on actual response
+      // Handle AI audio response
       if (response.audio_data) {
-        console.log('AI audio received, playing...');
+        console.log('🔊 Playing AI response...');
         audioPlayback.playAudio(response.audio_data);
+
+        // Wait for audio to finish playing before allowing new speech
+        setTimeout(() => {
+          setIsAiResponding(false);
+          console.log('🎤 Ready for user response');
+        }, 2000); // Estimate based on audio length, or we could track actual playback end
+      } else {
+        setIsAiResponding(false);
       }
 
-      setIsStreaming(false);
     } catch (error) {
-      console.error('Error sending audio:', error);
-      setError('Failed to process audio. Please try again.');
-      setIsStreaming(false);
+      console.error('❌ Error processing speech:', error);
+      setError('Failed to process speech. Please try again.');
+      setIsAiResponding(false);
     }
   });
 
+  // Simple connect/disconnect for compatibility
   const connect = useCallback(() => {
-    if (!interviewId) return;
-
     setConnectionAttempted(true);
-    setIsConnected(true);
-    setError(null);
-    console.log('Audio Interview HTTP mode ready for interview:', interviewId);
-  }, [interviewId]);
+    console.log('🎭 Conversational interview connected');
+  }, []);
+
+  const disconnect = useCallback(() => {
+    console.log('🎭 Conversational interview disconnected');
+  }, []);
 
   const startAudioStream = useCallback(() => {
+    console.log('🎤 Starting automatic audio capture');
     audioCapture.startCapture();
-    setIsStreaming(true);
   }, [audioCapture]);
 
   const stopAudioStream = useCallback(() => {
-    setIsStreaming(false);
+    console.log('🛑 Stopping automatic audio capture');
     audioCapture.stopCapture();
-    audioPlayback.stopAudio();
-  }, [audioCapture, audioPlayback]);
-
-  const disconnect = useCallback(() => {
-    stopAudioStream();
-    setIsConnected(true); // Stay "connected" for HTTP approach
-  }, [stopAudioStream]);
-
-  useEffect(() => {
-    return () => {
-      disconnect();
-    };
-  }, [disconnect]);
+  }, [audioCapture]);
 
   return {
     isConnected, // Always true in HTTP mode
@@ -86,6 +86,7 @@ export const useInterviewWebSocket = (interviewId: number | null) => {
     connectionAttempted,
     audioCapture,
     error,
+    isAiResponding,
     connect,
     disconnect,
     startAudioStream,

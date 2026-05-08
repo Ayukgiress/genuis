@@ -205,6 +205,7 @@ export default function InterviewsPage() {
     connectionAttempted,
     audioCapture,
     error: audioError,
+    isAiResponding,
     connect,
     disconnect,
     startAudioStream,
@@ -331,13 +332,15 @@ export default function InterviewsPage() {
     setTimeout(() => startAudioStream(), 1000);
     setIsInterviewActive(true);
     setNewMessage("");
-    showToast("Audio interview started — speak to respond", "success");
+    showToast("🎤 Conversational interview started - speak naturally!", "success");
   };
 
   const stopAudioInterview = () => {
+    console.log('🛑 Stopping conversational interview');
     stopAudioStream();
     disconnect();
     setIsInterviewActive(false);
+    showToast("Interview ended", "success");
   };
 
   const getJobDetails = (jobId: number) => jobs.find((job) => job.id === jobId.toString());
@@ -451,14 +454,27 @@ export default function InterviewsPage() {
                     </div>
                   )}
 
-                  {isStreaming && (
+                  {isStreaming && audioCapture.isListening && (
                     <div className="iv-rec-badge">
-                      <div className="iv-rec-dot" /> 🎤 REC
+                      <div className="iv-rec-dot pulse-red" /> 🎤 LISTENING
+                    </div>
+                  )}
+                  {isAiResponding && (
+                    <div className="iv-rec-badge ai-speaking">
+                      <div className="iv-rec-dot pulse-green" /> 🤖 AI SPEAKING
                     </div>
                   )}
                   <div className="iv-status-badge">
                     <div className={`iv-status-dot ${isInterviewActive ? "pulse" : ""}`} style={{ background: isInterviewActive ? "#00F29C" : "#5A6070" }} />
-                    <span>{isInterviewActive ? "AUDIO LIVE" : "STANDBY"}</span>
+                    <span>
+                      {isInterviewActive
+                        ? (isAiResponding
+                            ? "AI RESPONDING"
+                            : audioCapture.isListening
+                              ? "LISTENING"
+                              : "READY TO LISTEN")
+                        : "STANDBY"}
+                    </span>
                   </div>
 
                   {/* Job overlay */}
@@ -474,20 +490,21 @@ export default function InterviewsPage() {
                 <div className="iv-controls">
                   {isInterviewActive ? (
                     <>
-                      <textarea
-                        className="iv-transcript-input"
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        placeholder="Speak or type your response…"
-                        disabled={isSending}
-                        rows={1}
-                        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
-                      />
-                      <button className="iv-send-btn" onClick={handleSendMessage} disabled={isSending || !newMessage.trim()}>
-                        {isSending ? "Sending…" : "Send"}
-                      </button>
-                      <button className="iv-ctrl-btn danger" onClick={stopAudioInterview} title="Stop interview">
-                        ◼
+                      <div style={{ textAlign: "center", marginBottom: 16, padding: "12px", background: "rgba(0,0,0,0.3)", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)" }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>
+                          🎭 Conversational Interview Active
+                        </div>
+                        <div style={{ fontSize: 12, color: "#5A6070", lineHeight: 1.4 }}>
+                          Speak naturally when you hear the AI. The conversation flows automatically.
+                        </div>
+                      </div>
+
+                      <button
+                        className="iv-ctrl-btn danger"
+                        onClick={stopAudioInterview}
+                        style={{ width: "100%", padding: "12px" }}
+                      >
+                        🛑 End Interview
                       </button>
                     </>
                   ) : (
