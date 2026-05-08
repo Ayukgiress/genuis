@@ -13,7 +13,8 @@ import {
 } from 'recharts';
 import { analysisApi, analyticsApi, jobApi, kanbanApi, ApiError, getAuthToken, interviewApi } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
-import type { Analysis, AnalyticsSummary, Job, KanbanBoard, Interview } from '@/types';
+import { useApplicationStore } from '@/store/applicationStore';
+import type { Analysis, Analytics, AnalyticsSummary, Job, KanbanBoard, Interview } from '@/types';
 import { toast } from 'react-toastify';
 import Link from 'next/link';
 
@@ -22,8 +23,10 @@ const COLORS = ['#00f29c', '#6366f1', '#f59e0b', '#ef4444'];
 export default function DashboardPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading, fetchCurrentUser } = useAuth();
+  const { applications } = useApplicationStore();
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [analyticsSummary, setAnalyticsSummary] = useState<AnalyticsSummary | null>(null);
+  const [analytics, setAnalytics] = useState<Analytics[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dataLoaded, setDataLoaded] = useState(false);
@@ -67,9 +70,10 @@ export default function DashboardPage() {
         setError(null);
 
         // Use Promise.allSettled to prevent one failing API call from blocking others
-        const [analysesResult, summaryResult, boardsResult] = await Promise.allSettled([
+        const [analysesResult, summaryResult, analyticsResult, boardsResult] = await Promise.allSettled([
           analysisApi.list(),
           analyticsApi.getSummary(),
+          analyticsApi.list(),
           kanbanApi.listBoards()
         ]);
 
@@ -79,6 +83,10 @@ export default function DashboardPage() {
 
         if (summaryResult.status === 'fulfilled') {
           setAnalyticsSummary(summaryResult.value);
+        }
+
+        if (analyticsResult.status === 'fulfilled') {
+          setAnalytics(analyticsResult.value);
         }
 
         if (boardsResult.status === 'fulfilled') {
@@ -118,14 +126,19 @@ export default function DashboardPage() {
           activeInterviews.map((i) => i.job_id).filter((id) => Number.isFinite(id))
         );
 
-        // Derive applied jobs from kanban cards (reliable mapping should use card.title as job id)
-        // NOTE: If your backend stores job id somewhere else, update the mapping here.
+        // Derive applied jobs from kanban cards and application store
         const appliedJobList: Job[] = [];
         const appliedJobIdSet = new Set<string>();
 
-        const completedAnalysesList = analyses.filter((a) => a.status === 'completed');
+        // 1. Get unique job IDs from both sources
+        const uniqueJobIds = new Set<string>();
+        const appMap = new Map<string, any>();
+        
+        for (const app of applications) {
+          uniqueJobIds.add(app.jobId);
+          appMap.set(app.jobId, app);
+        }
 
-        // Collect candidate cards first
         for (const board of boards) {
           try {
             const cards = await kanbanApi.listCards(board.id);
@@ -135,21 +148,8 @@ export default function DashboardPage() {
                 card.column_id === 'review' ||
                 card.column_id === 'done';
 
-              if (!isAppliedColumn) continue;
-
-              // Keep the existing assumption that card.title is job id.
-              // This fixes the previous parseInt(card.title) comparison issue by normalizing types.
-              const jobIdStr = String(card.title);
-              if (!jobIdStr) continue;
-
-              try {
-                const job = await jobApi.getById(jobIdStr);
-                if (!appliedJobIdSet.has(job.id)) {
-                  appliedJobIdSet.add(job.id);
-                  appliedJobList.push(job);
-                }
-              } catch {
-                // If card.title is not a job id in your system, update mapping here.
+              if (isAppliedColumn && card.title) {
+                uniqueJobIds.add(String(card.title));
               }
             }
           } catch {
@@ -157,9 +157,39 @@ export default function DashboardPage() {
           }
         }
 
-        // Filter applied jobs to only those related to completed analyses (if needed)
-        // (Current UI previously tried to use analyses, but without a stable mapping.
-        //  Keeping appliedJobList as derived from kanban cards ensures alerts work.)
+        // 2. Fetch job details in parallel
+        const jobDetailResults = await Promise.allSettled(
+          Array.from(uniqueJobIds).map(id => jobApi.getById(id))
+        );
+
+        jobDetailResults.forEach((result, index) => {
+          const jobId = Array.from(uniqueJobIds)[index];
+          if (result.status === 'fulfilled') {
+            const job = result.value;
+            if (!appliedJobIdSet.has(job.id)) {
+              appliedJobIdSet.add(job.id);
+              appliedJobList.push(job);
+            }
+          } else {
+            // Fallback for application store jobs if fetch fails
+            const app = appMap.get(jobId);
+            if (app && !appliedJobIdSet.has(jobId)) {
+              appliedJobIdSet.add(jobId);
+              appliedJobList.push({
+                id: jobId,
+                title: app.title,
+                company: app.company,
+                location: 'Remote',
+                description: '',
+                requirements: [],
+                source: 'Applied',
+                source_url: '',
+                posted_at: app.appliedAt
+              });
+            }
+          }
+        });
+
         setAppliedJobs(appliedJobList);
 
         // Create missing prep sessions for applied jobs without active interviews
@@ -200,7 +230,7 @@ export default function DashboardPage() {
     }, 800);
 
     return () => clearTimeout(timeoutId);
-  }, [isAuthenticated, boards, router, analyses]);
+  }, [isAuthenticated, boards, router, analyses, applications]);
 
   const fetchJobs = useCallback(async () => {
     try {
@@ -338,33 +368,46 @@ export default function DashboardPage() {
   ];
 
   const chartData = React.useMemo(() => {
-    const eventValues = analyticsSummary?.event_types ? Object.values(analyticsSummary.event_types) : [];
-    const hasData = eventValues.length > 0;
-    
-    if (!hasData) {
+    if (!analytics || analytics.length === 0) {
       return [
-        { name: 'MON', value: 30 },
-        { name: 'TUE', value: 25 },
-        { name: 'WED', value: 35 },
-        { name: 'THU', value: 55 },
-        { name: 'FRI', value: 30 },
-        { name: 'SAT', value: 65 },
-        { name: 'SUN', value: 45 },
+        { name: 'MON', value: 0 },
+        { name: 'TUE', value: 0 },
+        { name: 'WED', value: 0 },
+        { name: 'THU', value: 0 },
+        { name: 'FRI', value: 0 },
+        { name: 'SAT', value: 0 },
+        { name: 'SUN', value: 0 },
       ];
     }
-    
+
+    // Filter to last 7 days
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const recentAnalytics = analytics.filter(event =>
+      new Date(event.created_at) >= sevenDaysAgo
+    );
+
+    // Group analytics by day of week
+    const dayCounts = recentAnalytics.reduce((acc, event) => {
+      const date = new Date(event.created_at);
+      const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
+
+      // Convert to MON-SUN format (1 = MON, 0 = SUN)
+      const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+      const dayName = dayNames[dayOfWeek];
+
+      acc[dayName] = (acc[dayName] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    // Return data for each day of the week
     const days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
-    const maxVal = Math.max(0, ...eventValues);
-    
-    return days.map((day, index) => {
-      // Create a more varied mock curve based on the actual data volume
-      const variance = [0.8, 0.6, 0.9, 1.2, 0.7, 1.5, 1.1][index];
-      return {
-        name: day,
-        value: Math.round(maxVal * variance)
-      };
-    });
-  }, [analyticsSummary]);
+    return days.map(day => ({
+      name: day,
+      value: dayCounts[day] || 0
+    }));
+  }, [analytics]);
 
   const funnelData = [
     { label: 'UPLOADED', value: totalAnalyses, percentage: totalAnalyses > 0 ? 100 : 0 },
@@ -415,7 +458,7 @@ export default function DashboardPage() {
         <p className="text-zinc-500 text-sm">Welcome back! Here&apos;s your AI-powered job search workspace.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
         {stats.map((stat) => (
           <div key={stat.label} className="p-6 rounded-2xl bg-zinc-900/50 border border-zinc-800/50 hover:border-zinc-700 transition-all group">
             <div className="flex justify-between items-start mb-4">

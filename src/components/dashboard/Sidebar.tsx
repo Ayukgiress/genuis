@@ -123,11 +123,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             </svg>
           </button>
         </div>
-        <div className="flex items-center gap-3">
-          <div>
-            <h1 className="text-sm font-bold text-white tracking-tight uppercase">Genuis</h1>
-          </div>
-        </div>
       </div>
 
       <nav className="flex-1 px-4 space-y-1">

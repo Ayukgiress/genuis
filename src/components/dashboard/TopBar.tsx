@@ -54,14 +54,6 @@ export const TopBar: React.FC<TopBarProps> = ({ onToggleSidebar }) => {
             </svg>
           </button>
         </div>
-
-        <button className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white text-black font-bold text-sm hover:opacity-90 transition-all">
-          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="3">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          New App
-        </button>
       </div>
     </header>
   );

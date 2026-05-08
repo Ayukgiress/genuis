@@ -14,8 +14,6 @@ import { useInterviewWebSocket } from "@/hooks/useInterviewWebSocket";
 import { useAudioPlayback } from "@/hooks/useAudioPlayback";
 import type { Interview, InterviewMessage, Job } from "@/types";
 
-
-
 export default function InterviewsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -49,7 +47,7 @@ export default function InterviewsPage() {
     connect,
     disconnect,
     startAudioStream,
-    stopAudioStream
+    stopAudioStream,
   } = useInterviewWebSocket(selectedInterview?.id || null);
 
   const showToast = (msg: string, type: "error" | "success") => {
@@ -85,9 +83,7 @@ export default function InterviewsPage() {
   }, [authLoading, isAuthenticated, router, fetchData]);
 
   useEffect(() => {
-    if (searchParams.get("action") === "new") {
-      setShowCreateModal(true);
-    }
+    if (searchParams.get("action") === "new") setShowCreateModal(true);
   }, [searchParams]);
 
   useEffect(() => {
@@ -171,9 +167,7 @@ export default function InterviewsPage() {
     setIsInterviewActive(true);
     setNewMessage("");
     showToast("🎤 Starting conversational interview...", "success");
-
     try {
-      // Send initial message to trigger AI to start the conversation
       const initialMessage: InterviewMessage = {
         id: Date.now(),
         interview_id: selectedInterview.id,
@@ -181,47 +175,34 @@ export default function InterviewsPage() {
         content: "Hello, I'm ready to begin the interview. Please start by introducing yourself and asking your first question.",
         created_at: new Date().toISOString(),
       };
-
-      // Add user message to UI
       const tempInterview = { ...selectedInterview, messages: [...(selectedInterview.messages || []), initialMessage] };
       setSelectedInterview(tempInterview);
-
-      // Send to API
       const aiResponse = await interviewApi.sendMessage(selectedInterview.id, {
         role: "user",
-        content: initialMessage.content
+        content: initialMessage.content,
       });
-
-      // Add AI response
       const finalInterview = { ...tempInterview, messages: [...tempInterview.messages, aiResponse] };
       setSelectedInterview(finalInterview);
       setInterviews((prev) => prev.map((int) => int.id === selectedInterview.id ? finalInterview : int));
-
-      // NEW: speech-to-speech for the first turn (assistant may return audio_data on text send)
       if (aiResponse.audio_data) {
         try {
           const ok = await audioPlayback.playAudio(aiResponse.audio_data, "audio/webm");
           if (!ok) console.warn("AI audio_data returned but playback failed.");
-        } catch (e) {
-          console.warn("AI audio playback threw:", e);
-        }
+        } catch (e) { console.warn("AI audio playback threw:", e); }
       }
-
-      // Now start audio capture after AI has responded (and after playback window)
       connect();
       setTimeout(() => {
         startAudioStream();
         showToast("🎤 AI has started - you can now respond!", "success");
-      }, 2500); // Give time for AI audio to play
+      }, 2500);
     } catch (err) {
-      console.error('Failed to start interview:', err);
+      console.error("Failed to start interview:", err);
       showToast("Failed to start interview", "error");
       setIsInterviewActive(false);
     }
   };
 
   const stopAudioInterview = () => {
-    console.log('🛑 Stopping conversational interview');
     stopAudioStream();
     disconnect();
     setIsInterviewActive(false);
@@ -232,73 +213,57 @@ export default function InterviewsPage() {
   const formatTime = (d: string) => new Date(d).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   const formatDate = (d: string) => new Date(d).toLocaleDateString([], { month: "short", day: "numeric" });
 
+  // ── Loading skeleton ──────────────────────────────────────────────────────
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-zinc-950">
-        <div className="relative">
-          <div className="fixed top-[-200px] right-[-200px] w-[600px] h-[600px] bg-primary/7 rounded-full pointer-events-none z-0" />
-          <div className="relative z-10 grid grid-cols-[280px_1fr_300px] grid-rows-[72px_1fr] h-screen gap-0 lg:grid-cols-[260px_1fr] xl:grid-cols-[280px_1fr_300px]">
-            <header className="col-span-full flex items-center justify-between px-8 py-0 border-b border-zinc-800/50 bg-zinc-950/80 backdrop-blur-xl">
-              <div className="flex items-center gap-4">
-                <div className="h-8 w-32 bg-zinc-800/60 rounded-xl animate-pulse" />
-                <div className="h-7 w-28 bg-primary/10 border border-primary/20 rounded-md animate-pulse" />
-              </div>
-              <div className="h-10 w-36 bg-zinc-800/60 rounded-xl animate-pulse" />
-            </header>
-
-            <aside className="row-start-2 border-r border-zinc-800/50 overflow-y-auto p-6 bg-zinc-900/30 hidden lg:block">
-              <div className="h-5 w-40 bg-zinc-800/60 rounded animate-pulse mb-5" />
-              <div className="space-y-3">
-                {Array.from({ length: 6 }).map((_, idx) => (
-                  <div
-                    key={idx}
-                    className="p-4 rounded-xl border border-zinc-800/50 bg-zinc-900/20 animate-pulse"
-                  >
-                    <div className="h-4 w-2/3 bg-zinc-800/70 rounded mb-3" />
-                    <div className="h-3 w-1/2 bg-zinc-800/70 rounded mb-4" />
-                    <div className="flex items-center justify-between">
-                      <div className="h-5 w-20 bg-primary/10 border border-primary/20 rounded" />
-                      <div className="h-4 w-20 bg-zinc-800/70 rounded" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </aside>
-
-            <main className="row-start-2 flex flex-col overflow-hidden">
-              <div className="flex-1 relative bg-zinc-950 flex items-center justify-center overflow-hidden">
-                <div className="flex flex-col items-center gap-6 text-white">
-                  <div className="w-32 h-32 rounded-full bg-zinc-800/50 border-2 border-zinc-700/50 animate-pulse" />
-                  <div className="h-4 w-44 bg-zinc-800/60 rounded animate-pulse" />
-                  <div className="h-4 w-28 bg-zinc-800/60 rounded animate-pulse" />
-                </div>
-              </div>
-
-              <div className="bg-zinc-900/50 border-t border-zinc-800/50 p-6 flex items-center gap-4">
-                <div className="w-full h-14 bg-zinc-800/60 rounded-xl animate-pulse" />
-              </div>
-            </main>
-
-            <aside className="row-start-2 border-l border-zinc-800/50 flex flex-col bg-zinc-900/30 hidden xl:flex">
-              <div className="p-5 pb-4 border-b border-zinc-800/50 flex items-center justify-between">
-                <div>
-                  <div className="h-4 w-24 bg-zinc-800/60 rounded animate-pulse" />
-                  <div className="h-3 w-28 bg-zinc-800/60 rounded mt-2 animate-pulse" />
-                </div>
-                <div className="h-7 w-28 bg-zinc-800/60 rounded animate-pulse" />
-              </div>
-              <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                {Array.from({ length: 6 }).map((_, idx) => (
-                  <div key={idx} className={`flex ${idx % 2 === 0 ? "justify-end" : "justify-start"}`}>
-                    <div className={`max-w-[85%] ${idx % 2 === 0 ? "order-2" : "order-1"}`}>
-                      <div className="px-4 py-3 rounded-xl bg-zinc-800/60 animate-pulse h-10" />
-                      <div className="h-3 w-24 bg-zinc-800/60 rounded mt-2 animate-pulse" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </aside>
+      <div className="min-h-screen bg-zinc-950 flex flex-col">
+        {/* Header skeleton */}
+        <header className="h-16 flex items-center justify-between px-8 border-b border-zinc-800/60 bg-zinc-950/90">
+          <div className="flex items-center gap-3">
+            <div className="h-7 w-36 bg-zinc-800/70 rounded-lg animate-pulse" />
+            <div className="h-5 w-20 bg-zinc-800/50 rounded animate-pulse" />
           </div>
+          <div className="h-9 w-32 bg-zinc-800/60 rounded-lg animate-pulse" />
+        </header>
+        {/* Body skeleton */}
+        <div className="flex flex-1 overflow-hidden">
+          {/* Sidebar */}
+          <aside className="w-72 border-r border-zinc-800/60 p-5 space-y-3 hidden lg:block bg-zinc-900/20">
+            <div className="h-4 w-28 bg-zinc-800/60 rounded animate-pulse mb-5" />
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="p-4 rounded-xl border border-zinc-800/40 bg-zinc-900/30 animate-pulse space-y-2">
+                <div className="h-4 w-3/4 bg-zinc-800/70 rounded" />
+                <div className="h-3 w-1/2 bg-zinc-800/60 rounded" />
+                <div className="flex justify-between mt-2">
+                  <div className="h-5 w-16 bg-zinc-800/60 rounded-full" />
+                  <div className="h-3 w-14 bg-zinc-800/50 rounded" />
+                </div>
+              </div>
+            ))}
+          </aside>
+          {/* Main */}
+          <main className="flex-1 flex flex-col bg-zinc-950">
+            <div className="flex-1 flex items-center justify-center">
+              <div className="w-36 h-36 rounded-full bg-zinc-800/40 border-2 border-zinc-700/40 animate-pulse" />
+            </div>
+            <div className="h-24 border-t border-zinc-800/50 bg-zinc-900/30 flex items-center px-6">
+              <div className="w-full h-12 bg-zinc-800/50 rounded-xl animate-pulse" />
+            </div>
+          </main>
+          {/* Transcript */}
+          <aside className="w-80 border-l border-zinc-800/60 hidden xl:flex flex-col bg-zinc-900/20">
+            <div className="p-5 border-b border-zinc-800/50">
+              <div className="h-4 w-24 bg-zinc-800/60 rounded animate-pulse" />
+              <div className="h-3 w-32 bg-zinc-800/50 rounded animate-pulse mt-2" />
+            </div>
+            <div className="flex-1 p-4 space-y-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className={`flex ${i % 2 === 0 ? "justify-end" : "justify-start"}`}>
+                  <div className="h-10 w-48 bg-zinc-800/50 rounded-xl animate-pulse" />
+                </div>
+              ))}
+            </div>
+          </aside>
         </div>
       </div>
     );
@@ -308,106 +273,274 @@ export default function InterviewsPage() {
   const messages = selectedInterview?.messages || [];
   const visibleMessages = hideAIMessages ? messages.filter((m) => m.role === "user") : messages;
 
+  // ── Status indicator helpers ─────────────────────────────────────────────
+  const statusLabel = isInterviewActive
+    ? isAiResponding ? "AI Speaking" : isStreaming && audioCapture.isListening ? "Listening" : "Ready"
+    : "Standby";
+
+  const statusColor = isInterviewActive
+    ? isAiResponding ? "text-primary" : isStreaming && audioCapture.isListening ? "text-emerald-400" : "text-zinc-300"
+    : "text-zinc-500";
+
+  const statusDot = isInterviewActive
+    ? isAiResponding ? "bg-primary animate-pulse" : isStreaming && audioCapture.isListening ? "bg-emerald-400 animate-pulse" : "bg-zinc-400"
+    : "bg-zinc-600";
+
   return (
-    <div className="min-h-screen bg-zinc-950">
-      <div className="relative">
-        {/* Ambient orb effect */}
-        <div className="fixed top-[-200px] right-[-200px] w-[600px] h-[600px] bg-primary/7 rounded-full pointer-events-none z-0" />
+    <div className="min-h-screen bg-zinc-950 font-sans">
+      {/* Ambient background glow */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-[-300px] right-[-200px] w-[700px] h-[700px] bg-primary/5 rounded-full blur-3xl" />
+        <div className="absolute bottom-[-200px] left-[-200px] w-[500px] h-[500px] bg-primary/3 rounded-full blur-3xl" />
+      </div>
 
-        <div className="relative z-10 grid grid-cols-[280px_1fr_300px] grid-rows-[72px_1fr] h-screen gap-0 lg:grid-cols-[260px_1fr] xl:grid-cols-[280px_1fr_300px]">
+      <div className="relative z-10 flex flex-col h-screen">
 
-          {/* ── Top bar ── */}
-          <header className="col-span-full flex items-center justify-between px-8 py-0 border-b border-zinc-800/50 bg-zinc-950/80 backdrop-blur-xl">
-            <div className="flex items-center gap-4">
-              <span className="text-xl font-black tracking-tight">inter<span className="text-primary">view</span>.ai</span>
-              <span className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider bg-primary/12 border border-primary/25 text-primary rounded">
+        {/* ── Header ──────────────────────────────────────────────────────── */}
+        <header className="flex items-center justify-between px-8 h-16 border-b border-zinc-800/60 bg-zinc-950/80 backdrop-blur-xl shrink-0">
+          {/* Brand */}
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              {/* Icon mark */}
+              <div className="w-8 h-8 rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-primary">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                  <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
+                </svg>
+              </div>
+              <span className="text-[17px] font-black tracking-tight">
+                inter<span className="text-primary">view</span>.ai
+              </span>
+            </div>
+            {/* Badges */}
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-widest bg-primary/10 border border-primary/20 text-primary rounded-md">
                 Voice AI
               </span>
               {isConnected && (
-                <span className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider bg-primary/12 border border-primary/40 text-primary rounded">
-                  ● WS Connected
+                <span className="px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-widest bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 rounded-md flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" />
+                  Live
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-3">
+          </div>
+
+          {/* Right actions */}
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-mono text-zinc-500 hidden sm:block">
+              {interviews.length} session{interviews.length !== 1 ? "s" : ""}
+            </span>
+            <button
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-black text-sm font-bold rounded-lg hover:opacity-90 active:scale-95 transition-all"
+              onClick={() => setShowCreateModal(true)}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M12 5v14M5 12h14"/>
+              </svg>
+              New Session
+            </button>
+          </div>
+        </header>
+
+        {/* ── Body ─────────────────────────────────────────────────────────── */}
+        <div className="flex flex-1 overflow-hidden">
+
+          {/* ── Sessions Sidebar ─────────────────────────────────────────── */}
+          <aside className="w-[260px] xl:w-[280px] shrink-0 border-r border-zinc-800/60 flex flex-col bg-zinc-900/20 hidden lg:flex">
+            {/* Sidebar header */}
+            <div className="px-4 py-3.5 border-b border-zinc-800/50 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Sessions</span>
+                <span className="text-[9px] font-mono text-zinc-600 bg-zinc-800/60 px-1.5 py-0.5 rounded-md tabular-nums">
+                  {interviews.length}
+                </span>
+              </div>
               <button
-                className="px-6 py-2 bg-primary text-black font-bold rounded-xl hover:opacity-90 transition-all text-sm"
                 onClick={() => setShowCreateModal(true)}
+                className="w-6 h-6 rounded-md bg-primary/15 border border-primary/25 flex items-center justify-center text-primary hover:bg-primary/25 transition-all"
+                title="New session"
               >
-                + New Session
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                  <path d="M12 5v14M5 12h14"/>
+                </svg>
               </button>
             </div>
-          </header>
 
-          {/* ── Sessions Sidebar ── */}
-          <aside className="row-start-2 border-r border-zinc-800/50 overflow-y-auto p-6 bg-zinc-900/30 hidden lg:block">
-            <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 pb-4 mb-4 border-b border-zinc-800/50">
-              Sessions · {interviews.length}
-            </div>
-            {interviews.length === 0 && (
-              <div className="text-center py-8 text-zinc-500 font-mono text-xs">
-                No sessions yet
-              </div>
-            )}
-            <div className="space-y-3">
-              {interviews.map((iv) => {
-                const j = getJobDetails(iv.job_id);
-                const active = selectedInterview?.id === iv.id;
-                return (
-                  <div
-                    key={iv.id}
-                    className={`p-4 rounded-xl border cursor-pointer transition-all ${
-                      active
-                        ? "bg-primary/12 border-primary/25"
-                        : "bg-zinc-800/30 border-transparent hover:bg-zinc-800/50 hover:border-zinc-700/50"
-                    }`}
-                    onClick={() => selectInterview(iv)}
-                  >
-                    <div className="font-bold text-sm mb-1 truncate">{j?.title || "Practice Session"}</div>
-                    <div className="text-xs text-zinc-500 mb-3">{j?.company || "—"}</div>
-                    <div className="flex items-center justify-between">
-                      <span className={`px-2 py-1 text-[9px] font-bold uppercase rounded-full tracking-wide ${
-                        iv.status === "completed"
-                          ? "bg-zinc-800/50 text-zinc-400"
-                          : "bg-primary/12 text-primary border border-primary/25"
-                      }`}>
-                        {iv.status}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[9px] font-mono text-zinc-500">{formatDate(iv.created_at)}</span>
-                        <button
-                          className="w-5 h-5 rounded flex items-center justify-center text-zinc-500 hover:text-red-500 hover:bg-red-500/10 transition-all"
-                          onClick={(e) => { e.stopPropagation(); handleDeleteInterview(iv.id); }}
-                          title="Delete"
-                        >
-                          ×
-                        </button>
+            {/* Session list */}
+            <div className="flex-1 overflow-y-auto py-2 px-2 space-y-0.5">
+              {interviews.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full gap-3 text-zinc-600 py-12">
+                  <div className="w-12 h-12 rounded-xl bg-zinc-800/40 border border-zinc-700/30 flex items-center justify-center">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="opacity-50">
+                      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                      <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
+                    </svg>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs font-medium text-zinc-500">No sessions yet</p>
+                    <p className="text-[10px] text-zinc-600 mt-0.5">Create one to get started</p>
+                  </div>
+                </div>
+              ) : (
+                interviews.map((iv) => {
+                  const j = getJobDetails(iv.job_id);
+                  const active = selectedInterview?.id === iv.id;
+                  const msgCount = iv.messages?.length ?? 0;
+                  const lastMsg = iv.messages?.[iv.messages.length - 1];
+                  const companyInitial = (j?.company || j?.title || "?")[0].toUpperCase();
+                  const isCompleted = iv.status === "completed";
+
+                  return (
+                    <div
+                      key={iv.id}
+                      onClick={() => selectInterview(iv)}
+                      className={`group relative rounded-xl cursor-pointer transition-all duration-150 ${
+                        active
+                          ? "bg-zinc-800/60 border border-zinc-700/50"
+                          : "hover:bg-zinc-800/30 border border-transparent"
+                      }`}
+                    >
+                      {/* Active left bar */}
+                      {active && (
+                        <div className="absolute left-0 top-3 bottom-3 w-[3px] bg-primary rounded-r-full" />
+                      )}
+
+                      <div className="px-3 py-3 pl-4">
+                        {/* Top row: avatar + title + delete */}
+                        <div className="flex items-start gap-2.5">
+                          {/* Company avatar */}
+                          <div className={`w-8 h-8 rounded-lg shrink-0 flex items-center justify-center text-[11px] font-black border transition-all ${
+                            active
+                              ? "bg-primary/20 border-primary/30 text-primary"
+                              : "bg-zinc-800/80 border-zinc-700/50 text-zinc-400 group-hover:border-zinc-600/60"
+                          }`}>
+                            {companyInitial}
+                          </div>
+
+                          <div className="flex-1 min-w-0 pt-0.5">
+                            <div className={`text-[13px] font-semibold truncate leading-tight transition-colors ${
+                              active ? "text-zinc-50" : "text-zinc-300 group-hover:text-zinc-100"
+                            }`}>
+                              {j?.title || "Practice Session"}
+                            </div>
+                            <div className="text-[11px] text-zinc-500 truncate mt-0.5">{j?.company || "—"}</div>
+                          </div>
+
+                          <button
+                            className="opacity-0 group-hover:opacity-100 w-5 h-5 mt-0.5 rounded flex items-center justify-center text-zinc-600 hover:text-red-400 hover:bg-red-500/10 transition-all text-sm leading-none shrink-0"
+                            onClick={(e) => { e.stopPropagation(); handleDeleteInterview(iv.id); }}
+                            title="Delete"
+                          >
+                            ×
+                          </button>
+                        </div>
+
+                        {/* Last message preview */}
+                        {lastMsg && (
+                          <div className="mt-2 ml-[42px]">
+                            <p className="text-[11px] text-zinc-600 leading-snug truncate">
+                              <span className="text-zinc-500">{lastMsg.role === "user" ? "You: " : "AI: "}</span>
+                              {lastMsg.content?.replace(/\[INTERVIEW_COMPLETE\]/g, "").trim().slice(0, 55)}…
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Bottom row: status + meta */}
+                        <div className="flex items-center gap-2 mt-2.5 ml-[42px]">
+                          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-md ${
+                            isCompleted
+                              ? "bg-zinc-800/60 text-zinc-500 border border-zinc-700/40"
+                              : "bg-primary/10 text-primary border border-primary/20"
+                          }`}>
+                            <span className={`w-1 h-1 rounded-full inline-block ${isCompleted ? "bg-zinc-500" : "bg-primary animate-pulse"}`} />
+                            {iv.status}
+                          </span>
+                          {msgCount > 0 && (
+                            <span className="text-[9px] font-mono text-zinc-600 flex items-center gap-1">
+                              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                              </svg>
+                              {msgCount}
+                            </span>
+                          )}
+                          <span className="text-[9px] font-mono text-zinc-700 ml-auto">{formatDate(iv.created_at)}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </aside>
 
-          {/* ── Audio Stage ── */}
-          <main className="row-start-2 flex flex-col overflow-hidden">
+          {/* ── Main Stage ──────────────────────────────────────────────────── */}
+          <main className="flex-1 flex flex-col overflow-hidden min-w-0">
             {selectedInterview ? (
               <>
-                {/* Audio Interview Area */}
-                <div className="flex-1 relative bg-gradient-to-br from-zinc-950 to-zinc-900 flex items-center justify-center overflow-hidden">
-                  <div className="flex flex-col items-center gap-6 text-white">
-                    <div className="w-32 h-32 rounded-full bg-primary/10 border-2 border-primary/30 flex items-center justify-center transition-all duration-300">
-                      {isStreaming ? (
+                {/* Interview job info bar */}
+                {job && (
+                  <div className="flex items-center gap-3 px-6 py-3 border-b border-zinc-800/50 bg-zinc-900/30 shrink-0">
+                    <div className="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700/50 flex items-center justify-center text-sm font-bold text-zinc-300 shrink-0">
+                      {(job.company || "?")[0]}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold truncate text-zinc-100">{job.title}</div>
+                      <div className="text-xs text-zinc-500 truncate">{job.company}</div>
+                    </div>
+                    <div className="ml-auto flex items-center gap-2 shrink-0">
+                      <div className={`flex items-center gap-1.5 text-xs font-mono ${statusColor}`}>
+                        <div className={`w-2 h-2 rounded-full ${statusDot}`} />
+                        {statusLabel}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Audio stage */}
+                <div className="flex-1 flex items-center justify-center bg-gradient-to-b from-zinc-950 to-zinc-900/70 relative overflow-hidden">
+                  {/* Subtle grid */}
+                  <div
+                    className="absolute inset-0 opacity-[0.025]"
+                    style={{
+                      backgroundImage: "linear-gradient(to right, #fff 1px, transparent 1px), linear-gradient(to bottom, #fff 1px, transparent 1px)",
+                      backgroundSize: "40px 40px",
+                    }}
+                  />
+
+                  {/* Central orb */}
+                  <div className="flex flex-col items-center gap-8 relative">
+                    {/* Outer glow ring */}
+                    <div className={`absolute inset-0 -m-8 rounded-full transition-all duration-700 ${
+                      isInterviewActive ? "bg-primary/6 blur-2xl scale-110" : "bg-transparent"
+                    }`} />
+
+                    {/* Orb */}
+                    <div className={`relative w-36 h-36 rounded-full flex items-center justify-center transition-all duration-500 ${
+                      isInterviewActive
+                        ? "bg-primary/15 border-2 border-primary/40 shadow-lg shadow-primary/10"
+                        : "bg-zinc-800/40 border-2 border-zinc-700/50"
+                    }`}>
+                      {isStreaming && audioCapture.isListening ? (
+                        /* Waveform bars */
                         <div className="flex items-center gap-1">
-                          <div className="w-1 h-5 bg-primary rounded animate-pulse"></div>
-                          <div className="w-1 h-8 bg-primary rounded animate-pulse" style={{ animationDelay: '0.1s' }}></div>
-                          <div className="w-1 h-5 bg-primary rounded animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                          <div className="w-1 h-8 bg-primary rounded animate-pulse" style={{ animationDelay: '0.3s' }}></div>
-                          <div className="w-1 h-5 bg-primary rounded animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                          {[5, 8, 5, 10, 6, 10, 5, 8, 5].map((h, i) => (
+                            <div
+                              key={i}
+                              className="w-1 rounded-full bg-primary animate-pulse"
+                              style={{ height: `${h * 2.5}px`, animationDelay: `${i * 0.07}s` }}
+                            />
+                          ))}
+                        </div>
+                      ) : isAiResponding ? (
+                        <div className="flex items-center gap-1.5">
+                          {[1, 2, 3].map((i) => (
+                            <div key={i} className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+                          ))}
                         </div>
                       ) : (
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-primary opacity-70">
+                        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"
+                          className={`transition-colors ${isInterviewActive ? "text-primary" : "text-zinc-500"}`}>
                           <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
                           <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
                           <line x1="12" y1="19" x2="12" y2="23"/>
@@ -415,107 +548,108 @@ export default function InterviewsPage() {
                         </svg>
                       )}
                     </div>
-                    <div className="font-mono text-sm uppercase tracking-wider text-zinc-400">
-                      {isStreaming ? "Listening..." : "Ready to Start"}
+
+                    {/* State label */}
+                    <div className="text-center">
+                      <div className={`text-xs font-mono uppercase tracking-widest transition-colors ${statusColor}`}>
+                        {isStreaming && audioCapture.isListening
+                          ? "Listening to you..."
+                          : isAiResponding
+                          ? "AI is responding..."
+                          : isInterviewActive
+                          ? "Ready for your response"
+                          : "Ready to start"}
+                      </div>
                     </div>
                   </div>
 
-                  {audioCapture.error && (
-                    <div className="absolute top-5 right-5 flex items-center gap-3 bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 font-mono text-sm text-red-500">
-                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-5 h-5">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                      </svg>
-                      <p>{audioCapture.error}</p>
-                    </div>
-                  )}
-
+                  {/* Top-left listening badge */}
                   {isStreaming && audioCapture.isListening && (
-                    <div className="absolute top-5 left-5 flex items-center gap-3 bg-black/70 backdrop-blur-lg border border-red-500/30 rounded-lg px-4 py-2 font-mono text-xs text-red-500">
-                      <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                      🎤 LISTENING
+                    <div className="absolute top-4 left-4 flex items-center gap-2 bg-zinc-900/80 backdrop-blur border border-zinc-700/50 rounded-lg px-3 py-1.5">
+                      <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">Recording</span>
                     </div>
                   )}
-                  {isAiResponding && (
-                    <div className="absolute top-5 left-5 flex items-center gap-3 bg-black/70 backdrop-blur-lg border border-primary/30 rounded-lg px-4 py-2 font-mono text-xs text-primary">
-                      <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
-                      🤖 AI SPEAKING
-                    </div>
-                  )}
-                  <div className="absolute top-5 right-5 flex items-center gap-3 bg-black/70 backdrop-blur-lg border border-primary/30 rounded-lg px-4 py-2 font-mono text-xs text-primary">
-                    <div className={`w-2 h-2 rounded-full ${isInterviewActive ? "bg-primary animate-pulse" : "bg-zinc-500"}`}></div>
-                    <span>
-                      {isInterviewActive
-                        ? (isAiResponding
-                            ? "AI RESPONDING"
-                            : audioCapture.isListening
-                              ? "LISTENING"
-                              : "READY TO LISTEN")
-                        : "STANDBY"}
-                    </span>
-                  </div>
 
-                  {/* Job overlay */}
-                  {job && (
-                    <div className="absolute bottom-5 left-5 bg-black/70 backdrop-blur-lg border border-zinc-700/50 rounded-xl px-4 py-3">
-                      <div className="font-bold text-sm">{job.title}</div>
-                      <div className="font-mono text-xs text-zinc-500 mt-1">{job.company}</div>
+                  {/* Top-left AI speaking badge */}
+                  {isAiResponding && (
+                    <div className="absolute top-4 left-4 flex items-center gap-2 bg-zinc-900/80 backdrop-blur border border-primary/30 rounded-lg px-3 py-1.5">
+                      <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-primary">AI Speaking</span>
+                    </div>
+                  )}
+
+                  {/* Audio error */}
+                  {audioCapture.error && (
+                    <div className="absolute top-4 right-4 flex items-center gap-2 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2 text-xs text-red-400 font-mono max-w-xs">
+                      <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                      </svg>
+                      {audioCapture.error}
                     </div>
                   )}
                 </div>
 
                 {/* Controls bar */}
-                <div className="bg-zinc-900/50 border-t border-zinc-800/50 p-6 flex items-center gap-4">
+                <div className="shrink-0 border-t border-zinc-800/50 bg-zinc-900/40 backdrop-blur px-6 py-5">
                   {isInterviewActive ? (
-                    <>
-                      <div className="text-center mb-4 p-4 bg-black/30 border border-zinc-700/50 rounded-lg w-full">
-                        <div className="text-sm font-semibold mb-2">
-                          🎭 Conversational Interview Active
-                        </div>
-                        <div className="text-xs text-zinc-500 leading-relaxed">
-                          Speak naturally when you hear the AI. The conversation flows automatically.
-                        </div>
+                    <div className="flex flex-col sm:flex-row items-center gap-3">
+                      <div className="flex items-center gap-3 flex-1 bg-zinc-800/30 border border-zinc-700/40 rounded-xl px-4 py-3 w-full sm:w-auto">
+                        <div className="w-2 h-2 rounded-full bg-primary animate-pulse shrink-0" />
+                        <p className="text-xs text-zinc-300 font-medium leading-snug">
+                          Conversational interview active — speak naturally after the AI finishes.
+                        </p>
                       </div>
-
                       <button
-                        className="w-full py-3 border border-red-500/30 bg-red-500/8 text-red-500 rounded-xl hover:bg-red-500/18 transition-all text-sm font-semibold"
                         onClick={stopAudioInterview}
+                        className="flex items-center gap-2 px-5 py-3 rounded-xl border border-red-500/30 bg-red-500/8 text-red-400 text-sm font-semibold hover:bg-red-500/15 active:scale-95 transition-all shrink-0"
                       >
-                        🛑 End Interview
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                          <rect x="6" y="6" width="12" height="12" rx="1"/>
+                        </svg>
+                        End Interview
                       </button>
-                    </>
+                    </div>
                   ) : (
-                    <div className="w-full flex items-center justify-center gap-4">
+                    <div className="flex flex-col items-center gap-2">
                       <button
-                        className="h-14 px-8 bg-gradient-to-r from-primary to-primary/80 text-black font-black rounded-xl hover:shadow-lg hover:shadow-primary/30 transition-all flex items-center gap-3 text-base tracking-tight"
                         onClick={startAudioInterview}
                         disabled={!!audioCapture.error}
+                        className="flex items-center gap-3 px-8 py-3.5 bg-primary text-black font-bold rounded-xl hover:opacity-90 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed text-sm shadow-lg shadow-primary/20"
                       >
-                        <span>🎤</span> Start Audio Interview
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                          <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
+                        </svg>
+                        Start Audio Interview
                       </button>
-                      {audioCapture.error && (
-                        <div className="font-mono text-xs text-red-500">
-                          Audio: {audioCapture.error}
-                        </div>
-                      )}
                       {connectionAttempted && !isConnected && (
-                        <div className="font-mono text-xs text-orange-500 mt-2">
-                          ⚠ HTTP audio processing unavailable. Backend needs audio endpoint support.
-                        </div>
+                        <p className="text-[11px] font-mono text-orange-400">
+                          ⚠ Backend audio endpoint unavailable
+                        </p>
                       )}
                     </div>
                   )}
                 </div>
               </>
             ) : (
-              <div className="flex flex-col items-center justify-center h-full gap-4 text-zinc-500">
-                <div className="w-20 h-20 rounded-3xl bg-zinc-800/50 border border-zinc-700/50 flex items-center justify-center text-4xl mb-2">
-                  🎤
+              /* Empty state */
+              <div className="flex flex-col items-center justify-center h-full gap-5 text-zinc-500 px-8">
+                <div className="w-20 h-20 rounded-2xl bg-zinc-800/40 border border-zinc-700/40 flex items-center justify-center">
+                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-zinc-500">
+                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                    <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
+                    <line x1="12" y1="19" x2="12" y2="23"/>
+                    <line x1="8" y1="23" x2="16" y2="23"/>
+                  </svg>
                 </div>
-                <h3 className="text-xl font-bold text-white">No Session Selected</h3>
-                <p className="font-mono text-xs tracking-wide">Pick a session from the left or create one</p>
+                <div className="text-center">
+                  <h3 className="text-lg font-bold text-zinc-200 mb-1">No Session Selected</h3>
+                  <p className="text-sm text-zinc-500">Choose a session from the sidebar or start a new one</p>
+                </div>
                 <button
-                  className="px-6 py-3 bg-primary text-black font-bold rounded-xl hover:opacity-90 transition-all"
                   onClick={() => setShowCreateModal(true)}
+                  className="px-5 py-2.5 bg-primary text-black text-sm font-bold rounded-xl hover:opacity-90 active:scale-95 transition-all"
                 >
                   New Interview
                 </button>
@@ -523,78 +657,163 @@ export default function InterviewsPage() {
             )}
           </main>
 
-          {/* ── Chat Transcript ── */}
-          <aside className="row-start-2 border-l border-zinc-800/50 flex flex-col bg-zinc-900/30 hidden xl:flex">
-            <div className="p-5 pb-4 border-b border-zinc-800/50 flex items-center justify-between">
-              <div>
-                <div className="font-bold text-sm">Transcript</div>
-                <div className="font-mono text-[10px] text-zinc-500 uppercase tracking-wider mt-1">REAL-TIME LOG</div>
+          {/* ── Transcript Panel ─────────────────────────────────────────── */}
+          <aside className="w-[300px] shrink-0 border-l border-zinc-800/60 flex flex-col bg-zinc-900/20 hidden xl:flex">
+            {/* Panel header */}
+            <div className="flex items-center justify-between px-4 py-3.5 border-b border-zinc-800/50 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-6 h-6 rounded-md bg-zinc-800/60 border border-zinc-700/40 flex items-center justify-center">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-400">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                  </svg>
+                </div>
+                <div>
+                  <span className="text-[13px] font-semibold text-zinc-200 leading-none">Transcript</span>
+                  <div className="text-[9px] font-mono uppercase tracking-widest text-zinc-600 mt-0.5">
+                    {visibleMessages.length} msg{visibleMessages.length !== 1 ? "s" : ""}
+                  </div>
+                </div>
               </div>
               <button
-                className="font-mono text-[9px] px-3 py-1.5 uppercase tracking-wider bg-zinc-800/50 border border-zinc-700 rounded text-zinc-400 hover:text-white hover:border-zinc-600 transition-all"
                 onClick={() => setHideAIMessages(!hideAIMessages)}
+                className={`text-[9px] font-mono uppercase tracking-widest px-2 py-1 rounded-md border transition-all ${
+                  hideAIMessages
+                    ? "bg-primary/10 border-primary/25 text-primary"
+                    : "bg-zinc-800/50 border-zinc-700/50 text-zinc-500 hover:text-zinc-300 hover:border-zinc-600"
+                }`}
               >
                 {hideAIMessages ? "Show AI" : "Hide AI"}
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4">
               {visibleMessages.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full gap-3 text-zinc-500">
-                  <div className="w-11 h-11 rounded-xl bg-zinc-800/50 border border-zinc-700/50 flex items-center justify-center text-lg">
-                    💬
+                <div className="flex flex-col items-center justify-center h-full gap-3 text-zinc-600">
+                  <div className="w-12 h-12 rounded-xl bg-zinc-800/30 border border-zinc-700/30 flex items-center justify-center">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="opacity-40">
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    </svg>
                   </div>
-                  <span className="font-mono text-xs tracking-wide">No messages yet</span>
+                  <div className="text-center">
+                    <p className="text-xs font-medium text-zinc-600">No messages yet</p>
+                    <p className="text-[10px] text-zinc-700 mt-0.5">Start an interview to see the transcript</p>
+                  </div>
                 </div>
               ) : (
-                visibleMessages.map((msg) => (
-                  <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                    <div className={`max-w-[85%] ${msg.role === "user" ? "order-2" : "order-1"}`}>
-                      <div className={`px-4 py-3 rounded-xl text-sm leading-relaxed ${
-                        msg.role === "user"
-                          ? "bg-primary text-black rounded-br-md"
-                          : "bg-zinc-800/50 border border-zinc-700/50 rounded-bl-md"
-                      }`}>
-                        {msg.content}
+                visibleMessages.map((msg, idx) => {
+                  const isUser = msg.role === "user";
+                  const prevMsg = visibleMessages[idx - 1];
+                  const isGrouped = prevMsg?.role === msg.role;
+
+                  return (
+                    <div key={msg.id} className={`flex gap-2 ${isUser ? "flex-row-reverse" : "flex-row"} ${isGrouped ? "-mt-2" : ""}`}>
+                      {/* Avatar — only show for first in a group */}
+                      <div className="shrink-0 w-6 flex flex-col items-center pt-0.5">
+                        {!isGrouped ? (
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-black border ${
+                            isUser
+                              ? "bg-primary/20 border-primary/30 text-primary"
+                              : "bg-zinc-700/60 border-zinc-600/50 text-zinc-400"
+                          }`}>
+                            {isUser ? "U" : "AI"}
+                          </div>
+                        ) : (
+                          <div className="w-6" />
+                        )}
                       </div>
-                      <div className={`font-mono text-[9px] mt-1 px-1 ${
-                        msg.role === "user" ? "text-right text-zinc-500" : "text-zinc-500"
-                      }`}>
-                        {formatTime(msg.created_at)}
+
+                      {/* Bubble + meta */}
+                      <div className={`flex flex-col gap-1 max-w-[82%] ${isUser ? "items-end" : "items-start"}`}>
+                        {/* Sender label — first in group only */}
+                        {!isGrouped && (
+                          <span className={`text-[9px] font-mono uppercase tracking-widest px-0.5 ${isUser ? "text-zinc-500" : "text-zinc-600"}`}>
+                            {isUser ? "You" : "Interviewer"}
+                          </span>
+                        )}
+
+                        <div className={`px-3 py-2.5 text-[12.5px] leading-relaxed rounded-2xl ${
+                          isUser
+                            ? "bg-primary text-black font-medium rounded-tr-sm"
+                            : "bg-zinc-800/70 border border-zinc-700/40 text-zinc-200 rounded-tl-sm"
+                        }`}>
+                          {msg.content?.replace(/\[INTERVIEW_COMPLETE\]/g, "").trim()}
+                        </div>
+
+                        {/* Time — only on last in group or standalone */}
+                        {(idx === visibleMessages.length - 1 || visibleMessages[idx + 1]?.role !== msg.role) && (
+                          <span className="text-[9px] font-mono text-zinc-700 px-0.5">
+                            {formatTime(msg.created_at)}
+                          </span>
+                        )}
                       </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
               <div ref={messagesEndRef} />
             </div>
+
+            {/* Transcript footer: jump to bottom shortcut */}
+            {visibleMessages.length > 3 && (
+              <div className="shrink-0 px-4 py-2.5 border-t border-zinc-800/40 flex items-center justify-between">
+                <span className="text-[9px] font-mono text-zinc-700 uppercase tracking-wider">
+                  {visibleMessages.filter(m => m.role === "user").length}u · {visibleMessages.filter(m => m.role !== "user").length}ai
+                </span>
+                <button
+                  onClick={() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })}
+                  className="text-[9px] font-mono text-zinc-600 hover:text-zinc-400 uppercase tracking-wider flex items-center gap-1 transition-colors"
+                >
+                  Latest
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M12 5v14M5 12l7 7 7-7"/>
+                  </svg>
+                </button>
+              </div>
+            )}
           </aside>
 
         </div>
+      </div>
 
-        {/* ── Create Modal ── */}
-        {showCreateModal && (
-          <div
-            className="fixed inset-0 bg-black/85 backdrop-blur-xl flex items-center justify-center p-5 z-50"
-            onClick={(e) => { if (e.target === e.currentTarget) setShowCreateModal(false); }}
-          >
-            <div className="bg-zinc-900 border border-zinc-700/50 rounded-3xl w-full max-w-md overflow-hidden">
-              <div className="p-8 pb-6 border-b border-zinc-800/50">
-                <h3 className="text-2xl font-black tracking-tight mb-2">New Interview Session</h3>
-                <p className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest">SELECT A JOB POSITION TO PRACTICE</p>
+      {/* ── Create Modal ──────────────────────────────────────────────────── */}
+      {showCreateModal && (
+        <div
+          className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-5 z-50"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowCreateModal(false); }}
+        >
+          <div className="bg-zinc-900 border border-zinc-700/60 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl shadow-black/60">
+            {/* Modal header */}
+            <div className="flex items-start justify-between p-7 pb-5 border-b border-zinc-800/60">
+              <div>
+                <h3 className="text-xl font-black tracking-tight mb-1">New Interview Session</h3>
+                <p className="text-xs font-mono text-zinc-500 uppercase tracking-widest">Select a job to practice for</p>
               </div>
-              <div className="p-8 space-y-6">
-                <div>
-                  <label className="block font-mono text-[10px] uppercase tracking-widest text-zinc-500 mb-3">Job Position</label>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-all text-lg leading-none mt-0.5"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Modal body */}
+            <div className="p-7 space-y-5">
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2.5">
+                  Job Position
+                </label>
+                <div className="relative">
                   <select
-                    className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-xl px-4 py-3 text-white outline-none focus:border-primary/50 transition-colors appearance-none"
-                    style={{
-                      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239CA3AF' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")`,
-                      backgroundRepeat: 'no-repeat',
-                      backgroundPosition: 'right 16px center',
-                      paddingRight: '44px'
-                    }}
                     value={selectedJobId}
                     onChange={(e) => setSelectedJobId(e.target.value)}
+                    className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all appearance-none cursor-pointer"
+                    style={{
+                      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2371717a' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")`,
+                      backgroundRepeat: "no-repeat",
+                      backgroundPosition: "right 14px center",
+                      paddingRight: "40px",
+                    }}
                   >
                     <option value="">Choose a role…</option>
                     {jobs.map((job) => (
@@ -602,38 +821,53 @@ export default function InterviewsPage() {
                     ))}
                   </select>
                 </div>
-                <div className="flex gap-3">
-                  <button
-                    className="flex-1 px-6 py-3 border border-zinc-700/50 bg-transparent text-white font-semibold rounded-xl hover:border-zinc-600 hover:bg-zinc-800/50 transition-all"
-                    onClick={() => setShowCreateModal(false)}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    className="flex-1 px-6 py-3 bg-primary text-black font-bold rounded-xl hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    onClick={handleCreateInterview}
-                    disabled={!selectedJobId || isCreating}
-                  >
-                    {isCreating ? "Creating…" : "Create Session"}
-                  </button>
-                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-1">
+                <button
+                  onClick={() => setShowCreateModal(false)}
+                  className="flex-1 px-4 py-2.5 rounded-xl border border-zinc-700/60 bg-transparent text-sm text-zinc-300 font-medium hover:bg-zinc-800/50 hover:border-zinc-600 active:scale-95 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateInterview}
+                  disabled={!selectedJobId || isCreating}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-primary text-black text-sm font-bold hover:opacity-90 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {isCreating ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31.4" strokeDashoffset="10" strokeLinecap="round"/>
+                      </svg>
+                      Creating…
+                    </span>
+                  ) : "Create Session"}
+                </button>
               </div>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* ── Toasts ── */}
-        {error && (
-          <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 px-5 py-3 bg-red-500/12 border border-red-500/30 text-red-500 rounded-xl font-mono text-sm tracking-wide animate-in slide-in-from-bottom-2 duration-300 z-50">
-            ⚠ {error}
-          </div>
-        )}
-        {success && (
-          <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 px-5 py-3 bg-primary/12 border border-primary/30 text-primary rounded-xl font-mono text-sm tracking-wide animate-in slide-in-from-bottom-2 duration-300 z-50">
-            ✓ {success}
-          </div>
-        )}
-      </div>
+      {/* ── Toasts ────────────────────────────────────────────────────────── */}
+      {error && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2.5 px-4 py-3 bg-zinc-900 border border-red-500/30 text-red-400 rounded-xl font-mono text-xs tracking-wide shadow-xl z-[60] animate-in slide-in-from-bottom-3 duration-200">
+          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          {error}
+        </div>
+      )}
+      {success && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2.5 px-4 py-3 bg-zinc-900 border border-primary/30 text-primary rounded-xl font-mono text-xs tracking-wide shadow-xl z-[60] animate-in slide-in-from-bottom-3 duration-200">
+          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          {success}
+        </div>
+      )}
     </div>
   );
 }

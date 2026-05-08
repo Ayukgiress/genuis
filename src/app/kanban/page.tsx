@@ -301,18 +301,6 @@ export default function KanbanPage() {
     <Button variant="primary" size="sm" className="text-xs font-black uppercase tracking-widest rounded-lg">Board</Button>
     <Button variant="ghost" size="sm" className="text-xs font-black uppercase tracking-widest">List</Button>
   </div>
-  <Button
-    variant="primary" 
-    size="lg"
-    onClick={() => openCreateCardModal()}
-    className="uppercase tracking-widest text-xs gap-2"
-  >
-    <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="3">
-      <line x1="12" y1="5" x2="12" y2="19" />
-      <line x1="5" y1="12" x2="19" y2="12" />
-    </svg>
-    New Application
-  </Button>
 </div>
       </div>
 

@@ -67,6 +67,29 @@ export const useInterviewWebSocket = (interviewId: number | null) => {
           console.log('🎤 Ready for user response');
         }, 2000); // Estimate based on audio length, or we could track actual playback end
       } else {
+        // Speech-to-speech fallback using browser TTS (because backend audio is missing)
+        const textToSpeak = response.content;
+        if (typeof window !== "undefined" && textToSpeak && "speechSynthesis" in window) {
+          try {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(textToSpeak);
+            utterance.rate = 1;
+            utterance.pitch = 1;
+            utterance.onend = () => {
+              setIsAiResponding(false);
+              console.log('🎤 Ready for user response');
+            };
+            utterance.onerror = () => {
+              setIsAiResponding(false);
+              console.log('🎤 Ready for user response (TTS error)');
+            };
+            window.speechSynthesis.speak(utterance);
+            return;
+          } catch {
+            // ignore and fall through
+          }
+        }
+
         setIsAiResponding(false);
       }
 
