@@ -158,22 +158,15 @@ export const useAudioCapture = (onChunkReady?: (base64: string) => void) => {
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
         console.log('📊 Audio blob size:', blob.size, 'bytes');
 
-        // Don't send header-only blobs. In practice, some browsers produce smaller segments;
-        // 1000 bytes is a safer floor than 5000 for speech in short answers.
-        const MIN_BYTES = 1000;
-
-        if (blob.size < MIN_BYTES) {
-          console.log('Audio too small, skipping:', blob.size, 'bytes');
-          chunksRef.current = [];
-          // Restart for next segment (if still streaming)
-          setTimeout(() => {
-            if (mediaRecorderRef.current && isStreaming) mediaRecorderRef.current.start();
-          }, 100);
-          return;
-        }
-
+        // Some browsers produce very small WebM chunks depending on MediaRecorder/VAD timing.
+        // Instead of dropping them, we still send them so the backend can decode or
+        // respond with a proper error/transcript.
         const blobType = blob.type || 'audio/webm';
         const normalizedBlob = blob.type === blobType ? blob : new Blob([blob], { type: blobType });
+
+        if (blob.size < 200) {
+          console.log('⚠ Very small audio chunk, still sending:', blob.size, 'bytes');
+        }
 
         const reader = new FileReader();
         reader.onloadend = () => {
