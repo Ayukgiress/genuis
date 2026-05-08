@@ -297,7 +297,7 @@ export default function InterviewsPage() {
                   key={i} 
                   className="w-1 bg-primary rounded-full animate-[bounce_1s_infinite]" 
                   style={{ 
-                    height: `${20 + Math.random() * 80}%`,
+                    height: `${20 + (i * 13) % 80}%`,
                     animationDelay: `${delay}s` 
                   }} 
                 />
@@ -383,7 +383,7 @@ export default function InterviewsPage() {
         <header className="flex items-center justify-between px-8 h-16 border-b border-zinc-800/60 bg-zinc-950/80 backdrop-blur-xl shrink-0">
           {/* Brand */}
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2">
               {/* Icon mark */}
               <div className="w-8 h-8 rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-primary">
@@ -392,7 +392,7 @@ export default function InterviewsPage() {
                 </svg>
               </div>
               <span className="text-[17px] font-black tracking-tight">
-                inter<span className="text-primary">view</span>.ai
+                Interview <span className="text-primary">Studio</span>
               </span>
             </div>
             {/* Badges */}
@@ -711,7 +711,7 @@ export default function InterviewsPage() {
                 <div className="text-center max-w-md">
                   <h3 className="text-xl font-bold text-zinc-200 mb-2">Ready to Practice?</h3>
                   <p className="text-sm text-zinc-500 mb-4">
-                    Select an interview session from the sidebar or create a new one to start practicing behavioral questions for your job applications.
+                    Pick a session on the left, or create a new one.
                   </p>
                   <div className="flex flex-col sm:flex-row gap-3 justify-center">
                     <button
