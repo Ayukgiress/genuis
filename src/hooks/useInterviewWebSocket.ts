@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { interviewApi } from '@/lib/api';
 import { useAudioCapture } from './useAudioCapture';
 import { useAudioPlayback } from './useAudioPlayback';
@@ -29,6 +29,13 @@ export const useInterviewWebSocket = (interviewId: number | null) => {
 
       // Send audio via HTTP POST
       const response: InterviewMessage = await interviewApi.sendAudioMessage(interviewId!, base64Audio);
+
+      // ✅ Ignore no_speech sentinel
+      if ((response as any).status === 'no_speech') {
+        console.log('No speech detected, ignoring');
+        setIsAiResponding(false);
+        return;
+      }
 
       console.log('✅ AI response received:', response);
 

@@ -42,32 +42,34 @@ export const useAudioCapture = (onChunkReady?: (base64: string) => void) => {
         if (!analyserRef.current) return;
         analyserRef.current.getByteFrequencyData(dataArray);
 
-        // Calculate average volume level
         let sum = 0;
-        for (let i = 0; i < bufferLength; i++) {
-          sum += dataArray[i];
-        }
+        for (let i = 0; i < bufferLength; i++) sum += dataArray[i];
         const average = sum / bufferLength;
 
-        // Voice activity detection thresholds
-        const SPEECH_THRESHOLD = 15; // Minimum volume to consider as speech
-        const SILENCE_DURATION = 2000; // 2 seconds of silence to stop recording
+        const SPEECH_THRESHOLD = 15;
+        const SILENCE_DURATION = 1500;
 
         if (average > SPEECH_THRESHOLD) {
           lastSpeechTime = Date.now();
+
           if (!isSpeaking) {
-            console.log('🎙️ Speech detected, listening...');
             isSpeaking = true;
             setIsListening(true);
+            console.log('🎙️ Speech detected, listening...');
+
+            // ✅ Start a FRESH recorder only when speech begins
+            if (mediaRecorderRef.current?.state === 'inactive') {
+              chunksRef.current = [];
+              mediaRecorderRef.current.start();
+            }
           }
         } else if (isSpeaking && Date.now() - lastSpeechTime > SILENCE_DURATION) {
-          console.log('🤫 Silence detected, processing segment');
           isSpeaking = false;
           setIsListening(false);
+          console.log('🤫 Silence detected, processing segment');
 
-          // Stop current recording and process the chunk
-          if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-            mediaRecorderRef.current.stop();
+          if (mediaRecorderRef.current?.state === 'recording') {
+            mediaRecorderRef.current.stop(); // onstop fires → sends chunk
           }
         }
       }, 100);
@@ -156,32 +158,23 @@ export const useAudioCapture = (onChunkReady?: (base64: string) => void) => {
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
         chunksRef.current = [];
 
-        if (blob.size < 1000) {
-          console.log('⚠ Small audio chunk, potentially just noise:', blob.size, 'bytes');
-          // If we want to be strict, we could return here, but for now let's keep sending
+        // ✅ Stricter minimum — WebM header alone is ~4KB
+        if (blob.size < 4000) {
+          console.log('No speech detected, ignoring');
+          return;
         }
 
         const reader = new FileReader();
         reader.onloadend = () => {
           const base64 = (reader.result as string).split(',')[1];
           onChunkReady?.(base64);
-
-          // Restart recording for next speech segment after processing
-          // Use a ref-based check for isStreaming to avoid closure issues
-          if (mediaRecorderRef.current && mediaRecorderRef.current.stream.active) {
-            setTimeout(() => {
-              if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'inactive') {
-                mediaRecorderRef.current.start();
-              }
-            }, 300);
-          }
         };
         reader.readAsDataURL(blob);
       };
 
-      // Start continuous recording
-      recorder.start();
-      console.log('🎬 Continuous recording started with VAD');
+      // Just initialize, don't start yet. VAD will control it.
+      mediaRecorderRef.current = recorder;
+      console.log('🎬 VAD-controlled recording ready');
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to access microphone';

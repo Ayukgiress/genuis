@@ -34,6 +34,7 @@ export default function InterviewsPage() {
   const [selectedJobId, setSelectedJobId] = useState<string>("");
   const [hideAIMessages, setHideAIMessages] = useState(false);
   const [isInterviewActive, setIsInterviewActive] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const audioPlayback = useAudioPlayback();
 
@@ -104,6 +105,30 @@ export default function InterviewsPage() {
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [selectedInterview?.messages]);
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl/Cmd + N to create new session
+      if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+        e.preventDefault();
+        setShowCreateModal(true);
+      }
+      // Escape to close modals
+      if (e.key === 'Escape') {
+        setShowCreateModal(false);
+        setSidebarOpen(false);
+      }
+      // Ctrl/Cmd + B to toggle sidebar
+      if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+        e.preventDefault();
+        setSidebarOpen(prev => !prev);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const handleCreateInterview = async () => {
     if (!selectedJobId) return;
     try {
@@ -153,6 +178,19 @@ export default function InterviewsPage() {
     } catch { showToast("Failed to delete", "error"); }
   };
 
+  const handleCompleteInterview = async (interviewId: number) => {
+    try {
+      await interviewApi.complete(interviewId);
+      setInterviews((prev) => prev.map((int) =>
+        int.id === interviewId ? { ...int, status: 'completed' } : int
+      ));
+      if (selectedInterview?.id === interviewId) {
+        setSelectedInterview({ ...selectedInterview, status: 'completed' });
+      }
+      showToast("Interview completed!", "success");
+    } catch { showToast("Failed to complete interview", "error"); }
+  };
+
   const selectInterview = (interview: Interview) => {
     if (selectedInterview?.id === interview.id) return;
     stopAudioInterview();
@@ -160,6 +198,7 @@ export default function InterviewsPage() {
     setIsInterviewActive(false);
     setSelectedInterview(interview);
     if (!interview.messages) fetchInterviewMessages(interview.id);
+    setSidebarOpen(false); // Close sidebar on mobile
   };
 
   const startAudioInterview = async () => {
@@ -317,6 +356,16 @@ export default function InterviewsPage() {
 
           {/* Right actions */}
           <div className="flex items-center gap-3">
+            <button
+              className="lg:hidden w-8 h-8 rounded-lg bg-zinc-800/50 border border-zinc-700/50 flex items-center justify-center text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-all"
+              onClick={() => setSidebarOpen(true)}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="3" y1="12" x2="21" y2="12"/>
+                <line x1="3" y1="6" x2="21" y2="6"/>
+                <line x1="3" y1="18" x2="21" y2="18"/>
+              </svg>
+            </button>
             <span className="text-xs font-mono text-zinc-500 hidden sm:block">
               {interviews.length} session{interviews.length !== 1 ? "s" : ""}
             </span>
@@ -332,11 +381,21 @@ export default function InterviewsPage() {
           </div>
         </header>
 
-        {/* ── Body ─────────────────────────────────────────────────────────── */}
+          {/* ── Body ─────────────────────────────────────────────────────────── */}
         <div className="flex flex-1 overflow-hidden">
 
+          {/* Mobile sidebar overlay */}
+          {sidebarOpen && (
+            <div
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
+              onClick={() => setSidebarOpen(false)}
+            />
+          )}
+
           {/* ── Sessions Sidebar ─────────────────────────────────────────── */}
-          <aside className="w-[260px] xl:w-[280px] shrink-0 border-r border-zinc-800/60 flex flex-col bg-zinc-900/20 hidden lg:flex">
+          <aside className={`w-[260px] xl:w-[280px] shrink-0 border-r border-zinc-800/60 flex flex-col bg-zinc-900/20 z-50 transition-transform duration-300 lg:translate-x-0 ${
+            sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          } fixed lg:relative inset-y-0 left-0 lg:flex`}>
             {/* Sidebar header */}
             <div className="px-4 py-3.5 border-b border-zinc-800/50 flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -416,13 +475,24 @@ export default function InterviewsPage() {
                             <div className="text-[11px] text-zinc-500 truncate mt-0.5">{j?.company || "—"}</div>
                           </div>
 
-                          <button
-                            className="opacity-0 group-hover:opacity-100 w-5 h-5 mt-0.5 rounded flex items-center justify-center text-zinc-600 hover:text-red-400 hover:bg-red-500/10 transition-all text-sm leading-none shrink-0"
-                            onClick={(e) => { e.stopPropagation(); handleDeleteInterview(iv.id); }}
-                            title="Delete"
-                          >
-                            ×
-                          </button>
+                           <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 mt-0.5">
+                             {!isCompleted && (iv.messages?.length ?? 0) > 0 && (
+                               <button
+                                 className="w-4 h-4 rounded flex items-center justify-center text-zinc-600 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all text-xs leading-none shrink-0"
+                                 onClick={(e) => { e.stopPropagation(); handleCompleteInterview(iv.id); }}
+                                 title="Mark as completed"
+                               >
+                                 ✓
+                               </button>
+                             )}
+                             <button
+                               className="w-4 h-4 rounded flex items-center justify-center text-zinc-600 hover:text-red-400 hover:bg-red-500/10 transition-all text-xs leading-none shrink-0"
+                               onClick={(e) => { e.stopPropagation(); handleDeleteInterview(iv.id); }}
+                               title="Delete"
+                             >
+                               ×
+                             </button>
+                           </div>
                         </div>
 
                         {/* Last message preview */}
@@ -440,10 +510,18 @@ export default function InterviewsPage() {
                           <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-md ${
                             isCompleted
                               ? "bg-zinc-800/60 text-zinc-500 border border-zinc-700/40"
+                              : (iv.messages?.length ?? 0) > 0
+                              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
                               : "bg-primary/10 text-primary border border-primary/20"
                           }`}>
-                            <span className={`w-1 h-1 rounded-full inline-block ${isCompleted ? "bg-zinc-500" : "bg-primary animate-pulse"}`} />
-                            {iv.status}
+                            <span className={`w-1 h-1 rounded-full inline-block ${
+                              isCompleted
+                                ? "bg-zinc-500"
+                                : (iv.messages?.length ?? 0) > 0
+                                ? "bg-emerald-400 animate-pulse"
+                                : "bg-primary animate-pulse"
+                            }`} />
+                            {isCompleted ? "Completed" : (iv.messages?.length ?? 0) > 0 ? "In Progress" : "Ready"}
                           </span>
                           {msgCount > 0 && (
                             <span className="text-[9px] font-mono text-zinc-600 flex items-center gap-1">
@@ -466,182 +544,289 @@ export default function InterviewsPage() {
           {/* ── Main Stage ──────────────────────────────────────────────────── */}
           <main className="flex-1 flex flex-col overflow-hidden min-w-0">
             {selectedInterview ? (
-              <>
+              <div className="flex flex-col h-full">
                 {/* Interview job info bar */}
                 {job && (
                   <div className="flex items-center gap-3 px-6 py-3 border-b border-zinc-800/50 bg-zinc-900/30 shrink-0">
                     <div className="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700/50 flex items-center justify-center text-sm font-bold text-zinc-300 shrink-0">
                       {(job.company || "?")[0]}
                     </div>
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <div className="text-sm font-semibold truncate text-zinc-100">{job.title}</div>
                       <div className="text-xs text-zinc-500 truncate">{job.company}</div>
                     </div>
-                    <div className="ml-auto flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-3 shrink-0">
                       <div className={`flex items-center gap-1.5 text-xs font-mono ${statusColor}`}>
                         <div className={`w-2 h-2 rounded-full ${statusDot}`} />
                         {statusLabel}
                       </div>
+                      {/* Audio toggle */}
+                      <button
+                        onClick={isInterviewActive ? stopAudioInterview : startAudioInterview}
+                        disabled={!!audioCapture.error}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                          isInterviewActive
+                            ? "bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/15"
+                            : "bg-primary/10 border border-primary/30 text-primary hover:bg-primary/15"
+                        } disabled:opacity-40 disabled:cursor-not-allowed`}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                          <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
+                        </svg>
+                        {isInterviewActive ? "Stop" : "Start"}
+                      </button>
                     </div>
                   </div>
                 )}
 
-                {/* Audio stage */}
-                <div className="flex-1 flex items-center justify-center bg-gradient-to-b from-zinc-950 to-zinc-900/70 relative overflow-hidden">
-                  {/* Subtle grid */}
-                  <div
-                    className="absolute inset-0 opacity-[0.025]"
-                    style={{
-                      backgroundImage: "linear-gradient(to right, #fff 1px, transparent 1px), linear-gradient(to bottom, #fff 1px, transparent 1px)",
-                      backgroundSize: "40px 40px",
-                    }}
-                  />
-
-                  {/* Central orb */}
-                  <div className="flex flex-col items-center gap-8 relative">
-                    {/* Outer glow ring */}
-                    <div className={`absolute inset-0 -m-8 rounded-full transition-all duration-700 ${
-                      isInterviewActive ? "bg-primary/6 blur-2xl scale-110" : "bg-transparent"
-                    }`} />
-
-                    {/* Orb */}
-                    <div className={`relative w-36 h-36 rounded-full flex items-center justify-center transition-all duration-500 ${
-                      isInterviewActive
-                        ? "bg-primary/15 border-2 border-primary/40 shadow-lg shadow-primary/10"
-                        : "bg-zinc-800/40 border-2 border-zinc-700/50"
-                    }`}>
-                      {isStreaming && audioCapture.isListening ? (
-                        /* Waveform bars */
-                        <div className="flex items-center gap-1">
-                          {[5, 8, 5, 10, 6, 10, 5, 8, 5].map((h, i) => (
-                            <div
-                              key={i}
-                              className="w-1 rounded-full bg-primary animate-pulse"
-                              style={{ height: `${h * 2.5}px`, animationDelay: `${i * 0.07}s` }}
-                            />
-                          ))}
-                        </div>
-                      ) : isAiResponding ? (
-                        <div className="flex items-center gap-1.5">
-                          {[1, 2, 3].map((i) => (
-                            <div key={i} className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
-                          ))}
+                {/* Main content area with chat and audio */}
+                <div className="flex flex-1 overflow-hidden">
+                  {/* Chat interface */}
+                  <div className="flex-1 flex flex-col border-r border-zinc-800/50">
+                    {/* Messages area */}
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                      {visibleMessages.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-full text-center py-12">
+                          <div className="w-16 h-16 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center mb-4">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-primary">
+                              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                            </svg>
+                          </div>
+                          <h3 className="text-sm font-semibold text-zinc-300 mb-2">Start the conversation</h3>
+                          <p className="text-xs text-zinc-500 max-w-sm">
+                            Begin with audio interview or send a text message to start practicing for this role.
+                          </p>
                         </div>
                       ) : (
-                        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"
-                          className={`transition-colors ${isInterviewActive ? "text-primary" : "text-zinc-500"}`}>
-                          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                          <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
-                          <line x1="12" y1="19" x2="12" y2="23"/>
-                          <line x1="8" y1="23" x2="16" y2="23"/>
-                        </svg>
+                        visibleMessages.map((message, index) => (
+                          <div key={message.id || index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                            <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                              message.role === 'user'
+                                ? 'bg-primary text-black'
+                                : 'bg-zinc-800/60 border border-zinc-700/50 text-zinc-100'
+                            }`}>
+                              <div className="text-sm leading-relaxed whitespace-pre-wrap">
+                                {message.content}
+                              </div>
+                              <div className={`text-[10px] mt-2 font-mono ${
+                                message.role === 'user' ? 'text-black/60' : 'text-zinc-500'
+                              }`}>
+                                {formatTime(message.created_at)}
+                              </div>
+                            </div>
+                          </div>
+                        ))
                       )}
+                      <div ref={messagesEndRef} />
                     </div>
 
-                    {/* State label */}
-                    <div className="text-center">
-                      <div className={`text-xs font-mono uppercase tracking-widest transition-colors ${statusColor}`}>
-                        {isStreaming && audioCapture.isListening
-                          ? "Listening to you..."
-                          : isAiResponding
-                          ? "AI is responding..."
-                          : isInterviewActive
-                          ? "Ready for your response"
-                          : "Ready to start"}
+                    {/* Message input */}
+                    <div className="border-t border-zinc-800/50 p-4 bg-zinc-900/20">
+                      <div className="flex gap-3">
+                        <div className="flex-1 relative">
+                          <input
+                            type="text"
+                            value={newMessage}
+                            onChange={(e) => setNewMessage(e.target.value)}
+                            onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                            placeholder="Type your message..."
+                            className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
+                            disabled={isSending}
+                          />
+                          {isSending && (
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                              <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                            </div>
+                          )}
+                        </div>
+                        <button
+                          onClick={handleSendMessage}
+                          disabled={!newMessage.trim() || isSending}
+                          className="px-4 py-3 bg-primary text-black font-semibold rounded-xl hover:opacity-90 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <line x1="22" y1="2" x2="11" y2="13"/>
+                            <polygon points="22,2 15,22 11,13 2,9"/>
+                          </svg>
+                        </button>
                       </div>
                     </div>
                   </div>
 
-                  {/* Top-left listening badge */}
-                  {isStreaming && audioCapture.isListening && (
-                    <div className="absolute top-4 left-4 flex items-center gap-2 bg-zinc-900/80 backdrop-blur border border-zinc-700/50 rounded-lg px-3 py-1.5">
-                      <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">Recording</span>
-                    </div>
-                  )}
-
-                  {/* Top-left AI speaking badge */}
-                  {isAiResponding && (
-                    <div className="absolute top-4 left-4 flex items-center gap-2 bg-zinc-900/80 backdrop-blur border border-primary/30 rounded-lg px-3 py-1.5">
-                      <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-primary">AI Speaking</span>
-                    </div>
-                  )}
-
-                  {/* Audio error */}
-                  {audioCapture.error && (
-                    <div className="absolute top-4 right-4 flex items-center gap-2 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2 text-xs text-red-400 font-mono max-w-xs">
-                      <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                      </svg>
-                      {audioCapture.error}
-                    </div>
-                  )}
-                </div>
-
-                {/* Controls bar */}
-                <div className="shrink-0 border-t border-zinc-800/50 bg-zinc-900/40 backdrop-blur px-6 py-5">
-                  {isInterviewActive ? (
-                    <div className="flex flex-col sm:flex-row items-center gap-3">
-                      <div className="flex items-center gap-3 flex-1 bg-zinc-800/30 border border-zinc-700/40 rounded-xl px-4 py-3 w-full sm:w-auto">
-                        <div className="w-2 h-2 rounded-full bg-primary animate-pulse shrink-0" />
-                        <p className="text-xs text-zinc-300 font-medium leading-snug">
-                          Conversational interview active — speak naturally after the AI finishes.
-                        </p>
+                  {/* Audio control panel */}
+                  <div className="w-80 shrink-0 bg-zinc-900/30 border-l border-zinc-800/50 flex flex-col">
+                    {/* Audio status header */}
+                    <div className="p-4 border-b border-zinc-800/50">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-sm font-semibold text-zinc-200">Audio Interview</h3>
+                        {isInterviewActive && (
+                          <span className="px-2 py-1 bg-primary/10 border border-primary/20 text-primary text-[10px] font-bold uppercase tracking-wider rounded-md">
+                            Active
+                          </span>
+                        )}
                       </div>
-                      <button
-                        onClick={stopAudioInterview}
-                        className="flex items-center gap-2 px-5 py-3 rounded-xl border border-red-500/30 bg-red-500/8 text-red-400 text-sm font-semibold hover:bg-red-500/15 active:scale-95 transition-all shrink-0"
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                          <rect x="6" y="6" width="12" height="12" rx="1"/>
-                        </svg>
-                        End Interview
-                      </button>
+
+                      {/* Status indicator */}
+                      <div className="flex items-center gap-3 p-3 bg-zinc-800/30 border border-zinc-700/40 rounded-xl">
+                        <div className={`w-3 h-3 rounded-full ${statusDot}`} />
+                        <div>
+                          <div className={`text-sm font-medium ${statusColor}`}>{statusLabel}</div>
+                          <div className="text-xs text-zinc-500">
+                            {isStreaming && audioCapture.isListening
+                              ? "Speak naturally"
+                              : isAiResponding
+                              ? "AI is speaking"
+                              : isInterviewActive
+                              ? "Waiting for AI"
+                              : "Ready to begin"}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  ) : (
-                    <div className="flex flex-col items-center gap-2">
-                      <button
-                        onClick={startAudioInterview}
-                        disabled={!!audioCapture.error}
-                        className="flex items-center gap-3 px-8 py-3.5 bg-primary text-black font-bold rounded-xl hover:opacity-90 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed text-sm shadow-lg shadow-primary/20"
-                      >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                          <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
-                        </svg>
-                        Start Audio Interview
-                      </button>
-                      {connectionAttempted && !isConnected && (
-                        <p className="text-[11px] font-mono text-orange-400">
-                          ⚠ Backend audio endpoint unavailable
-                        </p>
-                      )}
+
+                    {/* Audio visualization */}
+                    <div className="flex-1 flex items-center justify-center p-6">
+                      <div className="flex flex-col items-center gap-6">
+                        {/* Audio orb */}
+                        <div className={`relative w-24 h-24 rounded-full flex items-center justify-center transition-all duration-500 ${
+                          isInterviewActive
+                            ? "bg-primary/15 border-2 border-primary/40 shadow-lg shadow-primary/10"
+                            : "bg-zinc-800/40 border-2 border-zinc-700/50"
+                        }`}>
+                          {isStreaming && audioCapture.isListening ? (
+                            /* Waveform bars */
+                            <div className="flex items-center gap-0.5">
+                              {[3, 5, 3, 7, 4, 7, 3, 5, 3].map((h, i) => (
+                                <div
+                                  key={i}
+                                  className="w-0.5 rounded-full bg-primary animate-pulse"
+                                  style={{ height: `${h * 2}px`, animationDelay: `${i * 0.07}s` }}
+                                />
+                              ))}
+                            </div>
+                          ) : isAiResponding ? (
+                            <div className="flex items-center gap-1">
+                              {[1, 2, 3].map((i) => (
+                                <div key={i} className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+                              ))}
+                            </div>
+                          ) : (
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"
+                              className={`transition-colors ${isInterviewActive ? "text-primary" : "text-zinc-500"}`}>
+                              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                              <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
+                              <line x1="12" y1="19" x2="12" y2="23"/>
+                              <line x1="8" y1="23" x2="16" y2="23"/>
+                            </svg>
+                          )}
+                        </div>
+
+                        {/* Audio controls */}
+                        <div className="flex flex-col items-center gap-3 w-full max-w-xs">
+                          {isInterviewActive ? (
+                            <button
+                              onClick={stopAudioInterview}
+                              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-red-500/30 bg-red-500/8 text-red-400 text-sm font-semibold hover:bg-red-500/15 active:scale-95 transition-all"
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                <rect x="6" y="6" width="12" height="12" rx="1"/>
+                              </svg>
+                              End Audio Interview
+                            </button>
+                          ) : (
+                            <button
+                              onClick={startAudioInterview}
+                              disabled={!!audioCapture.error}
+                              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary text-black font-bold rounded-xl hover:opacity-90 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed text-sm shadow-lg shadow-primary/20"
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                                <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
+                              </svg>
+                              Start Audio Interview
+                            </button>
+                          )}
+
+                          {/* Connection status */}
+                          {connectionAttempted && !isConnected && (
+                            <div className="flex items-center gap-2 text-xs text-orange-400 bg-orange-500/10 border border-orange-500/20 rounded-lg px-3 py-2 w-full">
+                              <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                              </svg>
+                              Audio endpoint unavailable
+                            </div>
+                          )}
+
+                          {/* Audio error */}
+                          {audioCapture.error && (
+                            <div className="flex items-center gap-2 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 w-full">
+                              <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                              </svg>
+                              {audioCapture.error}
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  )}
+                  </div>
                 </div>
-              </>
+              </div>
             ) : (
               /* Empty state */
-              <div className="flex flex-col items-center justify-center h-full gap-5 text-zinc-500 px-8">
-                <div className="w-20 h-20 rounded-2xl bg-zinc-800/40 border border-zinc-700/40 flex items-center justify-center">
-                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-zinc-500">
+              <div className="flex flex-col items-center justify-center h-full gap-6 text-zinc-500 px-8">
+                <div className="w-24 h-24 rounded-2xl bg-zinc-800/40 border border-zinc-700/40 flex items-center justify-center">
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-zinc-500">
                     <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
                     <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
                     <line x1="12" y1="19" x2="12" y2="23"/>
                     <line x1="8" y1="23" x2="16" y2="23"/>
                   </svg>
                 </div>
-                <div className="text-center">
-                  <h3 className="text-lg font-bold text-zinc-200 mb-1">No Session Selected</h3>
-                  <p className="text-sm text-zinc-500">Choose a session from the sidebar or start a new one</p>
+                <div className="text-center max-w-md">
+                  <h3 className="text-xl font-bold text-zinc-200 mb-2">Ready to Practice?</h3>
+                  <p className="text-sm text-zinc-500 mb-4">
+                    Select an interview session from the sidebar or create a new one to start practicing behavioral questions for your job applications.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                    <button
+                      onClick={() => setSidebarOpen(true)}
+                      className="px-4 py-2.5 bg-zinc-800/60 border border-zinc-700/60 text-zinc-300 text-sm font-medium rounded-xl hover:bg-zinc-800/80 hover:border-zinc-600 transition-all"
+                    >
+                      View Sessions
+                    </button>
+                    <button
+                      onClick={() => setShowCreateModal(true)}
+                      className="px-4 py-2.5 bg-primary text-black text-sm font-bold rounded-xl hover:opacity-90 active:scale-95 transition-all"
+                    >
+                      New Interview
+                    </button>
+                  </div>
                 </div>
-                <button
-                  onClick={() => setShowCreateModal(true)}
-                  className="px-5 py-2.5 bg-primary text-black text-sm font-bold rounded-xl hover:opacity-90 active:scale-95 transition-all"
-                >
-                  New Interview
-                </button>
+
+                {/* Tips section */}
+                <div className="w-full max-w-lg mt-8">
+                  <h4 className="text-sm font-semibold text-zinc-400 mb-3 text-center">💡 Interview Tips</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="p-3 bg-zinc-800/30 border border-zinc-700/40 rounded-lg">
+                      <div className="text-xs font-medium text-zinc-300 mb-1">Practice Mode</div>
+                      <div className="text-[10px] text-zinc-500">Use audio interviews for realistic practice sessions</div>
+                    </div>
+                    <div className="p-3 bg-zinc-800/30 border border-zinc-700/40 rounded-lg">
+                      <div className="text-xs font-medium text-zinc-300 mb-1">Behavioral Questions</div>
+                      <div className="text-[10px] text-zinc-500">Focus on STAR method: Situation, Task, Action, Result</div>
+                    </div>
+                    <div className="p-3 bg-zinc-800/30 border border-zinc-700/40 rounded-lg">
+                      <div className="text-xs font-medium text-zinc-300 mb-1">Text Chat</div>
+                      <div className="text-[10px] text-zinc-500">Send text messages for quick practice or clarifications</div>
+                    </div>
+                    <div className="p-3 bg-zinc-800/30 border border-zinc-700/40 rounded-lg">
+                      <div className="text-xs font-medium text-zinc-300 mb-1">Track Progress</div>
+                      <div className="text-[10px] text-zinc-500">Complete sessions to mark your preparation progress</div>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </main>
