@@ -6,7 +6,10 @@ import type { InterviewMessage } from '@/types';
 
 // Note: Now using HTTP-based audio processing instead of WebSocket
 
-export const useInterviewWebSocket = (interviewId: number | null) => {
+export const useInterviewWebSocket = (
+  interviewId: number | null,
+  onMessage?: (message: InterviewMessage) => void
+) => {
   const [isConnected, setIsConnected] = useState(true); // Always "connected" for HTTP approach
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,6 +29,7 @@ export const useInterviewWebSocket = (interviewId: number | null) => {
 
     try {
       setIsAiResponding(true);
+      audioCapture.setPaused(true);
 
       // Send audio via HTTP POST
       const response: InterviewMessage = await interviewApi.sendAudioMessage(interviewId!, base64Audio);
@@ -34,10 +38,12 @@ export const useInterviewWebSocket = (interviewId: number | null) => {
       if ((response as any).status === 'no_speech') {
         console.log('No speech detected, ignoring');
         setIsAiResponding(false);
+        audioCapture.setPaused(false);
         return;
       }
 
       console.log('✅ AI response received:', response);
+      if (onMessage) onMessage(response);
 
       // Handle AI text response
       if (response.content) {
@@ -66,6 +72,7 @@ export const useInterviewWebSocket = (interviewId: number | null) => {
         console.log('🔊 Playing AI response...');
         audioPlayback.playAudio(audioData as string, 'audio/webm', () => {
           setIsAiResponding(false);
+          audioCapture.setPaused(false);
           console.log('🎤 Ready for user response');
         });
       } else {
@@ -79,10 +86,12 @@ export const useInterviewWebSocket = (interviewId: number | null) => {
             utterance.pitch = 1;
             utterance.onend = () => {
               setIsAiResponding(false);
+              audioCapture.setPaused(false);
               console.log('🎤 Ready for user response');
             };
             utterance.onerror = () => {
               setIsAiResponding(false);
+              audioCapture.setPaused(false);
               console.log('🎤 Ready for user response (TTS error)');
             };
             window.speechSynthesis.speak(utterance);
@@ -93,6 +102,7 @@ export const useInterviewWebSocket = (interviewId: number | null) => {
         }
 
         setIsAiResponding(false);
+        audioCapture.setPaused(false);
       }
 
     } catch (error: any) {
@@ -104,6 +114,7 @@ export const useInterviewWebSocket = (interviewId: number | null) => {
         setError(`Failed to process speech (${error?.status || 'unknown error'}). Please try again.`);
       }
       setIsAiResponding(false);
+      audioCapture.setPaused(false);
     }
   });
 

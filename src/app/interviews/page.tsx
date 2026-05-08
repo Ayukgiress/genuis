@@ -35,6 +35,16 @@ export default function InterviewsPage() {
 
   const audioPlayback = useAudioPlayback();
 
+  const fetchInterviewMessages = useCallback(async (interviewId: number) => {
+    try {
+      const messages = await interviewApi.getMessages(interviewId);
+      setInterviews((prev) =>
+        prev.map((int) => (int.id === interviewId ? { ...int, messages } : int))
+      );
+      setSelectedInterview((prev) => (prev?.id === interviewId ? { ...prev, messages } : prev));
+    } catch {}
+  }, []);
+
   const {
     isConnected,
     isStreaming,
@@ -46,32 +56,41 @@ export default function InterviewsPage() {
     disconnect,
     startAudioStream,
     stopAudioStream,
-  } = useInterviewWebSocket(selectedInterview?.id || null);
+  } = useInterviewWebSocket(
+    selectedInterview?.id || null,
+    useCallback(() => {
+      if (selectedInterview?.id) {
+        fetchInterviewMessages(selectedInterview.id);
+      }
+    }, [selectedInterview?.id, fetchInterviewMessages])
+  );
 
   const showToast = (msg: string, type: "error" | "success") => {
-    if (type === "error") { setError(msg); setTimeout(() => setError(null), 4000); }
-    else { setSuccess(msg); setTimeout(() => setSuccess(null), 4000); }
+    if (type === "error") {
+      setError(msg);
+      setTimeout(() => setError(null), 4000);
+    } else {
+      setSuccess(msg);
+      setTimeout(() => setSuccess(null), 4000);
+    }
   };
 
   const fetchData = useCallback(async () => {
     try {
       setIsLoading(true);
       const [interviewsData, jobsData, boardsData] = await Promise.all([
-        interviewApi.list(), jobApi.search({ limit: 50 }), kanbanApi.listBoards(),
+        interviewApi.list(),
+        jobApi.search({ limit: 50 }),
+        kanbanApi.listBoards(),
       ]);
       setInterviews(interviewsData);
       setJobs(jobsData);
       setBoards(boardsData);
-    } catch { showToast("Failed to load interviews.", "error"); }
-    finally { setIsLoading(false); }
-  }, []);
-
-  const fetchInterviewMessages = useCallback(async (interviewId: number) => {
-    try {
-      const messages = await interviewApi.getMessages(interviewId);
-      setInterviews((prev) => prev.map((int) => int.id === interviewId ? { ...int, messages } : int));
-      setSelectedInterview((prev) => prev?.id === interviewId ? { ...prev, messages } : prev);
-    } catch {}
+    } catch {
+      showToast("Failed to load interviews.", "error");
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -738,7 +757,6 @@ export default function InterviewsPage() {
               </button>
             </div>
 
-            {/* Modal body */}
             <div className="p-7 space-y-5">
               <div>
                 <label className="block text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2.5">
@@ -791,6 +809,7 @@ export default function InterviewsPage() {
           </div>
         </div>
       )}
+    
 
       {error && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2.5 px-4 py-3 bg-zinc-900 border border-red-500/30 text-red-400 rounded-xl font-mono text-xs tracking-wide shadow-xl z-[60] animate-in slide-in-from-bottom-3 duration-200">

@@ -5,6 +5,7 @@ export const useAudioCapture = (onChunkReady?: (base64: string) => void) => {
   const [error, setError] = useState<string | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isListening, setIsListening] = useState(false);
+  const isPausedRef = useRef(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -39,7 +40,7 @@ export const useAudioCapture = (onChunkReady?: (base64: string) => void) => {
       let lastSpeechTime = Date.now();
 
       vadIntervalRef.current = setInterval(() => {
-        if (!analyserRef.current) return;
+        if (!analyserRef.current || isPausedRef.current) return;
         analyserRef.current.getByteFrequencyData(dataArray);
 
         let sum = 0;
@@ -47,7 +48,7 @@ export const useAudioCapture = (onChunkReady?: (base64: string) => void) => {
         const average = sum / bufferLength;
 
         const SPEECH_THRESHOLD = 15;
-        const SILENCE_DURATION = 1500;
+        const SILENCE_DURATION = 1200;
 
         if (average > SPEECH_THRESHOLD) {
           lastSpeechTime = Date.now();
@@ -117,6 +118,7 @@ export const useAudioCapture = (onChunkReady?: (base64: string) => void) => {
   }, [stream]);
 
   const startCapture = useCallback(async () => {
+    isPausedRef.current = false;
     try {
       setError(null);
       console.log('🎤 Requesting microphone access for continuous recording...');
@@ -135,15 +137,15 @@ export const useAudioCapture = (onChunkReady?: (base64: string) => void) => {
       setStream(mediaStream);
       setIsStreaming(true);
 
-      // Start voice activity detection
-      startVoiceActivityDetection(mediaStream);
-
       // Set up MediaRecorder for continuous recording
       const recorder = new MediaRecorder(mediaStream, {
         mimeType: 'audio/webm;codecs=opus'
       });
       mediaRecorderRef.current = recorder;
       chunksRef.current = [];
+
+      // Start voice activity detection
+      startVoiceActivityDetection(mediaStream);
 
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -158,8 +160,8 @@ export const useAudioCapture = (onChunkReady?: (base64: string) => void) => {
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
         chunksRef.current = [];
 
-        // ✅ Stricter minimum — WebM header alone is ~4KB
-        if (blob.size < 4000) {
+        // ✅ Stricter minimum — WebM header alone is ~4KB (but let's allow smaller for very short bursts)
+        if (blob.size < 2000) {
           console.log('No speech detected, ignoring');
           return;
         }
@@ -183,6 +185,17 @@ export const useAudioCapture = (onChunkReady?: (base64: string) => void) => {
     }
   }, [onChunkReady, startVoiceActivityDetection]);
 
+  const setPaused = useCallback((paused: boolean) => {
+    isPausedRef.current = paused;
+    if (paused) {
+      setIsListening(false);
+      if (mediaRecorderRef.current?.state === 'recording') {
+        mediaRecorderRef.current.stop();
+        chunksRef.current = []; // Clear current chunks if paused
+      }
+    }
+  }, []);
+
   useEffect(() => {
     return () => {
       // Cleanup on unmount only
@@ -196,6 +209,7 @@ export const useAudioCapture = (onChunkReady?: (base64: string) => void) => {
     isListening,
     error,
     startCapture,
-    stopCapture
+    stopCapture,
+    setPaused
   };
 };
