@@ -11,6 +11,7 @@ import {
 } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { useInterviewWebSocket } from "@/hooks/useInterviewWebSocket";
+import { useAudioPlayback } from "@/hooks/useAudioPlayback";
 import type { Interview, InterviewMessage, Job } from "@/types";
 
 
@@ -35,6 +36,8 @@ export default function InterviewsPage() {
   const [selectedJobId, setSelectedJobId] = useState<string>("");
   const [hideAIMessages, setHideAIMessages] = useState(false);
   const [isInterviewActive, setIsInterviewActive] = useState(false);
+
+  const audioPlayback = useAudioPlayback();
 
   const {
     isConnected,
@@ -194,13 +197,22 @@ export default function InterviewsPage() {
       setSelectedInterview(finalInterview);
       setInterviews((prev) => prev.map((int) => int.id === selectedInterview.id ? finalInterview : int));
 
-      // Now start audio capture after AI has responded
+      // NEW: speech-to-speech for the first turn (assistant may return audio_data on text send)
+      if (aiResponse.audio_data) {
+        try {
+          const ok = await audioPlayback.playAudio(aiResponse.audio_data, "audio/webm");
+          if (!ok) console.warn("AI audio_data returned but playback failed.");
+        } catch (e) {
+          console.warn("AI audio playback threw:", e);
+        }
+      }
+
+      // Now start audio capture after AI has responded (and after playback window)
       connect();
       setTimeout(() => {
         startAudioStream();
         showToast("🎤 AI has started - you can now respond!", "success");
-      }, 2000); // Give time for AI audio to play
-
+      }, 2500); // Give time for AI audio to play
     } catch (err) {
       console.error('Failed to start interview:', err);
       showToast("Failed to start interview", "error");
@@ -222,10 +234,71 @@ export default function InterviewsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <div className="text-center text-zinc-500">
-          <div className="w-10 h-10 border-2 border-primary/20 border-t-primary rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="font-mono text-xs uppercase tracking-widest">Loading sessions...</p>
+      <div className="min-h-screen bg-zinc-950">
+        <div className="relative">
+          <div className="fixed top-[-200px] right-[-200px] w-[600px] h-[600px] bg-primary/7 rounded-full pointer-events-none z-0" />
+          <div className="relative z-10 grid grid-cols-[280px_1fr_300px] grid-rows-[72px_1fr] h-screen gap-0 lg:grid-cols-[260px_1fr] xl:grid-cols-[280px_1fr_300px]">
+            <header className="col-span-full flex items-center justify-between px-8 py-0 border-b border-zinc-800/50 bg-zinc-950/80 backdrop-blur-xl">
+              <div className="flex items-center gap-4">
+                <div className="h-8 w-32 bg-zinc-800/60 rounded-xl animate-pulse" />
+                <div className="h-7 w-28 bg-primary/10 border border-primary/20 rounded-md animate-pulse" />
+              </div>
+              <div className="h-10 w-36 bg-zinc-800/60 rounded-xl animate-pulse" />
+            </header>
+
+            <aside className="row-start-2 border-r border-zinc-800/50 overflow-y-auto p-6 bg-zinc-900/30 hidden lg:block">
+              <div className="h-5 w-40 bg-zinc-800/60 rounded animate-pulse mb-5" />
+              <div className="space-y-3">
+                {Array.from({ length: 6 }).map((_, idx) => (
+                  <div
+                    key={idx}
+                    className="p-4 rounded-xl border border-zinc-800/50 bg-zinc-900/20 animate-pulse"
+                  >
+                    <div className="h-4 w-2/3 bg-zinc-800/70 rounded mb-3" />
+                    <div className="h-3 w-1/2 bg-zinc-800/70 rounded mb-4" />
+                    <div className="flex items-center justify-between">
+                      <div className="h-5 w-20 bg-primary/10 border border-primary/20 rounded" />
+                      <div className="h-4 w-20 bg-zinc-800/70 rounded" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </aside>
+
+            <main className="row-start-2 flex flex-col overflow-hidden">
+              <div className="flex-1 relative bg-zinc-950 flex items-center justify-center overflow-hidden">
+                <div className="flex flex-col items-center gap-6 text-white">
+                  <div className="w-32 h-32 rounded-full bg-zinc-800/50 border-2 border-zinc-700/50 animate-pulse" />
+                  <div className="h-4 w-44 bg-zinc-800/60 rounded animate-pulse" />
+                  <div className="h-4 w-28 bg-zinc-800/60 rounded animate-pulse" />
+                </div>
+              </div>
+
+              <div className="bg-zinc-900/50 border-t border-zinc-800/50 p-6 flex items-center gap-4">
+                <div className="w-full h-14 bg-zinc-800/60 rounded-xl animate-pulse" />
+              </div>
+            </main>
+
+            <aside className="row-start-2 border-l border-zinc-800/50 flex flex-col bg-zinc-900/30 hidden xl:flex">
+              <div className="p-5 pb-4 border-b border-zinc-800/50 flex items-center justify-between">
+                <div>
+                  <div className="h-4 w-24 bg-zinc-800/60 rounded animate-pulse" />
+                  <div className="h-3 w-28 bg-zinc-800/60 rounded mt-2 animate-pulse" />
+                </div>
+                <div className="h-7 w-28 bg-zinc-800/60 rounded animate-pulse" />
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                {Array.from({ length: 6 }).map((_, idx) => (
+                  <div key={idx} className={`flex ${idx % 2 === 0 ? "justify-end" : "justify-start"}`}>
+                    <div className={`max-w-[85%] ${idx % 2 === 0 ? "order-2" : "order-1"}`}>
+                      <div className="px-4 py-3 rounded-xl bg-zinc-800/60 animate-pulse h-10" />
+                      <div className="h-3 w-24 bg-zinc-800/60 rounded mt-2 animate-pulse" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </aside>
+          </div>
         </div>
       </div>
     );
