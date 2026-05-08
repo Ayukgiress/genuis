@@ -253,20 +253,6 @@ export default function InterviewsPage() {
               <div className="w-full h-12 bg-zinc-800/50 rounded-xl animate-pulse" />
             </div>
           </main>
-          {/* Transcript */}
-          <aside className="w-80 border-l border-zinc-800/60 hidden xl:flex flex-col bg-zinc-900/20">
-            <div className="p-5 border-b border-zinc-800/50">
-              <div className="h-4 w-24 bg-zinc-800/60 rounded animate-pulse" />
-              <div className="h-3 w-32 bg-zinc-800/50 rounded animate-pulse mt-2" />
-            </div>
-            <div className="flex-1 p-4 space-y-3">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className={`flex ${i % 2 === 0 ? "justify-end" : "justify-start"}`}>
-                  <div className="h-10 w-48 bg-zinc-800/50 rounded-xl animate-pulse" />
-                </div>
-              ))}
-            </div>
-          </aside>
         </div>
       </div>
     );
@@ -660,126 +646,10 @@ export default function InterviewsPage() {
             )}
           </main>
 
-          {/* ── Transcript Panel ─────────────────────────────────────────── */}
-          <aside className="w-[300px] shrink-0 border-l border-zinc-800/60 flex flex-col bg-zinc-900/20 hidden xl:flex">
-            {/* Panel header */}
-            <div className="flex items-center justify-between px-4 py-3.5 border-b border-zinc-800/50 shrink-0">
-              <div className="flex items-center gap-2.5">
-                <div className="w-6 h-6 rounded-md bg-zinc-800/60 border border-zinc-700/40 flex items-center justify-center">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-400">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                  </svg>
-                </div>
-                <div>
-                  <span className="text-[13px] font-semibold text-zinc-200 leading-none">Transcript</span>
-                  <div className="text-[9px] font-mono uppercase tracking-widest text-zinc-600 mt-0.5">
-                    {visibleMessages.length} msg{visibleMessages.length !== 1 ? "s" : ""}
-                  </div>
-                </div>
-              </div>
-              <button
-                onClick={() => setHideAIMessages(!hideAIMessages)}
-                className={`text-[9px] font-mono uppercase tracking-widest px-2 py-1 rounded-md border transition-all ${
-                  hideAIMessages
-                    ? "bg-primary/10 border-primary/25 text-primary"
-                    : "bg-zinc-800/50 border-zinc-700/50 text-zinc-500 hover:text-zinc-300 hover:border-zinc-600"
-                }`}
-              >
-                {hideAIMessages ? "Show AI" : "Hide AI"}
-              </button>
-            </div>
-
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4">
-              {visibleMessages.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full gap-3 text-zinc-600">
-                  <div className="w-12 h-12 rounded-xl bg-zinc-800/30 border border-zinc-700/30 flex items-center justify-center">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="opacity-40">
-                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                    </svg>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-xs font-medium text-zinc-600">No messages yet</p>
-                    <p className="text-[10px] text-zinc-700 mt-0.5">Start an interview to see the transcript</p>
-                  </div>
-                </div>
-              ) : (
-                visibleMessages.map((msg, idx) => {
-                  const isUser = msg.role === "user";
-                  const prevMsg = visibleMessages[idx - 1];
-                  const isGrouped = prevMsg?.role === msg.role;
-
-                  return (
-                    <div key={msg.id} className={`flex gap-2 ${isUser ? "flex-row-reverse" : "flex-row"} ${isGrouped ? "-mt-2" : ""}`}>
-                      {/* Avatar — only show for first in a group */}
-                      <div className="shrink-0 w-6 flex flex-col items-center pt-0.5">
-                        {!isGrouped ? (
-                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-black border ${
-                            isUser
-                              ? "bg-primary/20 border-primary/30 text-primary"
-                              : "bg-zinc-700/60 border-zinc-600/50 text-zinc-400"
-                          }`}>
-                            {isUser ? "U" : "AI"}
-                          </div>
-                        ) : (
-                          <div className="w-6" />
-                        )}
-                      </div>
-
-                      {/* Bubble + meta */}
-                      <div className={`flex flex-col gap-1 max-w-[82%] ${isUser ? "items-end" : "items-start"}`}>
-                        {/* Sender label — first in group only */}
-                        {!isGrouped && (
-                          <span className={`text-[9px] font-mono uppercase tracking-widest px-0.5 ${isUser ? "text-zinc-500" : "text-zinc-600"}`}>
-                            {isUser ? "You" : "Interviewer"}
-                          </span>
-                        )}
-
-                        <div className={`px-3 py-2.5 text-[12.5px] leading-relaxed rounded-2xl ${
-                          isUser
-                            ? "bg-primary text-black font-medium rounded-tr-sm"
-                            : "bg-zinc-800/70 border border-zinc-700/40 text-zinc-200 rounded-tl-sm"
-                        }`}>
-                          {msg.content?.replace(/\[INTERVIEW_COMPLETE\]/g, "").trim()}
-                        </div>
-
-                        {/* Time — only on last in group or standalone */}
-                        {(idx === visibleMessages.length - 1 || visibleMessages[idx + 1]?.role !== msg.role) && (
-                          <span className="text-[9px] font-mono text-zinc-700 px-0.5">
-                            {formatTime(msg.created_at)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-
-            {/* Transcript footer: jump to bottom shortcut */}
-            {visibleMessages.length > 3 && (
-              <div className="shrink-0 px-4 py-2.5 border-t border-zinc-800/40 flex items-center justify-between">
-                <span className="text-[9px] font-mono text-zinc-700 uppercase tracking-wider">
-                  {visibleMessages.filter(m => m.role === "user").length}u · {visibleMessages.filter(m => m.role !== "user").length}ai
-                </span>
-                <button
-                  onClick={() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })}
-                  className="text-[9px] font-mono text-zinc-600 hover:text-zinc-400 uppercase tracking-wider flex items-center gap-1 transition-colors"
-                >
-                  Latest
-                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <path d="M12 5v14M5 12l7 7 7-7"/>
-                  </svg>
-                </button>
-              </div>
-            )}
-          </aside>
 
         </div>
       </div>
 
-      {/* ── Create Modal ──────────────────────────────────────────────────── */}
       {showCreateModal && (
         <div
           className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-5 z-50"
@@ -854,7 +724,6 @@ export default function InterviewsPage() {
         </div>
       )}
 
-      {/* ── Toasts ────────────────────────────────────────────────────────── */}
       {error && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2.5 px-4 py-3 bg-zinc-900 border border-red-500/30 text-red-400 rounded-xl font-mono text-xs tracking-wide shadow-xl z-[60] animate-in slide-in-from-bottom-3 duration-200">
           <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">

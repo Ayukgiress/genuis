@@ -371,42 +371,53 @@ export default function DashboardPage() {
     // Generate last 7 days
     const days = [];
     const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-    
+
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
       days.push({
         name: dayNames[d.getDay()],
         fullDate: d.toISOString().split('T')[0],
-        value: 0
+        resumes: 0,
+        jobs: 0,
+        interviews: 0
       });
     }
 
-    if (!analytics || analytics.length === 0) {
-      // Provide some default "growth" if no data, or just zeros
-      return days;
-    }
-
-    // Group analytics by date
-    const dayCounts = analytics.reduce((acc, event) => {
-      const date = event.created_at.split('T')[0];
-      acc[date] = (acc[date] || 0) + 1;
+    // Group resume analyses by date
+    const resumeCounts = analyses.reduce((acc, analysis) => {
+      if (analysis.created_at) {
+        const date = analysis.created_at.split('T')[0];
+        acc[date] = (acc[date] || 0) + 1;
+      }
       return acc;
     }, {} as Record<string, number>);
 
-    // Also include analyses in activity if they have created_at
-    analyses.forEach(analysis => {
-      if (analysis.created_at) {
-        const date = analysis.created_at.split('T')[0];
-        dayCounts[date] = (dayCounts[date] || 0) + 1;
+    // Group jobs applied by date (from application store)
+    const jobCounts = applications.reduce((acc, app) => {
+      if (app.appliedAt) {
+        const date = new Date(app.appliedAt).toISOString().split('T')[0];
+        acc[date] = (acc[date] || 0) + 1;
       }
-    });
+      return acc;
+    }, {} as Record<string, number>);
+
+    // Group interviews by date
+    const interviewCounts = interviews.reduce((acc, interview) => {
+      if (interview.created_at) {
+        const date = interview.created_at.split('T')[0];
+        acc[date] = (acc[date] || 0) + 1;
+      }
+      return acc;
+    }, {} as Record<string, number>);
 
     return days.map(day => ({
       name: day.name,
-      value: dayCounts[day.fullDate] || 0
+      resumes: resumeCounts[day.fullDate] || 0,
+      jobs: jobCounts[day.fullDate] || 0,
+      interviews: interviewCounts[day.fullDate] || 0
     }));
-  }, [analytics, analyses]);
+  }, [analyses, applications, interviews]);
 
   const funnelData = [
     { label: 'UPLOADED', value: totalAnalyses, percentage: totalAnalyses > 0 ? 100 : 0 },
@@ -488,7 +499,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 p-8 rounded-3xl bg-zinc-900/50 border border-zinc-800/50 space-y-6">
           <div className="flex justify-between items-center">
-            <h3 className="font-bold">Weekly Activity</h3>
+            <h3 className="font-bold">Weekly Progress</h3>
             <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-[10px] font-bold text-zinc-400">
               Last 7 Days
               <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="3">
@@ -496,14 +507,22 @@ export default function DashboardPage() {
               </svg>
             </button>
           </div>
-          <div className="h-[300px] w-full">
+          <div className="h-[250px] w-full">
             {mounted ? (
-               <ResponsiveContainer width="100%" height={300}>
+               <ResponsiveContainer width="100%" height={250}>
                 <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
-                    <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                    <linearGradient id="colorResumes" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#00f29c" stopOpacity={0.3}/>
                       <stop offset="95%" stopColor="#00f29c" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="colorJobs" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="colorInterviews" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#18181b" />
@@ -515,25 +534,47 @@ export default function DashboardPage() {
                     dy={10}
                     padding={{ left: 10, right: 10 }}
                   />
-                  <YAxis 
+                  <YAxis
                     axisLine={false}
                     tickLine={false}
                     tick={{ fill: '#52525b', fontSize: 10, fontWeight: 700 }}
                   />
                   <Tooltip
                     contentStyle={{ backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '12px' }}
-                    itemStyle={{ color: '#00f29c' }}
                     cursor={{ stroke: '#00f29c', strokeWidth: 1, strokeDasharray: '4 4' }}
                   />
                   <Area
                     type="monotone"
-                    dataKey="value"
+                    dataKey="resumes"
+                    stackId="1"
                     stroke="#00f29c"
-                    strokeWidth={3}
+                    strokeWidth={2}
                     fillOpacity={1}
-                    fill="url(#colorValue)"
+                    fill="url(#colorResumes)"
                     animationDuration={1500}
-                    baseLine={0}
+                    name="Resumes Analyzed"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="jobs"
+                    stackId="1"
+                    stroke="#6366f1"
+                    strokeWidth={2}
+                    fillOpacity={1}
+                    fill="url(#colorJobs)"
+                    animationDuration={1500}
+                    name="Jobs Applied"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="interviews"
+                    stackId="1"
+                    stroke="#f59e0b"
+                    strokeWidth={2}
+                    fillOpacity={1}
+                    fill="url(#colorInterviews)"
+                    animationDuration={1500}
+                    name="Interview Sessions"
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -545,7 +586,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="p-8 rounded-3xl bg-zinc-900/50 border border-zinc-800/50">
+        <div className="p-8 rounded-3xl bg-zinc-900/50 border border-zinc-800/50 max-h-[600px] overflow-hidden flex flex-col">
           <div className="flex justify-between items-start mb-6">
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-xl bg-primary/10 border border-primary/20">
@@ -563,8 +604,8 @@ export default function DashboardPage() {
           {appliedJobs.length > 0 ? (
             <div className="space-y-4">
               <p className="text-[10px] uppercase tracking-widest text-zinc-600 font-bold">Active Interview Prep Sessions ({appliedJobs.length})</p>
-              <div className="grid gap-3">
-                {appliedJobs.map((job) => (
+              <div className="grid gap-3 max-h-80 overflow-y-auto">
+                {appliedJobs.slice(0, 5).map((job) => (
                   <div key={job.id} className="flex items-center justify-between p-4 rounded-xl bg-zinc-800/50 border border-zinc-800 hover:border-primary/30 transition-all group">
                     <div className="flex items-center gap-3">
                       <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
@@ -602,6 +643,11 @@ export default function DashboardPage() {
                     </button>
                   </div>
                 ))}
+                {appliedJobs.length > 5 && (
+                  <p className="text-[10px] text-zinc-500 text-center pt-2">
+                    +{appliedJobs.length - 5} more applications
+                  </p>
+                )}
               </div>
               <div className="pt-4 border-t border-zinc-800/50">
                 <p className="text-[10px] uppercase tracking-widest text-zinc-600 font-bold mb-3">Stripe Interview Prep</p>

@@ -28,9 +28,7 @@ export const useInterviewWebSocket = (interviewId: number | null) => {
       setIsAiResponding(true);
 
       // Send audio via HTTP POST
-      const response: InterviewMessage = await interviewApi.sendAudioMessage(interviewId!, {
-        base64_audio: base64Audio
-      });
+      const response: InterviewMessage = await interviewApi.sendAudioMessage(interviewId!, base64Audio);
 
       console.log('✅ AI response received:', response);
 
@@ -95,7 +93,8 @@ export const useInterviewWebSocket = (interviewId: number | null) => {
       if (error?.status === 422) {
         console.log('No speech detected, ignoring');
       } else {
-        setError('Failed to process speech. Please try again.');
+        console.error('❌ Failed to send audio message:', error);
+        setError(`Failed to process speech (${error?.status || 'unknown error'}). Please try again.`);
       }
       setIsAiResponding(false);
     }

@@ -38,23 +38,6 @@ export const TopBar: React.FC<TopBarProps> = ({ onToggleSidebar }) => {
         </div>
       </div>
     </div>
-
-      <div className="flex items-center gap-6">
-        <div className="flex items-center gap-4 border-r border-zinc-800 pr-6">
-          <button className="relative p-2 text-zinc-400 hover:text-white transition-colors">
-            <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-            </svg>
-            <span className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full border-2 border-black" />
-          </button>
-          <button className="p-2 text-zinc-400 hover:text-white transition-colors">
-            <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-            </svg>
-          </button>
-        </div>
-      </div>
     </header>
   );
 };
