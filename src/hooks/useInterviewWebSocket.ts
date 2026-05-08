@@ -53,9 +53,13 @@ export const useInterviewWebSocket = (interviewId: number | null) => {
         setIsAiResponding(false);
       }
 
-    } catch (error) {
-      console.error('❌ Error processing speech:', error);
-      setError('Failed to process speech. Please try again.');
+    } catch (error: any) {
+      // 422 = no speech detected, not a real error
+      if (error?.status === 422) {
+        console.log('No speech detected, ignoring');
+      } else {
+        setError('Failed to process speech. Please try again.');
+      }
       setIsAiResponding(false);
     }
   });

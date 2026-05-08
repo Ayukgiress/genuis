@@ -158,17 +158,16 @@ export const useAudioCapture = (onChunkReady?: (base64: string) => void) => {
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
         console.log('📊 Audio blob size:', blob.size, 'bytes');
 
-        if (blob.size === 0) {
-          console.warn('⚠️ No audio data in this segment, skipping');
-          // Restart recording for next speech segment
-          if (isStreaming) {
-            chunksRef.current = [];
-            setTimeout(() => {
-              if (mediaRecorderRef.current && isStreaming) {
-                mediaRecorderRef.current.start();
-              }
-            }, 100);
-          }
+        // Don't send tiny blobs — WebM header alone is ~300 bytes, real audio is much larger
+        if (blob.size < 5000) {
+          console.log('Audio too small, skipping:', blob.size, 'bytes');
+          chunksRef.current = [];
+          // Restart for next segment
+          setTimeout(() => {
+            if (mediaRecorderRef.current && isStreaming) {
+              mediaRecorderRef.current.start();
+            }
+          }, 100);
           return;
         }
 
