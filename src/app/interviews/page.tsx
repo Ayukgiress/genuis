@@ -197,6 +197,12 @@ export default function InterviewsPage() {
     setIsInterviewActive(true);
     showToast("🎤 Starting conversational interview...", "success");
     try {
+      // Send system instruction first
+      await interviewApi.sendMessage(selectedInterview.id, {
+        role: "assistant",
+        content: "You are conducting a job interview. Your role is to ask questions to assess the candidate. Do not answer the candidate's responses or provide information. Only ask follow-up questions based on what they say. Start the interview professionally.",
+      });
+
       const initialMessage: InterviewMessage = {
         id: Date.now(),
         interview_id: selectedInterview.id,

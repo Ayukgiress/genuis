@@ -16,10 +16,12 @@ export const useInterviewWebSocket = (
   const [connectionAttempted, setConnectionAttempted] = useState(false);
   const [isAiResponding, setIsAiResponding] = useState(false);
 
+  const audioCaptureRef = useRef<any>(null);
+
   // Audio capture integration
   const audioPlayback = useAudioPlayback();
 
-  const audioCapture = useAudioCapture(async (base64Audio: string) => {
+  const audioCaptureCallback = useCallback(async (base64Audio: string) => {
     if (isAiResponding) {
       console.log('🤖 AI is responding, ignoring user speech');
       return;
@@ -29,7 +31,7 @@ export const useInterviewWebSocket = (
 
     try {
       setIsAiResponding(true);
-      audioCapture.setPaused(true);
+      audioCaptureRef.current?.setPaused(true);
 
       // Send audio via HTTP POST
       const response: InterviewMessage = await interviewApi.sendAudioMessage(interviewId!, base64Audio);
@@ -72,7 +74,7 @@ export const useInterviewWebSocket = (
         console.log('🔊 Playing AI response...');
         audioPlayback.playAudio(audioData as string, 'audio/webm', () => {
           setIsAiResponding(false);
-          audioCapture.setPaused(false);
+          audioCaptureRef.current?.setPaused(false);
           console.log('🎤 Ready for user response');
         });
       } else {
@@ -86,12 +88,12 @@ export const useInterviewWebSocket = (
             utterance.pitch = 1;
             utterance.onend = () => {
               setIsAiResponding(false);
-              audioCapture.setPaused(false);
+              audioCaptureRef.current?.setPaused(false);
               console.log('🎤 Ready for user response');
             };
             utterance.onerror = () => {
               setIsAiResponding(false);
-              audioCapture.setPaused(false);
+              audioCaptureRef.current?.setPaused(false);
               console.log('🎤 Ready for user response (TTS error)');
             };
             window.speechSynthesis.speak(utterance);
@@ -102,7 +104,7 @@ export const useInterviewWebSocket = (
         }
 
         setIsAiResponding(false);
-        audioCapture.setPaused(false);
+        audioCaptureRef.current?.setPaused(false);
       }
 
     } catch (error: any) {
@@ -114,9 +116,12 @@ export const useInterviewWebSocket = (
         setError(`Failed to process speech (${error?.status || 'unknown error'}). Please try again.`);
       }
       setIsAiResponding(false);
-      audioCapture.setPaused(false);
+      audioCaptureRef.current?.setPaused(false);
     }
-  });
+  }, [isAiResponding, onMessage, audioPlayback]);
+
+  const audioCapture = useAudioCapture(audioCaptureCallback);
+  audioCaptureRef.current = audioCapture;
 
   // Simple connect/disconnect for compatibility
   const connect = useCallback(() => {

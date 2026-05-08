@@ -42,6 +42,10 @@ export default function DashboardPage() {
   const [selectedBoard, setSelectedBoard] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [jobFilters, setJobFilters] = useState({ remote: false, location: '' });
+
+  // Interview coach pagination
+  const [interviewPage, setInterviewPage] = useState(0);
+  const interviewsPerPage = 3;
   
   // Unused job search state - kept for compatibility
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -586,7 +590,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="p-8 rounded-3xl bg-zinc-900/50 border border-zinc-800/50 max-h-[600px] overflow-hidden flex flex-col">
+        <div className="p-8 rounded-3xl bg-zinc-900/50 border border-zinc-800/50 flex flex-col">
           <div className="flex justify-between items-start mb-6">
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-xl bg-primary/10 border border-primary/20">
@@ -600,12 +604,12 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
-          
+
           {appliedJobs.length > 0 ? (
-            <div className="space-y-4">
+            <div className="space-y-4 flex-1 flex flex-col">
               <p className="text-[10px] uppercase tracking-widest text-zinc-600 font-bold">Active Interview Prep Sessions ({appliedJobs.length})</p>
-              <div className="grid gap-3 max-h-80 overflow-y-auto">
-                {appliedJobs.slice(0, 5).map((job) => (
+              <div className="grid gap-3 flex-1">
+                {appliedJobs.slice(interviewPage * interviewsPerPage, (interviewPage + 1) * interviewsPerPage).map((job) => (
                   <div key={job.id} className="flex items-center justify-between p-4 rounded-xl bg-zinc-800/50 border border-zinc-800 hover:border-primary/30 transition-all group">
                     <div className="flex items-center gap-3">
                       <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
@@ -643,12 +647,28 @@ export default function DashboardPage() {
                     </button>
                   </div>
                 ))}
-                {appliedJobs.length > 5 && (
-                  <p className="text-[10px] text-zinc-500 text-center pt-2">
-                    +{appliedJobs.length - 5} more applications
-                  </p>
-                )}
               </div>
+              {appliedJobs.length > interviewsPerPage && (
+                <div className="flex items-center justify-between pt-4 border-t border-zinc-800/50">
+                  <button
+                    onClick={() => setInterviewPage(Math.max(0, interviewPage - 1))}
+                    disabled={interviewPage === 0}
+                    className="px-3 py-1.5 text-[10px] font-bold bg-zinc-800 border border-zinc-700 rounded-lg hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-[10px] text-zinc-500">
+                    Page {interviewPage + 1} of {Math.ceil(appliedJobs.length / interviewsPerPage)}
+                  </span>
+                  <button
+                    onClick={() => setInterviewPage(Math.min(Math.ceil(appliedJobs.length / interviewsPerPage) - 1, interviewPage + 1))}
+                    disabled={interviewPage >= Math.ceil(appliedJobs.length / interviewsPerPage) - 1}
+                    className="px-3 py-1.5 text-[10px] font-bold bg-zinc-800 border border-zinc-700 rounded-lg hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
               <div className="pt-4 border-t border-zinc-800/50">
                 <p className="text-[10px] uppercase tracking-widest text-zinc-600 font-bold mb-3">Stripe Interview Prep</p>
                 <div className="p-4 rounded-xl bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20">
