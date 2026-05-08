@@ -417,17 +417,16 @@ export default function InterviewsPage() {
           </div>
         </header>
 
-          {/* ── Body ─────────────────────────────────────────────────────────── */}
+        {/* Mobile sidebar overlay */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
+        {/* ── Body ─────────────────────────────────────────────────────────── */}
         <div className="flex flex-1 overflow-hidden">
-
-          {/* Mobile sidebar overlay */}
-          {sidebarOpen && (
-            <div
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
-              onClick={() => setSidebarOpen(false)}
-            />
-          )}
-
           {/* ── Sessions Sidebar ─────────────────────────────────────────── */}
           <aside className={`w-[260px] xl:w-[280px] shrink-0 border-r border-zinc-800/60 flex flex-col bg-zinc-900/20 z-50 transition-transform duration-300 lg:translate-x-0 ${
             sidebarOpen ? 'translate-x-0' : '-translate-x-full'
@@ -709,7 +708,8 @@ export default function InterviewsPage() {
                       New Interview
                     </button>
                   </div>
-                </div>
+                 </div>
+               </div>
 
             )}
           </main>
