@@ -4,7 +4,7 @@ export const useAudioPlayback = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
 
-  const playAudio = useCallback(async (base64Audio: string, mimeType: string = 'audio/webm') => {
+  const playAudio = useCallback(async (base64Audio: string, mimeType: string = 'audio/webm', onEnded?: () => void) => {
     try {
       // Stop any currently playing audio
       if (audioRef.current) {
@@ -30,16 +30,18 @@ export const useAudioPlayback = () => {
         audioContextRef.current = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
       }
 
-      await audio.play();
-
       // Clean up when done
       audio.onended = () => {
         URL.revokeObjectURL(audioUrl);
+        onEnded?.();
       };
+
+      await audio.play();
 
       return true;
     } catch (error) {
       console.error('Audio playback error:', error);
+      onEnded?.(); // Ensure we unlock if playback fails
       return false;
     }
   }, []);

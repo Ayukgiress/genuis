@@ -186,15 +186,18 @@ export default function InterviewsPage() {
       setInterviews((prev) => prev.map((int) => int.id === selectedInterview.id ? finalInterview : int));
       if (aiResponse.audio_data) {
         try {
-          const ok = await audioPlayback.playAudio(aiResponse.audio_data, "audio/webm");
-          if (!ok) console.warn("AI audio_data returned but playback failed.");
-        } catch (e) { console.warn("AI audio playback threw:", e); }
+          await audioPlayback.playAudio(aiResponse.audio_data, "audio/webm", () => {
+            startAudioStream();
+            showToast("🎤 AI has started - you can now respond!", "success");
+          });
+        } catch (e) { 
+          console.warn("AI audio playback threw:", e);
+          startAudioStream();
+        }
+      } else {
+        startAudioStream();
       }
       connect();
-      setTimeout(() => {
-        startAudioStream();
-        showToast("🎤 AI has started - you can now respond!", "success");
-      }, 2500);
     } catch (err) {
       console.error("Failed to start interview:", err);
       showToast("Failed to start interview", "error");

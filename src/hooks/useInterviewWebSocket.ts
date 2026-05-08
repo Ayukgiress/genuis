@@ -59,13 +59,10 @@ export const useInterviewWebSocket = (interviewId: number | null) => {
 
       if (audioData) {
         console.log('🔊 Playing AI response...');
-        audioPlayback.playAudio(audioData as string);
-
-        // Wait for audio to finish playing before allowing new speech
-        setTimeout(() => {
+        audioPlayback.playAudio(audioData as string, 'audio/webm', () => {
           setIsAiResponding(false);
           console.log('🎤 Ready for user response');
-        }, 2000); // Estimate based on audio length, or we could track actual playback end
+        });
       } else {
         // Speech-to-speech fallback using browser TTS (because backend audio is missing)
         const textToSpeak = response.content;

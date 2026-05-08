@@ -368,46 +368,45 @@ export default function DashboardPage() {
   ];
 
   const chartData = React.useMemo(() => {
-    if (!analytics || analytics.length === 0) {
-      return [
-        { name: 'MON', value: 0 },
-        { name: 'TUE', value: 0 },
-        { name: 'WED', value: 0 },
-        { name: 'THU', value: 0 },
-        { name: 'FRI', value: 0 },
-        { name: 'SAT', value: 0 },
-        { name: 'SUN', value: 0 },
-      ];
+    // Generate last 7 days
+    const days = [];
+    const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+    
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      days.push({
+        name: dayNames[d.getDay()],
+        fullDate: d.toISOString().split('T')[0],
+        value: 0
+      });
     }
 
-    // Filter to last 7 days
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    if (!analytics || analytics.length === 0) {
+      // Provide some default "growth" if no data, or just zeros
+      return days;
+    }
 
-    const recentAnalytics = analytics.filter(event =>
-      new Date(event.created_at) >= sevenDaysAgo
-    );
-
-    // Group analytics by day of week
-    const dayCounts = recentAnalytics.reduce((acc, event) => {
-      const date = new Date(event.created_at);
-      const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
-
-      // Convert to MON-SUN format (1 = MON, 0 = SUN)
-      const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-      const dayName = dayNames[dayOfWeek];
-
-      acc[dayName] = (acc[dayName] || 0) + 1;
+    // Group analytics by date
+    const dayCounts = analytics.reduce((acc, event) => {
+      const date = event.created_at.split('T')[0];
+      acc[date] = (acc[date] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
 
-    // Return data for each day of the week
-    const days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+    // Also include analyses in activity if they have created_at
+    analyses.forEach(analysis => {
+      if (analysis.created_at) {
+        const date = analysis.created_at.split('T')[0];
+        dayCounts[date] = (dayCounts[date] || 0) + 1;
+      }
+    });
+
     return days.map(day => ({
-      name: day,
-      value: dayCounts[day] || 0
+      name: day.name,
+      value: dayCounts[day.fullDate] || 0
     }));
-  }, [analytics]);
+  }, [analytics, analyses]);
 
   const funnelData = [
     { label: 'UPLOADED', value: totalAnalyses, percentage: totalAnalyses > 0 ? 100 : 0 },
@@ -500,7 +499,7 @@ export default function DashboardPage() {
           <div className="h-[300px] w-full">
             {mounted ? (
                <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={chartData}>
+                <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#00f29c" stopOpacity={0.3}/>
@@ -514,11 +513,17 @@ export default function DashboardPage() {
                     tickLine={false}
                     tick={{ fill: '#52525b', fontSize: 10, fontWeight: 700 }}
                     dy={10}
+                    padding={{ left: 10, right: 10 }}
                   />
-                  <YAxis hide />
+                  <YAxis 
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: '#52525b', fontSize: 10, fontWeight: 700 }}
+                  />
                   <Tooltip
                     contentStyle={{ backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '12px' }}
                     itemStyle={{ color: '#00f29c' }}
+                    cursor={{ stroke: '#00f29c', strokeWidth: 1, strokeDasharray: '4 4' }}
                   />
                   <Area
                     type="monotone"
@@ -527,6 +532,8 @@ export default function DashboardPage() {
                     strokeWidth={3}
                     fillOpacity={1}
                     fill="url(#colorValue)"
+                    animationDuration={1500}
+                    baseLine={0}
                   />
                 </AreaChart>
               </ResponsiveContainer>

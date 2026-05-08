@@ -15,15 +15,15 @@ export const useAudioCapture = (onChunkReady?: (base64: string) => void) => {
   const recordingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Voice Activity Detection using audio levels
-  const startVoiceActivityDetection = useCallback(() => {
-    if (!stream) return;
+  const startVoiceActivityDetection = useCallback((mediaStream: MediaStream) => {
+    if (!mediaStream) return;
 
     console.log('🎤 Starting Voice Activity Detection');
 
     try {
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       const analyser = audioContext.createAnalyser();
-      const microphone = audioContext.createMediaStreamSource(stream);
+      const microphone = audioContext.createMediaStreamSource(mediaStream);
 
       analyser.fftSize = 256;
       analyser.smoothingTimeConstant = 0.3;
@@ -36,10 +36,11 @@ export const useAudioCapture = (onChunkReady?: (base64: string) => void) => {
       const dataArray = new Uint8Array(bufferLength);
 
       let isSpeaking = false;
-      let speechStartTime = 0;
+      let lastSpeechTime = Date.now();
 
       vadIntervalRef.current = setInterval(() => {
-        analyser.getByteFrequencyData(dataArray);
+        if (!analyserRef.current) return;
+        analyserRef.current.getByteFrequencyData(dataArray);
 
         // Calculate average volume level
         let sum = 0;
@@ -50,22 +51,17 @@ export const useAudioCapture = (onChunkReady?: (base64: string) => void) => {
 
         // Voice activity detection thresholds
         const SPEECH_THRESHOLD = 15; // Minimum volume to consider as speech
-        const SILENCE_DURATION = 1500; // 1.5 seconds of silence to stop recording
+        const SILENCE_DURATION = 2000; // 2 seconds of silence to stop recording
 
         if (average > SPEECH_THRESHOLD) {
+          lastSpeechTime = Date.now();
           if (!isSpeaking) {
-            console.log('🎙️ Speech detected, starting recording');
+            console.log('🎙️ Speech detected, listening...');
             isSpeaking = true;
-            speechStartTime = Date.now();
             setIsListening(true);
-
-            // Clear any existing silence timeout
-            if (silenceTimeoutRef.current) {
-              clearTimeout(silenceTimeoutRef.current);
-            }
           }
-        } else if (isSpeaking && Date.now() - speechStartTime > SILENCE_DURATION) {
-          console.log('🤫 Silence detected, stopping recording');
+        } else if (isSpeaking && Date.now() - lastSpeechTime > SILENCE_DURATION) {
+          console.log('🤫 Silence detected, processing segment');
           isSpeaking = false;
           setIsListening(false);
 
@@ -74,12 +70,12 @@ export const useAudioCapture = (onChunkReady?: (base64: string) => void) => {
             mediaRecorderRef.current.stop();
           }
         }
-      }, 100); // Check every 100ms
+      }, 100);
 
     } catch (err) {
       console.error('❌ Failed to start voice activity detection:', err);
     }
-  }, [stream]);
+  }, []);
 
   const stopCapture = useCallback(() => {
     console.log('🛑 Stopping audio capture');
@@ -127,6 +123,7 @@ export const useAudioCapture = (onChunkReady?: (base64: string) => void) => {
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
+          autoGainControl: true,
           sampleRate: 44100,
           channelCount: 1
         }
@@ -137,7 +134,7 @@ export const useAudioCapture = (onChunkReady?: (base64: string) => void) => {
       setIsStreaming(true);
 
       // Start voice activity detection
-      startVoiceActivityDetection();
+      startVoiceActivityDetection(mediaStream);
 
       // Set up MediaRecorder for continuous recording
       const recorder = new MediaRecorder(mediaStream, {
@@ -149,43 +146,37 @@ export const useAudioCapture = (onChunkReady?: (base64: string) => void) => {
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           chunksRef.current.push(event.data);
-          console.log('📦 Audio chunk received, size:', event.data.size);
         }
       };
 
       recorder.onstop = () => {
+        if (chunksRef.current.length === 0) return;
+        
         console.log('⏹️ Speech segment ended, processing audio...');
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-        console.log('📊 Audio blob size:', blob.size, 'bytes');
+        chunksRef.current = [];
 
-        // Some browsers produce very small WebM chunks depending on MediaRecorder/VAD timing.
-        // Instead of dropping them, we still send them so the backend can decode or
-        // respond with a proper error/transcript.
-        const blobType = blob.type || 'audio/webm';
-        const normalizedBlob = blob.type === blobType ? blob : new Blob([blob], { type: blobType });
-
-        if (blob.size < 200) {
-          console.log('⚠ Very small audio chunk, still sending:', blob.size, 'bytes');
+        if (blob.size < 1000) {
+          console.log('⚠ Small audio chunk, potentially just noise:', blob.size, 'bytes');
+          // If we want to be strict, we could return here, but for now let's keep sending
         }
 
         const reader = new FileReader();
         reader.onloadend = () => {
           const base64 = (reader.result as string).split(',')[1];
-          console.log('📤 Sending speech segment, base64 length:', base64.length);
           onChunkReady?.(base64);
 
           // Restart recording for next speech segment after processing
-          if (isStreaming) {
-            chunksRef.current = [];
+          // Use a ref-based check for isStreaming to avoid closure issues
+          if (mediaRecorderRef.current && mediaRecorderRef.current.stream.active) {
             setTimeout(() => {
-              if (mediaRecorderRef.current && isStreaming) {
+              if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'inactive') {
                 mediaRecorderRef.current.start();
               }
-            }, 500); // Small delay to prevent overlap
+            }, 300);
           }
         };
-        reader.readAsDataURL(normalizedBlob);
-        chunksRef.current = [];
+        reader.readAsDataURL(blob);
       };
 
       // Start continuous recording
@@ -197,11 +188,15 @@ export const useAudioCapture = (onChunkReady?: (base64: string) => void) => {
       console.error('❌ Audio capture error:', err);
       setError(errorMessage);
     }
-  }, [onChunkReady, startVoiceActivityDetection, isStreaming]);
+  }, [onChunkReady, startVoiceActivityDetection]);
 
   useEffect(() => {
-    return () => stopCapture();
-  }, [stopCapture]);
+    return () => {
+      // Cleanup on unmount only
+      if (vadIntervalRef.current) clearInterval(vadIntervalRef.current);
+      if (audioContextRef.current) audioContextRef.current.close();
+    };
+  }, []);
 
   return {
     isStreaming,
