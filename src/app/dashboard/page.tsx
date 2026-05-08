@@ -338,7 +338,10 @@ export default function DashboardPage() {
   ];
 
   const chartData = React.useMemo(() => {
-    if (!analyticsSummary?.event_types) {
+    const eventValues = analyticsSummary?.event_types ? Object.values(analyticsSummary.event_types) : [];
+    const hasData = eventValues.length > 0;
+    
+    if (!hasData) {
       return [
         { name: 'MON', value: 30 },
         { name: 'TUE', value: 25 },
@@ -349,11 +352,18 @@ export default function DashboardPage() {
         { name: 'SUN', value: 45 },
       ];
     }
+    
     const days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
-    return days.map((day, index) => ({
-      name: day,
-      value: Math.max(...Object.values(analyticsSummary.event_types || {a:1})) - (index * 5)
-    }));
+    const maxVal = Math.max(0, ...eventValues);
+    
+    return days.map((day, index) => {
+      // Create a more varied mock curve based on the actual data volume
+      const variance = [0.8, 0.6, 0.9, 1.2, 0.7, 1.5, 1.1][index];
+      return {
+        name: day,
+        value: Math.round(maxVal * variance)
+      };
+    });
   }, [analyticsSummary]);
 
   const funnelData = [
@@ -444,9 +454,9 @@ export default function DashboardPage() {
               </svg>
             </button>
           </div>
-          <div className="h-[300px] w-full min-h-[300px]" style={{ minHeight: 300 }}>
+          <div className="h-[300px] w-full">
             {mounted ? (
-               <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={300}>
+               <ResponsiveContainer width="100%" height={300}>
                 <AreaChart data={chartData}>
                   <defs>
                     <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
