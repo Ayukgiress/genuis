@@ -335,11 +335,8 @@ export const interviewApi = {
   sendMessage: (interviewId: number, data: InterviewMessageCreate) =>
     api.post<InterviewMessage>(`/api/interviews/${interviewId}/messages`, data),
   sendAudioMessage: (interviewId: number, audioData: string) => {
-    const formData = new FormData();
-    formData.append('audio_data', audioData);
-    return request<InterviewMessage>(`/api/interviews/${interviewId}/audio`, {
-      method: "POST",
-      body: formData,
+    return api.post<InterviewMessage>(`/api/interviews/${interviewId}/audio`, {
+      base64_audio: audioData,
     });
   },
   getMessages: (interviewId: number) => api.get<InterviewMessage[]>(`/api/interviews/${interviewId}/messages`),

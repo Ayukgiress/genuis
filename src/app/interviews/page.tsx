@@ -196,44 +196,59 @@ export default function InterviewsPage() {
     if (!selectedInterview || isInterviewActive) return;
     setIsInterviewActive(true);
     showToast("🎤 Starting conversational interview...", "success");
+    
     try {
-      // Send system instruction first
-      await interviewApi.sendMessage(selectedInterview.id, {
-        role: "assistant",
-        content: "You are conducting a job interview. Your role is to ask questions to assess the candidate. Do not answer the candidate's responses or provide information. Only ask follow-up questions based on what they say. Start the interview professionally.",
-      });
+      // Connect first so we're ready
+      connect();
 
-      const initialMessage: InterviewMessage = {
-        id: Date.now(),
-        interview_id: selectedInterview.id,
-        role: "user",
-        content: "Hello, I'm ready to begin the interview. Please start by introducing yourself and asking your first question.",
-        created_at: new Date().toISOString(),
-      };
-      const tempInterview = { ...selectedInterview, messages: [...(selectedInterview.messages || []), initialMessage] };
-      setSelectedInterview(tempInterview);
-      const aiResponse = await interviewApi.sendMessage(selectedInterview.id, {
-        role: "user",
-        content: initialMessage.content,
-        generate_audio: true,
-      } as any);
-      const finalInterview = { ...tempInterview, messages: [...tempInterview.messages, aiResponse] };
-      setSelectedInterview(finalInterview);
-      setInterviews((prev) => prev.map((int) => int.id === selectedInterview.id ? finalInterview : int));
-      if (aiResponse.audio_data) {
+      const existingMessages = selectedInterview.messages || [];
+      
+      // If there's already an assistant message (likely the one created on creation), play it
+      const lastAssistantMsg = [...existingMessages].reverse().find(m => m.role === 'assistant');
+      
+      if (lastAssistantMsg && lastAssistantMsg.audio_data) {
+        console.log("🔊 Playing existing initial assistant message");
         try {
-          await audioPlayback.playAudio(aiResponse.audio_data, "audio/webm", () => {
+          await audioPlayback.playAudio(lastAssistantMsg.audio_data, "audio/webm", () => {
             startAudioStream();
             showToast("🎤 AI has started - you can now respond!", "success");
           });
-        } catch (e) { 
-          console.warn("AI audio playback threw:", e);
-          startAudioStream();
+          return;
+        } catch (e) {
+          console.warn("Failed to play existing audio, falling back to trigger", e);
         }
+      }
+
+      // If no audio message to play, or playback failed, trigger a new one
+      const initialTriggerMsg = "Hello, I'm ready to begin the interview. Please start by introducing yourself and asking your first question.";
+      
+      const aiResponse = await interviewApi.sendMessage(selectedInterview.id, {
+        role: "user",
+        content: initialTriggerMsg,
+        generate_audio: true,
+      } as any);
+
+      // Update local state with new messages
+      const updatedMessages = [...existingMessages, {
+        id: Date.now() - 1,
+        interview_id: selectedInterview.id,
+        role: "user",
+        content: initialTriggerMsg,
+        created_at: new Date().toISOString()
+      } as InterviewMessage, aiResponse];
+
+      const updatedInterview = { ...selectedInterview, messages: updatedMessages };
+      setSelectedInterview(updatedInterview);
+      setInterviews((prev) => prev.map((int) => int.id === selectedInterview.id ? updatedInterview : int));
+
+      if (aiResponse.audio_data) {
+        await audioPlayback.playAudio(aiResponse.audio_data, "audio/webm", () => {
+          startAudioStream();
+          showToast("🎤 AI has started - you can now respond!", "success");
+        });
       } else {
         startAudioStream();
       }
-      connect();
     } catch (err) {
       console.error("Failed to start interview:", err);
       showToast("Failed to start interview", "error");
