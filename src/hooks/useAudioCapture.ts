@@ -23,6 +23,12 @@ export const useAudioCapture = (onChunkReady?: (base64: string) => void) => {
 
     try {
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      
+      // ✅ Resume AudioContext if suspended (common in Chrome/Safari)
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
+
       const analyser = audioContext.createAnalyser();
       const microphone = audioContext.createMediaStreamSource(mediaStream);
 
@@ -47,8 +53,8 @@ export const useAudioCapture = (onChunkReady?: (base64: string) => void) => {
         for (let i = 0; i < bufferLength; i++) sum += dataArray[i];
         const average = sum / bufferLength;
 
-        const SPEECH_THRESHOLD = 8;
-        const SILENCE_DURATION = 1000;
+        const SPEECH_THRESHOLD = 5;
+        const SILENCE_DURATION = 1500;
 
         if (average > SPEECH_THRESHOLD) {
           lastSpeechTime = Date.now();
@@ -80,7 +86,7 @@ export const useAudioCapture = (onChunkReady?: (base64: string) => void) => {
             }
           }
         }
-      }, 100);
+      }, 50);
 
     } catch (err) {
       console.error('❌ Failed to start voice activity detection:', err);
@@ -144,10 +150,20 @@ export const useAudioCapture = (onChunkReady?: (base64: string) => void) => {
       setStream(mediaStream);
       setIsStreaming(true);
 
+      // ✅ Find supported mimeType
+      const supportedMimeTypes = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/ogg;codecs=opus',
+        'audio/mp4',
+        'audio/wav'
+      ];
+      
+      const mimeType = supportedMimeTypes.find(type => MediaRecorder.isTypeSupported(type)) || '';
+      console.log(`🎬 Using mimeType: ${mimeType || 'default'}`);
+
       // Set up MediaRecorder for continuous recording
-      const recorder = new MediaRecorder(mediaStream, {
-        mimeType: 'audio/webm;codecs=opus'
-      });
+      const recorder = new MediaRecorder(mediaStream, mimeType ? { mimeType } : {});
       mediaRecorderRef.current = recorder;
       chunksRef.current = [];
 
@@ -164,12 +180,12 @@ export const useAudioCapture = (onChunkReady?: (base64: string) => void) => {
         if (chunksRef.current.length === 0) return;
         
         console.log('⏹️ Speech segment ended, processing audio...');
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        const blob = new Blob(chunksRef.current, { type: mimeType || 'audio/webm' });
         chunksRef.current = [];
 
-        // ✅ Stricter minimum — WebM header alone is ~4KB (but let's allow smaller for very short bursts)
-        if (blob.size < 2000) {
-          console.log('No speech detected, ignoring');
+        // ✅ Smaller minimum — allow short words like "Yes", "No"
+        if (blob.size < 500) {
+          console.log(`No speech detected, segment too small (${blob.size} bytes)`);
           return;
         }
 
