@@ -77,32 +77,36 @@ export const useInterviewWebSocket = (
           audioCaptureRef.current?.setPaused(false);
           console.log('🎤 Ready for user response');
         });
-      } else {
+      } else if (response.content) {
         // Speech-to-speech fallback using browser TTS (because backend audio is missing)
+        console.log('🔊 Falling back to browser TTS for AI response');
         const textToSpeak = response.content;
         if (typeof window !== "undefined" && textToSpeak && "speechSynthesis" in window) {
           try {
             window.speechSynthesis.cancel();
             const utterance = new SpeechSynthesisUtterance(textToSpeak);
-            utterance.rate = 1;
-            utterance.pitch = 1;
             utterance.onend = () => {
               setIsAiResponding(false);
               audioCaptureRef.current?.setPaused(false);
               console.log('🎤 Ready for user response');
             };
-            utterance.onerror = () => {
+            utterance.onerror = (event) => {
+              console.error('TTS error:', event);
               setIsAiResponding(false);
               audioCaptureRef.current?.setPaused(false);
               console.log('🎤 Ready for user response (TTS error)');
             };
             window.speechSynthesis.speak(utterance);
-            return;
-          } catch {
-            // ignore and fall through
+          } catch (e) {
+            console.error('TTS execution error:', e);
+            setIsAiResponding(false);
+            audioCaptureRef.current?.setPaused(false);
           }
+        } else {
+          setIsAiResponding(false);
+          audioCaptureRef.current?.setPaused(false);
         }
-
+      } else {
         setIsAiResponding(false);
         audioCaptureRef.current?.setPaused(false);
       }

@@ -217,6 +217,19 @@ export default function InterviewsPage() {
         } catch (e) {
           console.warn("Failed to play existing audio, falling back to trigger", e);
         }
+      } else if (lastAssistantMsg && lastAssistantMsg.content) {
+        // Fallback to browser TTS for existing message if audio_data is missing
+        console.log("🔊 Falling back to browser TTS for initial assistant message");
+        if (typeof window !== "undefined" && "speechSynthesis" in window) {
+          window.speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance(lastAssistantMsg.content);
+          utterance.onend = () => {
+            startAudioStream();
+            showToast("🎤 AI has started - you can now respond!", "success");
+          };
+          window.speechSynthesis.speak(utterance);
+          return;
+        }
       }
 
       // If no audio message to play, or playback failed, trigger a new one
@@ -246,6 +259,20 @@ export default function InterviewsPage() {
           startAudioStream();
           showToast("🎤 AI has started - you can now respond!", "success");
         });
+      } else if (aiResponse.content) {
+        // Fallback to browser TTS for new AI response
+        console.log("🔊 Falling back to browser TTS for new AI response");
+        if (typeof window !== "undefined" && "speechSynthesis" in window) {
+          window.speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance(aiResponse.content);
+          utterance.onend = () => {
+            startAudioStream();
+            showToast("🎤 AI has started - you can now respond!", "success");
+          };
+          window.speechSynthesis.speak(utterance);
+        } else {
+          startAudioStream();
+        }
       } else {
         startAudioStream();
       }

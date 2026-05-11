@@ -47,8 +47,8 @@ export const useAudioCapture = (onChunkReady?: (base64: string) => void) => {
         for (let i = 0; i < bufferLength; i++) sum += dataArray[i];
         const average = sum / bufferLength;
 
-        const SPEECH_THRESHOLD = 15;
-        const SILENCE_DURATION = 1200;
+        const SPEECH_THRESHOLD = 8;
+        const SILENCE_DURATION = 1000;
 
         if (average > SPEECH_THRESHOLD) {
           lastSpeechTime = Date.now();
@@ -56,7 +56,7 @@ export const useAudioCapture = (onChunkReady?: (base64: string) => void) => {
           if (!isSpeaking) {
             isSpeaking = true;
             setIsListening(true);
-            console.log('🎙️ Speech detected, listening...');
+            console.log(`🎙️ Speech detected (lvl: ${average.toFixed(1)}), listening...`);
 
             // ✅ Start a FRESH recorder only when speech begins
             if (mediaRecorderRef.current?.state === 'inactive') {
@@ -64,13 +64,20 @@ export const useAudioCapture = (onChunkReady?: (base64: string) => void) => {
               mediaRecorderRef.current.start();
             }
           }
-        } else if (isSpeaking && Date.now() - lastSpeechTime > SILENCE_DURATION) {
-          isSpeaking = false;
-          setIsListening(false);
-          console.log('🤫 Silence detected, processing segment');
+        } else {
+          // Add a periodic log for debugging levels when silent (optional, every 2s)
+          if (Date.now() % 2000 < 100) {
+            // console.log(`🔈 Ambient level: ${average.toFixed(1)}`);
+          }
 
-          if (mediaRecorderRef.current?.state === 'recording') {
-            mediaRecorderRef.current.stop(); // onstop fires → sends chunk
+          if (isSpeaking && Date.now() - lastSpeechTime > SILENCE_DURATION) {
+            isSpeaking = false;
+            setIsListening(false);
+            console.log('🤫 Silence detected, processing segment');
+
+            if (mediaRecorderRef.current?.state === 'recording') {
+              mediaRecorderRef.current.stop(); // onstop fires → sends chunk
+            }
           }
         }
       }, 100);
