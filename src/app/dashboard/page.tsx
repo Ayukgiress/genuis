@@ -126,8 +126,8 @@ export default function DashboardPage() {
         const activeInterviews = interviewsData.filter((i) => i.status === 'active');
         setInterviews(activeInterviews);
 
-        const activeJobIdSet = new Set<number>(
-          activeInterviews.map((i) => i.job_id).filter((id) => Number.isFinite(id))
+        const activeJobIdSet = new Set<string>(
+          activeInterviews.map((i) => i.job_id)
         );
 
         // Derive applied jobs from kanban cards and application store
@@ -198,14 +198,13 @@ export default function DashboardPage() {
 
         // Create missing prep sessions for applied jobs without active interviews
         for (const job of appliedJobList) {
-          const jobIdNum = parseInt(job.id, 10);
-          const hasInterview = activeJobIdSet.has(jobIdNum);
+          const hasInterview = activeJobIdSet.has(job.id);
 
-          if (hasInterview || !Number.isFinite(jobIdNum)) continue;
+          if (hasInterview) continue;
 
           try {
             const interview = await interviewApi.create({
-              job_id: jobIdNum.toString(),
+              job_id: job.id,
               status: 'active',
             });
 
@@ -219,7 +218,7 @@ export default function DashboardPage() {
               );
             }, 1000);
 
-            activeJobIdSet.add(jobIdNum);
+            activeJobIdSet.add(job.id);
           } catch {
             // Skip silently
           }
@@ -629,12 +628,12 @@ export default function DashboardPage() {
                     </div>
                     <button
                       onClick={() => {
-                        const interview = interviews.find(i => i.job_id === parseInt(job.id));
+                        const interview = interviews.find(i => i.job_id === job.id);
                         if (interview) {
                           router.push(`/interviews?id=${interview.id}`);
                         } else {
                            interviewApi.create({
-                             job_id: parseInt(job.id).toString(),
+                             job_id: job.id,
                              status: 'active'
                            }).then(interview => {
                             router.push(`/interviews?id=${interview.id}`);

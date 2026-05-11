@@ -347,7 +347,7 @@ export interface JobSearchParams {
 export interface Interview {
   id: number;
   user_id: number;
-  job_id: number;
+  job_id: string;
   status: "active" | "completed" | "cancelled";
   created_at: string;
   updated_at?: string;
@@ -375,6 +375,6 @@ export interface InterviewMessageCreate {
 }
 
 export interface InterviewStartRequest {
-  job_id: number;
+  job_id: string;
   resume_content?: string;
 }

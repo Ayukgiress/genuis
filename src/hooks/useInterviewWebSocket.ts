@@ -72,6 +72,7 @@ export const useInterviewWebSocket = (
 
       if (audioData) {
         console.log('🔊 Playing AI response...');
+        setIsAiResponding(true); // Ensure it's true while playing
         audioPlayback.playAudio(audioData as string, 'audio/webm', () => {
           setIsAiResponding(false);
           audioCaptureRef.current?.setPaused(false);
@@ -84,6 +85,7 @@ export const useInterviewWebSocket = (
         if (typeof window !== "undefined" && textToSpeak && "speechSynthesis" in window) {
           try {
             window.speechSynthesis.cancel();
+            setIsAiResponding(true); // Highlight AI as speaking
             const utterance = new SpeechSynthesisUtterance(textToSpeak);
             utterance.onend = () => {
               setIsAiResponding(false);

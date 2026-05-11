@@ -53,8 +53,8 @@ export const useAudioCapture = (onChunkReady?: (base64: string) => void) => {
         for (let i = 0; i < bufferLength; i++) sum += dataArray[i];
         const average = sum / bufferLength;
 
-        const SPEECH_THRESHOLD = 5;
-        const SILENCE_DURATION = 1500;
+        const SPEECH_THRESHOLD = 3.5;
+        const SILENCE_DURATION = 1800;
 
         if (average > SPEECH_THRESHOLD) {
           lastSpeechTime = Date.now();

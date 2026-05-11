@@ -32,6 +32,7 @@ export default function InterviewsPage() {
   const [selectedJobId, setSelectedJobId] = useState<string>("");
   const [isInterviewActive, setIsInterviewActive] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [localAiSpeaking, setLocalAiSpeaking] = useState(false);
 
   const audioPlayback = useAudioPlayback();
 
@@ -201,35 +202,57 @@ export default function InterviewsPage() {
       // Connect first so we're ready
       connect();
 
-      const existingMessages = selectedInterview.messages || [];
+      // Ensure we have messages
+      let currentInterview = selectedInterview;
+      if (!currentInterview.messages || currentInterview.messages.length === 0) {
+        const freshMessages = await interviewApi.getMessages(currentInterview.id);
+        currentInterview = { ...currentInterview, messages: freshMessages };
+        setSelectedInterview(currentInterview);
+      }
+
+      const existingMessages = currentInterview.messages || [];
       
       // If there's already an assistant message (likely the one created on creation), play it
       const lastAssistantMsg = [...existingMessages].reverse().find(m => m.role === 'assistant');
       
-      if (lastAssistantMsg && lastAssistantMsg.audio_data) {
-        console.log("🔊 Playing existing initial assistant message");
-        try {
-          await audioPlayback.playAudio(lastAssistantMsg.audio_data, "audio/webm", () => {
-            startAudioStream();
-            showToast("🎤 AI has started - you can now respond!", "success");
-          });
-          return;
-        } catch (e) {
-          console.warn("Failed to play existing audio, falling back to trigger", e);
-        }
-      } else if (lastAssistantMsg && lastAssistantMsg.content) {
-        // Fallback to browser TTS for existing message if audio_data is missing
-        console.log("🔊 Falling back to browser TTS for initial assistant message");
-        if (typeof window !== "undefined" && "speechSynthesis" in window) {
-          window.speechSynthesis.cancel();
-          const utterance = new SpeechSynthesisUtterance(lastAssistantMsg.content);
-          utterance.onend = () => {
-            startAudioStream();
-            showToast("🎤 AI has started - you can now respond!", "success");
-          };
-          window.speechSynthesis.speak(utterance);
-          return;
-        }
+      if (lastAssistantMsg) {
+        console.log("🔊 Playing initial assistant message");
+        
+        // Use a function to handle the speaking state
+        const handleAiSpeaking = async (content: string, audioData?: string) => {
+          setLocalAiSpeaking(true);
+          
+          if (audioData) {
+            try {
+              await audioPlayback.playAudio(audioData, "audio/webm", () => {
+                setLocalAiSpeaking(false);
+                startAudioStream();
+                showToast("🎤 AI has started - you can now respond!", "success");
+              });
+              return true;
+            } catch (e) {
+              console.warn("Failed to play audio data, falling back to TTS", e);
+            }
+          }
+          
+          if (typeof window !== "undefined" && "speechSynthesis" in window) {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(content);
+            utterance.onend = () => {
+              setLocalAiSpeaking(false);
+              startAudioStream();
+              showToast("🎤 AI has started - you can now respond!", "success");
+            };
+            utterance.onerror = () => setLocalAiSpeaking(false);
+            window.speechSynthesis.speak(utterance);
+            return true;
+          }
+          setLocalAiSpeaking(false);
+          return false;
+        };
+
+        const spoke = await handleAiSpeaking(lastAssistantMsg.content, lastAssistantMsg.audio_data);
+        if (spoke) return;
       }
 
       // If no audio message to play, or playback failed, trigger a new one
@@ -255,7 +278,9 @@ export default function InterviewsPage() {
       setInterviews((prev) => prev.map((int) => int.id === selectedInterview.id ? updatedInterview : int));
 
       if (aiResponse.audio_data) {
+        setLocalAiSpeaking(true);
         await audioPlayback.playAudio(aiResponse.audio_data, "audio/webm", () => {
+          setLocalAiSpeaking(false);
           startAudioStream();
           showToast("🎤 AI has started - you can now respond!", "success");
         });
@@ -264,11 +289,14 @@ export default function InterviewsPage() {
         console.log("🔊 Falling back to browser TTS for new AI response");
         if (typeof window !== "undefined" && "speechSynthesis" in window) {
           window.speechSynthesis.cancel();
+          setLocalAiSpeaking(true);
           const utterance = new SpeechSynthesisUtterance(aiResponse.content);
           utterance.onend = () => {
+            setLocalAiSpeaking(false);
             startAudioStream();
             showToast("🎤 AI has started - you can now respond!", "success");
           };
+          utterance.onerror = () => setLocalAiSpeaking(false);
           window.speechSynthesis.speak(utterance);
         } else {
           startAudioStream();
@@ -290,7 +318,7 @@ export default function InterviewsPage() {
     showToast("Interview ended", "success");
   };
 
-  const getJobDetails = (jobId: number) => jobs.find((job) => job.id === jobId.toString());
+  const getJobDetails = (jobId: string) => jobs.find((job) => job.id === jobId);
   const formatTime = (d: string) => new Date(d).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   const formatDate = (d: string) => new Date(d).toLocaleDateString([], { month: "short", day: "numeric" });
 
@@ -683,7 +711,7 @@ export default function InterviewsPage() {
                     <div className="flex flex-col items-center">
                       <WaveIndicator 
                         isActive={isInterviewActive} 
-                        isSpeaking={isAiResponding} 
+                        isSpeaking={isAiResponding || localAiSpeaking} 
                         label="AI Interviewer" 
                         isAi={true} 
                       />
