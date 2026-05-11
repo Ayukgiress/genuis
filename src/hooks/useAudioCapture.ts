@@ -16,7 +16,7 @@ export const useAudioCapture = (onChunkReady?: (base64: string) => void) => {
   const recordingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Voice Activity Detection using audio levels
-  const startVoiceActivityDetection = useCallback((mediaStream: MediaStream) => {
+  const startVoiceActivityDetection = useCallback(async (mediaStream: MediaStream) => {
     if (!mediaStream) return;
 
     console.log('🎤 Starting Voice Activity Detection');
@@ -168,7 +168,7 @@ export const useAudioCapture = (onChunkReady?: (base64: string) => void) => {
       chunksRef.current = [];
 
       // Start voice activity detection
-      startVoiceActivityDetection(mediaStream);
+      await startVoiceActivityDetection(mediaStream);
 
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) {

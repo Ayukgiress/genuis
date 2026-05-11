@@ -295,8 +295,19 @@ export default function InterviewsPage() {
   const formatDate = (d: string) => new Date(d).toLocaleDateString([], { month: "short", day: "numeric" });
 
   const WaveIndicator = ({ isActive, isSpeaking, label, isAi = false }: { isActive: boolean; isSpeaking: boolean; label: string; isAi?: boolean }) => (
-    <div className="flex flex-col items-center justify-center gap-6 py-6 transition-all duration-700">
+    <div className={`flex flex-col items-center justify-center gap-6 py-6 px-8 rounded-3xl transition-all duration-700 ${
+      isActive && isSpeaking 
+        ? 'scale-105 bg-primary/5 ring-1 ring-primary/20 shadow-[0_0_40px_rgba(var(--primary-rgb),0.1)]' 
+        : 'opacity-50 grayscale-[0.5]'
+    }`}>
       <div className="relative flex items-center justify-center h-48 w-48">
+        {/* Speaking Status Badge */}
+        {isActive && isSpeaking && (
+          <div className="absolute -top-4 px-3 py-1 bg-primary text-black text-[10px] font-bold uppercase tracking-widest rounded-full z-20 shadow-[0_4px_12px_rgba(var(--primary-rgb),0.4)] animate-bounce">
+            Speaking...
+          </div>
+        )}
+        
         {/* Animated circles for waves */}
         {isActive && isSpeaking && (
           <>
@@ -683,7 +694,7 @@ export default function InterviewsPage() {
                       <WaveIndicator 
                         isActive={isInterviewActive} 
                         isSpeaking={isStreaming && audioCapture.isListening} 
-                        label="You (Speaking)" 
+                        label="You" 
                       />
                     </div>
                   </div>
