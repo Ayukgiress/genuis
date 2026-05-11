@@ -215,7 +215,8 @@ export default function InterviewsPage() {
       const aiResponse = await interviewApi.sendMessage(selectedInterview.id, {
         role: "user",
         content: initialMessage.content,
-      });
+        generate_audio: true,
+      } as any);
       const finalInterview = { ...tempInterview, messages: [...tempInterview.messages, aiResponse] };
       setSelectedInterview(finalInterview);
       setInterviews((prev) => prev.map((int) => int.id === selectedInterview.id ? finalInterview : int));
