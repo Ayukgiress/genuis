@@ -26,11 +26,11 @@ export default function InterviewsLayout({
   }, []);
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-[#F7F6F2] text-zinc-900">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="lg:pl-64 flex flex-col min-h-screen">
         <TopBar onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
-        <main className="flex-1 p-8">
+        <main className="flex-1 min-h-0">
           {children}
         </main>
       </div>

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { interviewApi } from '@/lib/api';
 import { useAudioCapture } from './useAudioCapture';
 import { useAudioPlayback } from './useAudioPlayback';
@@ -11,10 +11,10 @@ export const useInterviewWebSocket = (
   onMessage?: (message: InterviewMessage) => void
 ) => {
   const [isConnected, setIsConnected] = useState(true); // Always "connected" for HTTP approach
-  const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [connectionAttempted, setConnectionAttempted] = useState(false);
   const [isAiResponding, setIsAiResponding] = useState(false);
+  const [isTtsActive, setIsTtsActive] = useState(false); // explicit TTS flag
 
   const audioCaptureRef = useRef<any>(null);
 
@@ -40,7 +40,7 @@ export const useInterviewWebSocket = (
       if ((response as any).status === 'no_speech') {
         console.log('No speech detected, ignoring');
         setIsAiResponding(false);
-        audioCapture.setPaused(false);
+        audioCaptureRef.current?.setPaused(false);
         return;
       }
 
@@ -51,16 +51,6 @@ export const useInterviewWebSocket = (
       if (response.content) {
         console.log('💬 AI says:', response.content);
       }
-
-      // Handle AI audio response
-      console.log('🔎 AI audio fields present on response:', {
-        keys: Object.keys(response as any),
-        audio_data: (response as any).audio_data,
-        audio: (response as any).audio,
-        audioData: (response as any).audioData,
-        ai_audio_base64: (response as any).ai_audio_base64,
-        aiAudioBase64: (response as any).aiAudioBase64,
-      });
 
       const audioData =
         (response as any).audio_data ??
@@ -86,15 +76,18 @@ export const useInterviewWebSocket = (
           try {
             window.speechSynthesis.cancel();
             setIsAiResponding(true); // Highlight AI as speaking
+            setIsTtsActive(true);
             const utterance = new SpeechSynthesisUtterance(textToSpeak);
             utterance.onend = () => {
               setIsAiResponding(false);
+              setIsTtsActive(false);
               audioCaptureRef.current?.setPaused(false);
               console.log('🎤 Ready for user response');
             };
             utterance.onerror = (event) => {
               console.error('TTS error:', event);
               setIsAiResponding(false);
+              setIsTtsActive(false);
               audioCaptureRef.current?.setPaused(false);
               console.log('🎤 Ready for user response (TTS error)');
             };
@@ -102,14 +95,17 @@ export const useInterviewWebSocket = (
           } catch (e) {
             console.error('TTS execution error:', e);
             setIsAiResponding(false);
+            setIsTtsActive(false);
             audioCaptureRef.current?.setPaused(false);
           }
         } else {
           setIsAiResponding(false);
+          setIsTtsActive(false);
           audioCaptureRef.current?.setPaused(false);
         }
       } else {
         setIsAiResponding(false);
+        setIsTtsActive(false);
         audioCaptureRef.current?.setPaused(false);
       }
 
@@ -122,12 +118,23 @@ export const useInterviewWebSocket = (
         setError(`Failed to process speech (${error?.status || 'unknown error'}). Please try again.`);
       }
       setIsAiResponding(false);
+      setIsTtsActive(false);
       audioCaptureRef.current?.setPaused(false);
     }
   }, [isAiResponding, onMessage, audioPlayback]);
 
   const audioCapture = useAudioCapture(audioCaptureCallback);
   audioCaptureRef.current = audioCapture;
+
+  // Stop any in-flight TTS / AI audio when interview is torn down
+  useEffect(() => {
+    return () => {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        try { window.speechSynthesis.cancel(); } catch {}
+      }
+      audioPlayback.stopAudio();
+    };
+  }, [audioPlayback]);
 
   // Simple connect/disconnect for compatibility
   const connect = useCallback(() => {
@@ -137,7 +144,11 @@ export const useInterviewWebSocket = (
 
   const disconnect = useCallback(() => {
     console.log('🎭 Conversational interview disconnected');
-  }, []);
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      try { window.speechSynthesis.cancel(); } catch {}
+    }
+    audioPlayback.stopAudio();
+  }, [audioPlayback]);
 
   const startAudioStream = useCallback(() => {
     console.log('🎤 Starting automatic audio capture');
@@ -151,11 +162,13 @@ export const useInterviewWebSocket = (
 
   return {
     isConnected, // Always true in HTTP mode
-    isStreaming,
+    isStreaming: audioCapture.isStreaming, // propagate mic streaming state up
     connectionAttempted,
     audioCapture,
     error,
     isAiResponding,
+    isTtsActive,
+    isUserSpeaking: audioCapture.isStreaming && audioCapture.isListening && !isAiResponding,
     connect,
     disconnect,
     startAudioStream,
