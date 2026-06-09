@@ -16,6 +16,7 @@ import {
   type CollisionDetection,
   pointerWithin,
   rectIntersection,
+  useDroppable,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -165,6 +166,8 @@ function CardPreview({ card, columnId }: { card: KanbanCard; columnId: KanbanCol
   );
 }
 
+/* ── Column drop zone (empty-space droppable) ─────────────────────────── */
+
 function ColumnView({
   id, title, count, cards, isOver, onAddCard, onDelete,
 }: {
@@ -189,27 +192,73 @@ function ColumnView({
           </svg>
         </button>
       </div>
-      <div className="flex-1 min-h-[120px]">
-        <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
-          <div className="space-y-4">
-            {cards.map((card) => (
-              <SortableCard key={card.id} card={card} columnId={id} onDelete={onDelete} />
-            ))}
-          </div>
-        </SortableContext>
-        {id === "todo" && (
-          <button
-            onClick={() => onAddCard("todo")}
-            className="mt-4 w-full py-4 border-2 border-dashed border-zinc-900 rounded-[2rem] text-xs font-black tracking-[0.2em] text-zinc-600 hover:border-zinc-800 hover:text-zinc-400 transition-all uppercase flex items-center justify-center gap-2"
-          >
-            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="3">
-              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            Add Lead
-          </button>
-        )}
-      </div>
+
+      <ColumnDropZone id={id} cards={cards} onAddCard={onAddCard} onDelete={onDelete} />
     </div>
+  );
+}
+
+/**
+ * The actual droppable area inside a column. Split into:
+ *  - "list area": the SortableContext holding the cards
+ *  - "tail droppable": a useDroppable zone AFTER the last card,
+ *    so dropping in empty space at the bottom still registers
+ *  - "empty droppable": a useDroppable for the whole zone when no cards
+ */
+function ColumnDropZone({
+  id, cards, onAddCard, onDelete,
+}: {
+  id: KanbanColumnId;
+  cards: KanbanCard[];
+  onAddCard: (id: KanbanColumnId) => void;
+  onDelete: (id: string) => void;
+}) {
+  // Always register a fallback "column" droppable so empty columns can accept drops.
+  const empty = useDroppable({
+    id: `column-${id}`,
+    data: { type: "column", columnId: id },
+  });
+
+  return (
+    <div ref={empty.setNodeRef} className="flex-1 min-h-[160px] flex flex-col">
+      <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+        <div className="flex-1 space-y-4">
+          {cards.map((card) => (
+            <SortableCard key={card.id} card={card} columnId={id} onDelete={onDelete} />
+          ))}
+        </div>
+      </SortableContext>
+
+      {/* Tail droppable — always present, even if no cards. Lets the user drop at the END of any column. */}
+      <TailDroppable columnId={id} />
+
+      {/* "Add Lead" only on the wishlist column, shown BELOW the cards as a single, non-duplicate add affordance. */}
+      {id === "todo" && (
+        <button
+          onClick={() => onAddCard("todo")}
+          className="mt-4 w-full py-4 border-2 border-dashed border-zinc-900 rounded-[2rem] text-xs font-black tracking-[0.2em] text-zinc-600 hover:border-zinc-800 hover:text-zinc-400 transition-all uppercase flex items-center justify-center gap-2"
+        >
+          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="3">
+            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+          Add Lead
+        </button>
+      )}
+    </div>
+  );
+}
+
+function TailDroppable({ columnId }: { columnId: KanbanColumnId }) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `tail-${columnId}`,
+    data: { type: "column-tail", columnId },
+  });
+  return (
+    <div
+      ref={setNodeRef}
+      className={`mt-2 h-3 rounded-md transition-colors ${isOver ? "bg-primary/30" : "bg-transparent"}`}
+      aria-hidden
+    />
   );
 }
 
@@ -232,6 +281,10 @@ export function KanbanBoard({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
+  // Layered collision detection: prefer precise pointer hits, then rect
+  // intersection, then closest corners (so cross-column drops are still
+  // detected when no card is hovered). `closestCenter` is not needed here
+  // and is intentionally not imported.
   const collisionDetection: CollisionDetection = (args) => {
     const pointerCollisions = pointerWithin(args);
     if (pointerCollisions.length > 0) return pointerCollisions;
@@ -250,15 +303,20 @@ export function KanbanBoard({
     if (data?.type === "card" && data.card) setActiveCard(data.card);
   }
 
+  /** Resolve which column an `over` target belongs to. */
+  function resolveOverColumn(overId: string, data?: { type?: string; columnId?: KanbanColumnId }): KanbanColumnId | null {
+    if (data?.type === "column" && data.columnId) return data.columnId;
+    if (data?.type === "column-tail" && data.columnId) return data.columnId;
+    return findColumnOfCard(overId);
+  }
+
   function handleDragOver(e: DragOverEvent) {
     const { active, over } = e;
     if (!over) { setOverColumn(null); return; }
     const activeId = String(active.id);
+    const overData = over.data.current as { type?: string; columnId?: KanbanColumnId } | undefined;
     const overId = String(over.id);
-    const overData = over.data.current as { type?: string } | undefined;
-    let overCol: KanbanColumnId | null = null;
-    if (overData?.type === "column") overCol = overId as KanbanColumnId;
-    else overCol = findColumnOfCard(overId);
+    const overCol = resolveOverColumn(overId, overData);
     if (overCol) setOverColumn(overCol);
 
     // Auto-move across columns during drag
@@ -281,17 +339,30 @@ export function KanbanBoard({
     const overId = String(over.id);
     if (activeId === overId) return;
 
-    const overData = over.data.current as { type?: string } | undefined;
-    let targetColumnId: KanbanColumnId | null = null;
-    if (overData?.type === "column") targetColumnId = overId as KanbanColumnId;
-    else targetColumnId = findColumnOfCard(overId);
+    const overData = over.data.current as { type?: string; columnId?: KanbanColumnId } | undefined;
+    const targetColumnId = resolveOverColumn(overId, overData);
     if (!targetColumnId) return;
+
+    // Compute the desired index:
+    //  - "column-tail" → drop at the END of the target column
+    //  - "column" (empty) → drop at index 0
+    //  - over a card → insert at that card's position
+    const isTail = overData?.type === "column-tail";
+    // 'isEmptyColumn' is implicit: when overData?.type === "column",
+    // the newIndex falls through to 0 (the empty column's first slot).
+    const isEmptyColumn = overData?.type === "column";
+    void isEmptyColumn;
 
     let newIndex = 0;
     setCards((prev): KanbanCard[] => {
       const targetList = prev.filter((c) => c.column_id === targetColumnId && c.id !== activeId);
-      const overIndex = targetList.findIndex((c) => c.id === overId);
-      newIndex = overIndex >= 0 ? overIndex : targetList.length;
+
+      if (isTail) {
+        newIndex = targetList.length;
+      } else {
+        const overIndex = targetList.findIndex((c) => c.id === overId);
+        newIndex = overIndex >= 0 ? overIndex : 0; // empty column → 0
+      }
 
       const inserted = [...targetList];
       inserted.splice(newIndex, 0, { ...dragged, column_id: targetColumnId });
@@ -326,7 +397,10 @@ export function KanbanBoard({
             title={column.title}
             count={buckets[column.id].length}
             cards={buckets[column.id]}
-            isOver={overColumn === column.id && activeCard != null && draggedColumn !== column.id}
+            // Highlight the column whenever a card is being dragged AND
+            // the cursor is hovering any droppable in this column — including
+            // the same-column case, the empty-column case, and the tail case.
+            isOver={overColumn === column.id && activeCard != null}
             onAddCard={onAddCard}
             onDelete={onDeleteCard}
           />

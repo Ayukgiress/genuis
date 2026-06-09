@@ -13,7 +13,7 @@ export default function InterviewsLayout({
 
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth >= 1024) { // lg breakpoint
+      if (window.innerWidth >= 1024) {
         setSidebarOpen(true);
       } else {
         setSidebarOpen(false);
@@ -26,7 +26,7 @@ export default function InterviewsLayout({
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#F7F6F2] text-zinc-900">
+    <div className="min-h-screen bg-black text-white">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="lg:pl-64 flex flex-col min-h-screen">
         <TopBar onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />

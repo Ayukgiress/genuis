@@ -3,8 +3,14 @@
 import React from "react";
 import type { Interview, Job } from "@/types";
 
+/* ──────────────────────────────────────────────────────────────────────────
+   Sub-components for the interview page (part 1)
+   Uses the global dark theme (bg-card, text-white, primary = #00f29c)
+   ────────────────────────────────────────────────────────────────────────── */
 
 export type Phase = "idle" | "ai_speaking" | "user_speaking" | "processing" | "ready";
+
+const PRIMARY = "#00f29c";
 
 
 export function SessionList({
@@ -34,26 +40,26 @@ export function SessionList({
     <>
       {panelOpen && (
         <div
-          className="fixed inset-0 bg-zinc-900/40 backdrop-blur-sm z-40 lg:hidden"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
           onClick={closePanel}
         />
       )}
 
       <aside
         className={`
-          w-[280px] shrink-0 bg-white border-r border-zinc-200
+          w-[280px] shrink-0 bg-zinc-950 border-r border-zinc-800
           flex flex-col z-50 transition-transform duration-300
           fixed lg:relative inset-y-0 left-0 lg:top-0
           ${panelOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
         `}
         style={{ top: 0 }}
       >
-        <div className="px-5 pt-5 pb-3 border-b border-zinc-100 shrink-0">
+        <div className="px-5 pt-5 pb-3 border-b border-zinc-800/70 shrink-0">
           <div className="flex items-center justify-between mb-1">
-            <h2 className="text-sm font-semibold text-zinc-900">Practice sessions</h2>
+            <h2 className="text-sm font-semibold text-white">Practice sessions</h2>
             <button
               onClick={onCreate}
-              className="w-7 h-7 rounded-lg bg-zinc-900 text-white grid place-items-center hover:bg-zinc-700 transition-colors"
+              className="w-7 h-7 rounded-lg bg-primary text-black grid place-items-center hover:opacity-90 transition-opacity"
               title="New session (⌘N)"
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -69,8 +75,8 @@ export function SessionList({
         <div className="flex-1 overflow-y-auto wf-scrollbar px-2 py-2">
           {interviews.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 gap-3 text-center px-4">
-              <div className="w-12 h-12 rounded-2xl bg-zinc-100 grid place-items-center">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-zinc-400">
+              <div className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 grid place-items-center">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-zinc-500">
                   <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
                   <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
                   <line x1="12" y1="19" x2="12" y2="23" />
@@ -78,12 +84,12 @@ export function SessionList({
                 </svg>
               </div>
               <div>
-                <p className="text-sm font-medium text-zinc-700">No sessions yet</p>
+                <p className="text-sm font-medium text-zinc-300">No sessions yet</p>
                 <p className="text-xs text-zinc-500 mt-0.5">Start a new one to begin practicing.</p>
               </div>
               <button
                 onClick={onCreate}
-                className="mt-1 text-xs font-semibold text-emerald-700 hover:underline"
+                className="mt-1 text-xs font-semibold text-primary hover:opacity-80"
               >
                 Start a session →
               </button>
@@ -106,28 +112,32 @@ export function SessionList({
                     className={`
                       group relative flex items-start gap-2.5 px-2.5 py-2.5 rounded-xl cursor-pointer
                       transition-colors duration-100
-                      ${isActive ? "bg-zinc-100" : "hover:bg-zinc-50"}
+                      ${isActive ? "bg-zinc-900" : "hover:bg-zinc-900/60"}
                     `}
                   >
                     {isActive && (
-                      <span className="absolute left-0 top-3 bottom-3 w-[3px] bg-emerald-600 rounded-r-full" />
+                      <span
+                        className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full"
+                        style={{ backgroundColor: PRIMARY }}
+                      />
                     )}
 
                     <div
                       className={`
                         w-9 h-9 shrink-0 rounded-lg grid place-items-center text-[13px] font-semibold
                         ${isActive
-                          ? "bg-emerald-600 text-white"
+                          ? "text-black"
                           : isCompleted
-                            ? "bg-zinc-200 text-zinc-500"
-                            : "bg-zinc-100 text-zinc-700"}
+                            ? "bg-zinc-800 text-zinc-500"
+                            : "bg-zinc-800 text-zinc-300"}
                       `}
+                      style={isActive ? { backgroundColor: PRIMARY } : undefined}
                     >
                       {initial}
                     </div>
 
                     <div className="flex-1 min-w-0">
-                      <p className={`text-[13px] font-medium truncate leading-tight ${isActive ? "text-zinc-900" : "text-zinc-800"}`}>
+                      <p className={`text-[13px] font-medium truncate leading-tight ${isActive ? "text-white" : "text-zinc-200"}`}>
                         {title}
                       </p>
                       <p className="text-[11px] text-zinc-500 truncate mt-0.5">
@@ -135,15 +145,18 @@ export function SessionList({
                       </p>
                       <div className="flex items-center gap-1.5 mt-1">
                         {isCompleted ? (
-                          <span className="text-[10px] font-medium text-zinc-500 bg-zinc-100 px-1.5 py-0.5 rounded">
+                          <span className="text-[10px] font-medium text-zinc-500 bg-zinc-900 px-1.5 py-0.5 rounded">
                             Completed
                           </span>
                         ) : hasMessages ? (
-                          <span className="text-[10px] font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+                          <span
+                            className="text-[10px] font-medium px-1.5 py-0.5 rounded"
+                            style={{ color: PRIMARY, backgroundColor: "rgba(0,242,156,0.1)" }}
+                          >
                             In progress
                           </span>
                         ) : (
-                          <span className="text-[10px] font-medium text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
+                          <span className="text-[10px] font-medium text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">
                             Not started
                           </span>
                         )}
@@ -153,7 +166,7 @@ export function SessionList({
                     <div className="opacity-0 group-hover:opacity-100 flex flex-col gap-0.5 shrink-0 transition-opacity">
                       {!isCompleted && hasMessages && (
                         <button
-                          className="w-6 h-6 grid place-items-center rounded-md text-zinc-400 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
+                          className="w-6 h-6 grid place-items-center rounded-md text-zinc-500 hover:text-primary hover:bg-zinc-800 transition-colors"
                           onClick={(e) => { e.stopPropagation(); onComplete(iv.id); }}
                           title="Mark complete"
                         >
@@ -163,7 +176,7 @@ export function SessionList({
                         </button>
                       )}
                       <button
-                        className="w-6 h-6 grid place-items-center rounded-md text-zinc-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        className="w-6 h-6 grid place-items-center rounded-md text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
                         onClick={(e) => { e.stopPropagation(); onDelete(iv.id); }}
                         title="Delete"
                       >
@@ -181,15 +194,15 @@ export function SessionList({
           )}
         </div>
 
-        <div className="px-5 py-3 border-t border-zinc-100 shrink-0">
-          <p className="text-[11px] text-zinc-400">⌘N · new session</p>
+        <div className="px-5 py-3 border-t border-zinc-800/70 shrink-0">
+          <p className="text-[11px] text-zinc-600">⌘N · new session</p>
         </div>
       </aside>
     </>
   );
 }
 
-/* ── STAGE HEADER ─────────────────────────────────────────────────────────── */
+/* ── MINIMAL STAGE HEADER (no in-page top bar) ───────────────────────────── */
 
 export function StageHeader({
   job,
@@ -197,7 +210,6 @@ export function StageHeader({
   phase,
   elapsed,
   formatElapsed,
-  isConnected,
   onToggle,
   onMobileSessions,
   disabled,
@@ -207,87 +219,82 @@ export function StageHeader({
   phase: Phase;
   elapsed: number;
   formatElapsed: (s: number) => string;
-  isConnected: boolean;
   onToggle: () => void;
   onMobileSessions: () => void;
   disabled: boolean;
 }) {
   return (
-    <div className="sticky top-0 z-10 bg-[#F7F6F2]/85 backdrop-blur-md border-b border-zinc-200/70 px-4 sm:px-8 py-3.5">
-      <div className="flex items-center gap-3 max-w-5xl mx-auto">
-        <button
-          onClick={onMobileSessions}
-          className="lg:hidden w-9 h-9 rounded-lg bg-white border border-zinc-200 grid place-items-center text-zinc-700"
-          aria-label="Open sessions"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="3" y1="6" x2="21" y2="6" />
-            <line x1="3" y1="12" x2="21" y2="12" />
-            <line x1="3" y1="18" x2="21" y2="18" />
-          </svg>
-        </button>
+    <div className="border-b border-zinc-800/70 px-4 sm:px-8 py-4 flex items-center gap-3">
+      {/* Mobile sessions toggle */}
+      <button
+        onClick={onMobileSessions}
+        className="lg:hidden w-9 h-9 rounded-lg bg-zinc-900 border border-zinc-800 grid place-items-center text-zinc-400 hover:text-white"
+        aria-label="Open sessions"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <line x1="3" y1="6" x2="21" y2="6" />
+          <line x1="3" y1="12" x2="21" y2="12" />
+          <line x1="3" y1="18" x2="21" y2="18" />
+        </svg>
+      </button>
 
-        {job && (
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-lg bg-white border border-zinc-200 grid place-items-center text-[13px] font-bold text-zinc-700 shrink-0">
-              {(job.company || job.title || "?")[0].toUpperCase()}
-            </div>
-            <div className="min-w-0">
-              <p className="text-[14px] font-semibold text-zinc-900 truncate leading-tight">
-                {job.title}
-              </p>
-              <p className="text-[12px] text-zinc-500 truncate">
-                {job.company}{job.location ? ` · ${job.location}` : ""}
-              </p>
-            </div>
+      {/* Job context */}
+      {job && (
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-9 h-9 rounded-lg bg-zinc-900 border border-zinc-800 grid place-items-center text-[12px] font-bold text-zinc-300 shrink-0">
+            {(job.company || job.title || "?")[0].toUpperCase()}
+          </div>
+          <div className="min-w-0">
+            <p className="text-[14px] font-semibold text-white truncate leading-tight">
+              {job.title}
+            </p>
+            <p className="text-[12px] text-zinc-500 truncate">
+              {job.company}{job.location ? ` · ${job.location}` : ""}
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-center gap-2 ml-auto shrink-0">
+        {/* Phase pill (compact) */}
+        <PhaseChip phase={phase} isActive={isInterviewActive} />
+
+        {/* Timer */}
+        {isInterviewActive && (
+          <div className="hidden sm:flex items-center text-[12px] font-mono text-zinc-500 bg-zinc-900 border border-zinc-800 px-2 py-1 rounded-md">
+            {formatElapsed(elapsed)}
           </div>
         )}
 
-        <div className="flex items-center gap-2 ml-auto shrink-0">
-          <PhaseChip phase={phase} isActive={isInterviewActive} />
-
-          {isConnected && (
-            <div className="hidden sm:flex items-center gap-1.5 text-[11px] font-medium text-emerald-700">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Live
-            </div>
+        {/* Start / End */}
+        <button
+          onClick={onToggle}
+          disabled={disabled}
+          className={`
+            inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-semibold
+            transition-all duration-150
+            ${isInterviewActive
+              ? "bg-zinc-900 border border-red-500/30 text-red-400 hover:bg-red-500/10"
+              : "bg-primary text-black hover:opacity-90"}
+            disabled:opacity-50 disabled:cursor-not-allowed
+          `}
+        >
+          {isInterviewActive ? (
+            <>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="5" y="5" width="14" height="14" rx="2" />
+              </svg>
+              End
+            </>
+          ) : (
+            <>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+              Start session
+            </>
           )}
-
-          {isInterviewActive && (
-            <div className="hidden sm:flex items-center gap-1 text-[12px] font-mono text-zinc-600 bg-white border border-zinc-200 px-2 py-1 rounded-md">
-              {formatElapsed(elapsed)}
-            </div>
-          )}
-
-          <button
-            onClick={onToggle}
-            disabled={disabled}
-            className={`
-              inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-semibold
-              transition-all duration-150
-              ${isInterviewActive
-                ? "bg-white border border-red-200 text-red-700 hover:bg-red-50"
-                : "bg-zinc-900 text-white hover:bg-zinc-800"}
-              disabled:opacity-50 disabled:cursor-not-allowed
-            `}
-          >
-            {isInterviewActive ? (
-              <>
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
-                  <rect x="5" y="5" width="14" height="14" rx="2" />
-                </svg>
-                End session
-              </>
-            ) : (
-              <>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-                Start session
-              </>
-            )}
-          </button>
-        </div>
+        </button>
       </div>
     </div>
   );
@@ -296,31 +303,34 @@ export function StageHeader({
 function PhaseChip({ phase, isActive }: { phase: Phase; isActive: boolean }) {
   if (!isActive) {
     return (
-      <div className="inline-flex items-center gap-1.5 text-[11px] font-medium text-zinc-500 bg-white border border-zinc-200 px-2.5 py-1 rounded-md">
-        <span className="w-1.5 h-1.5 rounded-full bg-zinc-300" />
+      <div className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-medium text-zinc-500 bg-zinc-900 border border-zinc-800 px-2.5 py-1 rounded-md">
+        <span className="w-1.5 h-1.5 rounded-full bg-zinc-600" />
         Ready
       </div>
     );
   }
   if (phase === "ai_speaking") {
     return (
-      <div className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-md">
-        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+      <div
+        className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-md border"
+        style={{ color: PRIMARY, backgroundColor: "rgba(0,242,156,0.08)", borderColor: "rgba(0,242,156,0.3)" }}
+      >
+        <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: PRIMARY }} />
         AI speaking
       </div>
     );
   }
   if (phase === "user_speaking") {
     return (
-      <div className="inline-flex items-center gap-1.5 text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-md">
-        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-        You · speaking
+      <div className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-medium text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 rounded-md">
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+        You're speaking
       </div>
     );
   }
   return (
-    <div className="inline-flex items-center gap-1.5 text-[11px] font-medium text-zinc-600 bg-white border border-zinc-200 px-2.5 py-1 rounded-md">
-      <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-pulse" />
+    <div className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-medium text-zinc-400 bg-zinc-900 border border-zinc-800 px-2.5 py-1 rounded-md">
+      <span className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-pulse" />
       Listening
     </div>
   );

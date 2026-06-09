@@ -333,7 +333,7 @@ export default function InterviewsPage() {
     return (
       <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-full border-2 border-zinc-200 border-t-emerald-600 animate-spin" />
+          <div className="w-10 h-10 rounded-full border-2 border-zinc-800 border-t-primary animate-spin" />
           <p className="text-xs text-zinc-500 tracking-wide">Loading sessions…</p>
         </div>
       </div>
@@ -357,8 +357,8 @@ export default function InterviewsPage() {
         }
         .wf-scrollbar::-webkit-scrollbar { width: 6px; }
         .wf-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .wf-scrollbar::-webkit-scrollbar-thumb { background: #e4e4e7; border-radius: 6px; }
-        .wf-scrollbar::-webkit-scrollbar-thumb:hover { background: #d4d4d8; }
+        .wf-scrollbar::-webkit-scrollbar-thumb { background: #27272a; border-radius: 6px; }
+        .wf-scrollbar::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
       `}</style>
 
       <div className="flex h-[calc(100vh-64px)] overflow-hidden">
@@ -375,7 +375,7 @@ export default function InterviewsPage() {
           closePanel={() => setPanelOpen(false)}
         />
 
-        <main className="flex-1 min-w-0 overflow-y-auto wf-scrollbar bg-[#F7F6F2]">
+        <main className="flex-1 min-w-0 overflow-y-auto wf-scrollbar bg-black">
           {selectedInterview ? (
             <div className="h-full flex flex-col">
               <StageHeader
@@ -384,7 +384,6 @@ export default function InterviewsPage() {
                 phase={phase}
                 elapsed={elapsed}
                 formatElapsed={formatElapsed}
-                isConnected={isConnected}
                 onToggle={isInterviewActive ? stopAudioInterview : startAudioInterview}
                 onMobileSessions={() => setPanelOpen(true)}
                 disabled={!!audioCapture.error}
@@ -438,7 +437,7 @@ export default function InterviewsPage() {
 
       {/* Toasts */}
       {error && (
-        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 px-4 py-2.5 bg-white border border-red-200 text-red-700 rounded-xl shadow-lg text-[13px]">
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 px-4 py-2.5 bg-zinc-900 border border-red-500/30 text-red-400 rounded-xl shadow-lg text-[13px]">
           <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
             <circle cx="12" cy="12" r="10" />
             <line x1="12" y1="8" x2="12" y2="12" />
@@ -448,7 +447,7 @@ export default function InterviewsPage() {
         </div>
       )}
       {success && (
-        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 px-4 py-2.5 bg-white border border-emerald-200 text-emerald-700 rounded-xl shadow-lg text-[13px]">
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 px-4 py-2.5 bg-zinc-900 border border-primary/30 text-primary rounded-xl shadow-lg text-[13px]">
           <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
             <polyline points="20 6 9 17 4 12" />
           </svg>
