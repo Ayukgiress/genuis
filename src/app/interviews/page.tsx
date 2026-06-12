@@ -13,7 +13,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useInterviewWebSocket } from "@/hooks/useInterviewWebSocket";
 import { useAudioPlayback } from "@/hooks/useAudioPlayback";
 import type { Interview, InterviewMessage, Job } from "@/types";
-import { SessionList, StageHeader, type Phase } from "./_components";
+import { SessionPicker, StageHeader, type Phase } from "./_components";
 import {
   InterviewStage,
   PhaseCaption,
@@ -24,7 +24,7 @@ import {
 } from "./_components2";
 
 /* ──────────────────────────────────────────────────────────────────────────
-   Wellfound-inspired interview page
+   Clean interview page — single-column, focused stage
    ────────────────────────────────────────────────────────────────────────── */
 
 export default function InterviewsPage() {
@@ -44,7 +44,6 @@ export default function InterviewsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string>("");
   const [isInterviewActive, setIsInterviewActive] = useState(false);
-  const [panelOpen, setPanelOpen] = useState(false);
   const [localAiSpeaking, setLocalAiSpeaking] = useState(false);
   const [elapsed, setElapsed] = useState(0);
 
@@ -137,7 +136,7 @@ export default function InterviewsPage() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "n") { e.preventDefault(); setShowCreateModal(true); }
-      if (e.key === "Escape") { setShowCreateModal(false); setPanelOpen(false); }
+      if (e.key === "Escape") setShowCreateModal(false);
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -206,7 +205,6 @@ export default function InterviewsPage() {
     stopAudioInterview();
     setSelectedInterview(interview);
     if (!interview.messages) fetchInterviewMessages(interview.id);
-    setPanelOpen(false);
   };
 
   const startAudioInterview = async () => {
@@ -361,8 +359,9 @@ export default function InterviewsPage() {
         .wf-scrollbar::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
       `}</style>
 
-      <div className="flex h-[calc(100vh-64px)] overflow-hidden">
-        <SessionList
+      {/* Single-column clean stage */}
+      <div className="flex flex-col h-[calc(100vh-64px)] overflow-hidden bg-black">
+        <StageHeader
           interviews={interviews}
           selectedId={selectedInterview?.id || null}
           onSelect={selectInterview}
@@ -371,25 +370,19 @@ export default function InterviewsPage() {
           onComplete={handleCompleteInterview}
           getJob={getJobDetails}
           formatRelative={formatRelative}
-          panelOpen={panelOpen}
-          closePanel={() => setPanelOpen(false)}
+          job={job}
+          isInterviewActive={isInterviewActive}
+          phase={phase}
+          elapsed={elapsed}
+          formatElapsed={formatElapsed}
+          onToggle={isInterviewActive ? stopAudioInterview : startAudioInterview}
+          disabled={!!audioCapture.error}
         />
 
-        <main className="flex-1 min-w-0 overflow-y-auto wf-scrollbar bg-black">
+        <main className="flex-1 min-h-0 overflow-y-auto wf-scrollbar">
           {selectedInterview ? (
-            <div className="h-full flex flex-col">
-              <StageHeader
-                job={job}
-                isInterviewActive={isInterviewActive}
-                phase={phase}
-                elapsed={elapsed}
-                formatElapsed={formatElapsed}
-                onToggle={isInterviewActive ? stopAudioInterview : startAudioInterview}
-                onMobileSessions={() => setPanelOpen(true)}
-                disabled={!!audioCapture.error}
-              />
-
-              <div className="flex-1 px-4 sm:px-8 py-8 sm:py-10 flex flex-col items-center justify-center">
+            <div className="min-h-full flex flex-col">
+              <div className="flex-1 px-4 sm:px-8 py-10 sm:py-14 flex flex-col items-center justify-center">
                 <InterviewStage
                   phase={phase}
                   isInterviewActive={isInterviewActive}
