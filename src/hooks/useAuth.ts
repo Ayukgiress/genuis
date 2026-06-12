@@ -8,9 +8,12 @@ export function useAuth() {
     token,
     isAuthenticated,
     isLoading,
+    error,
     login,
     logout,
     register,
+    fetchCurrentUser,
+    clearError,
   } = useAuthStore();
 
   return {
@@ -18,8 +21,11 @@ export function useAuth() {
     token,
     isAuthenticated,
     isLoading,
+    error,
     login,
     logout,
     register,
+    fetchCurrentUser,
+    clearError,
   };
 }

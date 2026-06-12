@@ -1,0 +1,43 @@
+import React from 'react';
+
+interface TopBarProps {
+  onToggleSidebar: () => void;
+}
+
+export const TopBar: React.FC<TopBarProps> = ({ onToggleSidebar }) => {
+  return (
+    <header className="h-20 border-b border-zinc-800 bg-black/50 backdrop-blur-md sticky top-0 z-10 flex items-center justify-between px-8">
+      <div className="flex items-center gap-4 flex-1">
+        <button
+          onClick={onToggleSidebar}
+          className="lg:hidden p-2 text-zinc-400 hover:text-white transition-colors"
+        >
+          <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+        </button>
+        <div className="flex-1 max-w-xl">
+        <div className="relative group">
+          <svg 
+            viewBox="0 0 24 24" 
+            className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-primary transition-colors"
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="2"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Search companies, jobs, or applications..."
+            className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl py-3 pl-12 pr-4 text-sm text-zinc-300 placeholder:text-zinc-600 focus:outline-none focus:border-primary/50 transition-all"
+          />
+        </div>
+      </div>
+    </div>
+    </header>
+  );
+};
