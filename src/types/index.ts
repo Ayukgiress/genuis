@@ -359,14 +359,23 @@ export interface InterviewCreate {
   status?: "active" | "completed" | "cancelled";
 }
 
+export type AvatarType = 'animated' | 'video' | 'none';
+export type PlaybackState = 'idle' | 'playing' | 'paused' | 'ended';
+
 export interface InterviewMessage {
   id: number;
   interview_id: number;
   role: "user" | "assistant";
   content: string;
   created_at: string;
-  audio_data?: string; // base64 encoded audio data
-  transcript?: string; // speech-to-text transcript
+  // Audio
+  audio_data?: string;           // base64 encoded audio
+  transcript?: string;           // speech-to-text transcript
+  // AI video avatar (optional — absent in audio-only mode)
+  ai_avatar_video_url?: string;  // streaming/CDN URL for avatar video clip
+  video_data?: string;           // base64 encoded video (inline fallback)
+  avatar_type?: AvatarType;      // which avatar renderer to use
+  playback_state?: PlaybackState;
 }
 
 export interface InterviewMessageCreate {

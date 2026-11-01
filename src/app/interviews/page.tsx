@@ -10,8 +10,7 @@ import {
   getAuthToken,
 } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
-import { useInterviewWebSocket } from "@/hooks/useInterviewWebSocket";
-import { useAudioPlayback } from "@/hooks/useAudioPlayback";
+import { useInterviewSession, type SessionPhase, type AiTurnMedia } from "@/hooks/useInterviewSession";
 import { useVideoCapture } from "@/hooks/useVideoCapture";
 import type { Interview, InterviewMessage, Job } from "@/types";
 import { SessionPicker, StageHeader, type Phase } from "./_components";
@@ -44,11 +43,9 @@ export default function InterviewsPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string>("");
-  const [isInterviewActive, setIsInterviewActive] = useState(false);
-  const [localAiSpeaking, setLocalAiSpeaking] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+  const [aiMedia, setAiMedia] = useState<AiTurnMedia>({});
 
-  const audioPlayback = useAudioPlayback();
   const videoCapture = useVideoCapture();
 
   const fetchInterviewMessages = useCallback(async (interviewId: number) => {
@@ -63,24 +60,13 @@ export default function InterviewsPage() {
     } catch {}
   }, []);
 
-  const {
-    isConnected,
-    isStreaming,
-    connectionAttempted,
-    audioCapture,
-    isAiResponding,
-    isTtsActive,
-    isUserSpeaking,
-    connect,
-    disconnect,
-    startAudioStream,
-    stopAudioStream,
-  } = useInterviewWebSocket(
-    selectedInterview?.id || null,
-    useCallback(() => {
+  const session = useInterviewSession({
+    interviewId: selectedInterview?.id || null,
+    onMessage: useCallback(() => {
       if (selectedInterview?.id) fetchInterviewMessages(selectedInterview.id);
-    }, [selectedInterview?.id, fetchInterviewMessages])
-  );
+    }, [selectedInterview?.id, fetchInterviewMessages]),
+    onAiTurnMedia: useCallback((media: AiTurnMedia) => setAiMedia(media), []),
+  });
 
   /* Toast */
   const showToast = (msg: string, type: "error" | "success") => {
@@ -146,10 +132,10 @@ export default function InterviewsPage() {
 
   /* Elapsed timer */
   useEffect(() => {
-    if (!isInterviewActive) { setElapsed(0); return; }
+    if (!session.isActive) { setElapsed(0); return; }
     const t = setInterval(() => setElapsed((s) => s + 1), 1000);
     return () => clearInterval(t);
-  }, [isInterviewActive]);
+  }, [session.isActive]);
 
   /* Actions */
   const handleCreateInterview = async () => {
@@ -193,15 +179,9 @@ export default function InterviewsPage() {
   };
 
   const stopAudioInterview = useCallback(() => {
-    stopAudioStream();
-    disconnect();
+    session.stop();
     videoCapture.stopCapture();
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      try { window.speechSynthesis.cancel(); } catch {}
-    }
-    setLocalAiSpeaking(false);
-    setIsInterviewActive(false);
-  }, [stopAudioStream, disconnect, videoCapture]);
+  }, [session, videoCapture]);
 
   const selectInterview = (interview: Interview) => {
     if (selectedInterview?.id === interview.id) return;
@@ -211,15 +191,12 @@ export default function InterviewsPage() {
   };
 
   const startAudioInterview = async () => {
-    if (!selectedInterview || isInterviewActive) return;
-    setIsInterviewActive(true);
-    // Start camera alongside the interview
+    if (!selectedInterview || session.isActive) return;
     videoCapture.startCapture();
     showToast("Starting session…", "success");
+    session.start();
 
     try {
-      connect();
-
       let currentInterview = selectedInterview;
       if (!currentInterview.messages || currentInterview.messages.length === 0) {
         const freshMessages = await interviewApi.getMessages(currentInterview.id);
@@ -231,34 +208,12 @@ export default function InterviewsPage() {
       const lastAssistant = [...existing].reverse().find((m) => m.role === "assistant");
 
       if (lastAssistant) {
-        const handleAiSpeaking = async (content: string, audioData?: string) => {
-          setLocalAiSpeaking(true);
-          if (audioData) {
-            try {
-              await audioPlayback.playAudio(audioData, "audio/webm", () => {
-                setLocalAiSpeaking(false);
-                startAudioStream();
-              });
-              return true;
-            } catch (e) {
-              console.warn("Failed to play audio data, falling back to TTS", e);
-            }
-          }
-          if (typeof window !== "undefined" && "speechSynthesis" in window) {
-            window.speechSynthesis.cancel();
-            setLocalAiSpeaking(true);
-            const utterance = new SpeechSynthesisUtterance(content);
-            utterance.onend = () => { setLocalAiSpeaking(false); startAudioStream(); };
-            utterance.onerror = () => { setLocalAiSpeaking(false); startAudioStream(); };
-            window.speechSynthesis.speak(utterance);
-            return true;
-          }
-          setLocalAiSpeaking(false);
-          return false;
-        };
-
-        const spoke = await handleAiSpeaking(lastAssistant.content, lastAssistant.audio_data);
-        if (spoke) return;
+        await session.speakOpening(lastAssistant.content, {
+          audioData: lastAssistant.audio_data,
+          videoUrl: lastAssistant.ai_avatar_video_url,
+          videoData: lastAssistant.video_data,
+        });
+        return;
       }
 
       const trigger = "Hello, I'm ready to begin the interview. Please start by introducing yourself and asking your first question.";
@@ -275,30 +230,15 @@ export default function InterviewsPage() {
       setSelectedInterview(updated);
       setInterviews((prev) => prev.map((i) => i.id === selectedInterview.id ? updated : i));
 
-      if (aiResponse.audio_data) {
-        setLocalAiSpeaking(true);
-        await audioPlayback.playAudio(aiResponse.audio_data, "audio/webm", () => {
-          setLocalAiSpeaking(false);
-          startAudioStream();
-        });
-      } else if (aiResponse.content) {
-        if (typeof window !== "undefined" && "speechSynthesis" in window) {
-          window.speechSynthesis.cancel();
-          setLocalAiSpeaking(true);
-          const utterance = new SpeechSynthesisUtterance(aiResponse.content);
-          utterance.onend = () => { setLocalAiSpeaking(false); startAudioStream(); };
-          utterance.onerror = () => { setLocalAiSpeaking(false); startAudioStream(); };
-          window.speechSynthesis.speak(utterance);
-        } else {
-          startAudioStream();
-        }
-      } else {
-        startAudioStream();
-      }
+      await session.speakOpening(aiResponse.content, {
+        audioData: aiResponse.audio_data,
+        videoUrl: aiResponse.ai_avatar_video_url,
+        videoData: aiResponse.video_data,
+      });
     } catch (err) {
       console.error("Failed to start interview:", err);
       showToast("Failed to start", "error");
-      setIsInterviewActive(false);
+      session.stop();
     }
   };
 
@@ -316,16 +256,16 @@ export default function InterviewsPage() {
   const formatElapsed = (s: number) =>
     `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
-  /* Phase — single source of truth for the speaking indicator */
-  const phase: Phase = !isInterviewActive
-    ? "idle"
-    : isAiResponding && !localAiSpeaking && !isTtsActive
-      ? "processing"
-      : localAiSpeaking || isTtsActive
-        ? "ai_speaking"
-        : isUserSpeaking || (isStreaming && audioCapture.isListening)
-          ? "user_speaking"
-          : "ready";
+  /* Phase — mapped from session state machine */
+  const phaseMap: Record<SessionPhase, Phase> = {
+    idle: "idle",
+    preparing: "idle",
+    ai_speaking: "ai_speaking",
+    user_listening: session.audioCapture.isListening ? "user_speaking" : "ready",
+    processing: "processing",
+    completed: "idle",
+  };
+  const phase: Phase = phaseMap[session.phase];
 
   const job = selectedInterview ? getJobDetails(selectedInterview.job_id) : null;
   const userInitial = (user?.name || user?.email || "Y")[0].toUpperCase();
@@ -376,12 +316,12 @@ export default function InterviewsPage() {
           getJob={getJobDetails}
           formatRelative={formatRelative}
           job={job}
-          isInterviewActive={isInterviewActive}
+          isInterviewActive={session.isActive}
           phase={phase}
           elapsed={elapsed}
           formatElapsed={formatElapsed}
-          onToggle={isInterviewActive ? stopAudioInterview : startAudioInterview}
-          disabled={!!audioCapture.error}
+          onToggle={session.isActive ? stopAudioInterview : startAudioInterview}
+          disabled={!!session.audioCapture.error}
         />
 
         <main className="flex-1 min-h-0 overflow-y-auto wf-scrollbar">
@@ -390,24 +330,23 @@ export default function InterviewsPage() {
               <div className="flex-1 px-4 sm:px-8 py-10 sm:py-14 flex flex-col items-center justify-center">
                 <InterviewStage
                   phase={phase}
-                  isInterviewActive={isInterviewActive}
+                  isInterviewActive={session.isActive}
                   job={job}
                   userInitial={userInitial}
                   userName={userName}
-                  onToggle={isInterviewActive ? stopAudioInterview : startAudioInterview}
-                  disabled={!!audioCapture.error}
+                  onToggle={session.isActive ? stopAudioInterview : startAudioInterview}
+                  disabled={!!session.audioCapture.error}
                   attachVideo={videoCapture.attachVideo}
                   isCameraOn={videoCapture.isStreaming}
                   cameraError={videoCapture.error}
+                  aiMedia={aiMedia}
                 />
 
-                <PhaseCaption phase={phase} isActive={isInterviewActive} jobTitle={job?.title} />
+                <PhaseCaption phase={phase} isActive={session.isActive} jobTitle={job?.title} />
 
                 <div className="mt-6 w-full max-w-md space-y-2">
-                  {connectionAttempted && !isConnected && (
-                    <Notice tone="warn" msg="Audio endpoint unavailable — running in limited mode" />
-                  )}
-                  {audioCapture.error && <Notice tone="error" msg={audioCapture.error} />}
+                  {session.error && <Notice tone="warn" msg={session.error} />}
+                  {session.audioCapture.error && <Notice tone="error" msg={session.audioCapture.error} />}
                 </div>
               </div>
 

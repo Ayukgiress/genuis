@@ -3,14 +3,42 @@
 import React, { useEffect, useRef } from "react";
 import type { Job } from "@/types";
 import type { Phase } from "./_components";
+import type { AiTurnMedia } from "@/hooks/useInterviewSession";
 
 const PRIMARY = "#00f29c";
 
 /* ── AI VIDEO PANEL ─────────────────────────────────────────────────────── */
 
-export function AIVideoPanel({ phase, isActive }: { phase: Phase; isActive: boolean }) {
+export function AIVideoPanel({
+  phase,
+  isActive,
+  media,
+}: {
+  phase: Phase;
+  isActive: boolean;
+  media?: AiTurnMedia;
+}) {
   const speaking = phase === "ai_speaking";
   const processing = phase === "processing";
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Play/pause the avatar video clip in sync with the speaking phase
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+    if (speaking) {
+      el.play().catch(() => {});
+    } else {
+      el.pause();
+    }
+  }, [speaking]);
+
+  // Resolve which video source to use (URL preferred over base64)
+  const videoSrc = media?.videoUrl
+    ? media.videoUrl
+    : media?.videoData
+      ? `data:video/webm;base64,${media.videoData}`
+      : null;
 
   return (
     <div
@@ -20,7 +48,7 @@ export function AIVideoPanel({ phase, isActive }: { phase: Phase; isActive: bool
         bg-zinc-950
       `}
     >
-      {/* Animated gradient background — simulates AI "presence" */}
+      {/* Animated gradient background */}
       <div
         className="absolute inset-0 transition-opacity duration-500"
         style={{
@@ -30,59 +58,58 @@ export function AIVideoPanel({ phase, isActive }: { phase: Phase; isActive: bool
         }}
       />
 
-      {/* AI avatar */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
-        <div className="relative">
-          {/* Pulse rings when speaking */}
-          {speaking && (
-            <>
+      {/* Avatar video clip — shown when backend provides video */}
+      {videoSrc ? (
+        <video
+          ref={videoRef}
+          src={videoSrc}
+          loop
+          muted={false}
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+      ) : (
+        /* Fallback: animated avatar (audio-only mode) */
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
+          <div className="relative">
+            {speaking && (
+              <>
+                <span
+                  className="absolute inset-0 m-auto rounded-full bg-primary opacity-20"
+                  style={{ width: 80, height: 80, animation: "wf-pulse-ring 1.8s cubic-bezier(0.4,0,0.2,1) infinite" }}
+                />
+                <span
+                  className="absolute inset-0 m-auto rounded-full bg-primary opacity-10"
+                  style={{ width: 80, height: 80, animation: "wf-pulse-ring 1.8s cubic-bezier(0.4,0,0.2,1) infinite 0.6s" }}
+                />
+              </>
+            )}
+            <div
+              className={`relative z-10 w-20 h-20 rounded-full grid place-items-center transition-all duration-300
+                ${speaking ? "bg-primary text-black" : "bg-zinc-800 text-zinc-300"}`}
+            >
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+                <circle cx="12" cy="8" r="4" />
+                <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" strokeLinecap="round" />
+              </svg>
+            </div>
+          </div>
+          <div className="flex items-end gap-[3px] h-6">
+            {[0, 0.15, 0.3, 0.1, 0.25, 0.05, 0.2, 0.12].map((delay, i) => (
               <span
-                className="absolute inset-0 m-auto rounded-full bg-primary opacity-20"
+                key={i}
+                className="w-[3px] rounded-full transition-all duration-300"
                 style={{
-                  width: 80, height: 80,
-                  animation: "wf-pulse-ring 1.8s cubic-bezier(0.4,0,0.2,1) infinite",
+                  height: speaking ? `${10 + (i % 3) * 8}px` : "4px",
+                  backgroundColor: speaking ? PRIMARY : "#3f3f46",
+                  animation: speaking ? `wf-bar ${0.7 + (i % 3) * 0.15}s ease-in-out ${delay}s infinite` : undefined,
+                  transformOrigin: "center",
                 }}
               />
-              <span
-                className="absolute inset-0 m-auto rounded-full bg-primary opacity-10"
-                style={{
-                  width: 80, height: 80,
-                  animation: "wf-pulse-ring 1.8s cubic-bezier(0.4,0,0.2,1) infinite 0.6s",
-                }}
-              />
-            </>
-          )}
-          <div
-            className={`
-              relative z-10 w-20 h-20 rounded-full grid place-items-center transition-all duration-300
-              ${speaking ? "bg-primary text-black" : "bg-zinc-800 text-zinc-300"}
-            `}
-          >
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-              <circle cx="12" cy="8" r="4" />
-              <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" strokeLinecap="round" />
-            </svg>
+            ))}
           </div>
         </div>
-
-        {/* Waveform bars */}
-        <div className="flex items-end gap-[3px] h-6">
-          {[0, 0.15, 0.3, 0.1, 0.25, 0.05, 0.2, 0.12].map((delay, i) => (
-            <span
-              key={i}
-              className="w-[3px] rounded-full transition-all duration-300"
-              style={{
-                height: speaking ? `${10 + (i % 3) * 8}px` : "4px",
-                backgroundColor: speaking ? PRIMARY : "#3f3f46",
-                animation: speaking
-                  ? `wf-bar ${0.7 + (i % 3) * 0.15}s ease-in-out ${delay}s infinite`
-                  : undefined,
-                transformOrigin: "center",
-              }}
-            />
-          ))}
-        </div>
-      </div>
+      )}
 
       {/* Status badge */}
       <div className="absolute top-3 left-3">
@@ -105,7 +132,6 @@ export function AIVideoPanel({ phase, isActive }: { phase: Phase; isActive: bool
         </span>
       </div>
 
-      {/* "AI" label bottom-right */}
       <div className="absolute bottom-3 right-3">
         <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">AI</span>
       </div>
@@ -232,6 +258,7 @@ export function InterviewStage({
   attachVideo,
   isCameraOn,
   cameraError,
+  aiMedia,
 }: {
   phase: Phase;
   isInterviewActive: boolean;
@@ -243,12 +270,13 @@ export function InterviewStage({
   attachVideo: (el: HTMLVideoElement | null) => void;
   isCameraOn: boolean;
   cameraError: string | null;
+  aiMedia?: AiTurnMedia;
 }) {
   return (
     <div className="w-full max-w-4xl">
       {/* Video grid — 2 columns on md+, stacked on mobile */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-        <AIVideoPanel phase={phase} isActive={isInterviewActive} />
+        <AIVideoPanel phase={phase} isActive={isInterviewActive} media={aiMedia} />
         <UserVideoPanel
           phase={phase}
           isActive={isInterviewActive}
