@@ -32,9 +32,11 @@ export default function DashboardPage() {
   const [dataLoaded, setDataLoaded] = useState(false);
   const [mounted, setMounted] = useState(false);
   const fetchInitiated = useRef(false);
-  
+  const interviewDataLoaded = useRef(false);
+
   // Interview state
-  const [interviews, setInterviews] = useState<Interview[]>([]);
+  // Map of job_id -> interview for O(1) lookup
+  const [interviewMap, setInterviewMap] = useState<Map<string, Interview>>(new Map());
   const [appliedJobs, setAppliedJobs] = useState<Job[]>([]);
   
   // Kanban state
@@ -46,7 +48,7 @@ export default function DashboardPage() {
   // Interview coach pagination
   const [interviewPage, setInterviewPage] = useState(0);
   const interviewsPerPage = 3;
-  
+
   // Unused job search state - kept for compatibility
   const [jobs, setJobs] = useState<Job[]>([]);
   const [isLoadingJobs, setIsLoadingJobs] = useState(false);
@@ -115,125 +117,99 @@ export default function DashboardPage() {
     fetchDashboardData();
   }, [authLoading, isAuthenticated, router, dataLoaded, fetchCurrentUser]);
 
-  // Load interviews and applied jobs for interview prep alerts
+  // Load interviews and applied jobs for interview prep alerts — runs once only
   useEffect(() => {
     if (!isAuthenticated || !getAuthToken()) return;
+    if (interviewDataLoaded.current) return;
+    interviewDataLoaded.current = true;
 
     const loadInterviewData = async () => {
       try {
-        // Fetch once (avoid repeated calls inside loops)
+        // Fetch all interviews once
         const interviewsData = await interviewApi.list();
         const activeInterviews = interviewsData.filter((i) => i.status === 'active');
-        setInterviews(activeInterviews);
 
-        const activeJobIdSet = new Set<string>(
-          activeInterviews.map((i) => i.job_id)
-        );
-
-        // Derive applied jobs from kanban cards and application store
-        const appliedJobList: Job[] = [];
-        const appliedJobIdSet = new Set<string>();
-
-        // 1. Get unique job IDs from both sources
-        const uniqueJobIds = new Set<string>();
-        const appMap = new Map<string, any>();
-        
-        for (const app of applications) {
-          uniqueJobIds.add(app.jobId);
-          appMap.set(app.jobId, app);
+        // Build job_id -> interview map (deduped by job_id, keep first)
+        const newInterviewMap = new Map<string, Interview>();
+        for (const iv of activeInterviews) {
+          if (!newInterviewMap.has(iv.job_id)) newInterviewMap.set(iv.job_id, iv);
         }
 
-        for (const board of boards) {
-          try {
-            const cards = await kanbanApi.listCards(board.id);
-            for (const card of cards) {
-              const isAppliedColumn =
-                card.column_id === 'in_progress' ||
-                card.column_id === 'review' ||
-                card.column_id === 'done';
-
-              if (isAppliedColumn && card.title) {
-                uniqueJobIds.add(String(card.title));
-              }
-            }
-          } catch {
-            // Skip boards without cards
+        // Derive unique job IDs strictly from applicationStore (real job IDs only)
+        const seenJobIds = new Set<string>();
+        const uniqueApps: typeof applications[number][] = [];
+        for (const app of applications) {
+          if (app.jobId && !seenJobIds.has(app.jobId)) {
+            seenJobIds.add(app.jobId);
+            uniqueApps.push(app);
           }
         }
 
-        // 2. Fetch job details in parallel
+        // Fetch job details in parallel; fall back to store data on failure
         const jobDetailResults = await Promise.allSettled(
-          Array.from(uniqueJobIds).map(id => jobApi.getById(id))
+          uniqueApps.map(app => jobApi.getById(app.jobId))
         );
 
+        const appliedJobList: Job[] = [];
         jobDetailResults.forEach((result, index) => {
-          const jobId = Array.from(uniqueJobIds)[index];
+          const app = uniqueApps[index];
           if (result.status === 'fulfilled') {
-            const job = result.value;
-            if (!appliedJobIdSet.has(job.id)) {
-              appliedJobIdSet.add(job.id);
-              appliedJobList.push(job);
-            }
+            appliedJobList.push(result.value);
           } else {
-            // Fallback for application store jobs if fetch fails
-            const app = appMap.get(jobId);
-            if (app && !appliedJobIdSet.has(jobId)) {
-              appliedJobIdSet.add(jobId);
-              appliedJobList.push({
-                id: jobId,
-                title: app.title,
-                company: app.company,
-                location: 'Remote',
-                description: '',
-                requirements: [],
-                source: 'Applied',
-                source_url: '',
-                posted_at: app.appliedAt
-              });
-            }
+            appliedJobList.push({
+              id: app.jobId,
+              title: app.title,
+              company: app.company,
+              location: 'Remote',
+              description: '',
+              requirements: [],
+              source: 'Applied',
+              source_url: '',
+              posted_at: app.appliedAt,
+            });
           }
         });
 
         setAppliedJobs(appliedJobList);
 
-        // Create missing prep sessions for applied jobs without active interviews
-        for (const job of appliedJobList) {
-          const hasInterview = activeJobIdSet.has(job.id);
+        // Create missing prep sessions for jobs without an active interview
+        const jobsMissingPrep = appliedJobList.filter(job => !newInterviewMap.has(job.id));
 
-          if (hasInterview) continue;
+        await Promise.allSettled(
+          jobsMissingPrep.map(async (job) => {
+            try {
+              const interview = await interviewApi.create({ job_id: job.id, status: 'active' });
+              newInterviewMap.set(job.id, interview);
+            } catch {
+              // Skip silently
+            }
+          })
+        );
 
-          try {
-            const interview = await interviewApi.create({
-              job_id: job.id,
-              status: 'active',
-            });
+        setInterviewMap(new Map(newInterviewMap));
 
-            setTimeout(() => {
-              toast.info(
-                "Ready to practice for your interview? I've prepared behavioral questions for this application!",
-                {
-                  autoClose: 6000,
-                  onClick: () => router.push(`/interviews?id=${interview.id}`),
-                }
-              );
-            }, 1000);
-
-            activeJobIdSet.add(job.id);
-          } catch {
-            // Skip silently
-          }
+        // Fire a single toast if any new prep sessions were needed
+        if (jobsMissingPrep.length > 0) {
+          const firstNewInterview = newInterviewMap.get(jobsMissingPrep[0].id);
+          toast.info(
+            `Interview prep ready for ${jobsMissingPrep.length} application${jobsMissingPrep.length > 1 ? 's' : ''}! Click to start practicing.`,
+            {
+              autoClose: 6000,
+              onClick: firstNewInterview
+                ? () => router.push(`/interviews?id=${firstNewInterview.id}`)
+                : undefined,
+            }
+          );
         }
       } catch (err) {
         console.error('Failed to load interviews/applied jobs:', err);
       }
     };
 
-    const timeoutId = setTimeout(() => {
-      loadInterviewData();
-    }, 800);
-
+    const timeoutId = setTimeout(loadInterviewData, 800);
     return () => clearTimeout(timeoutId);
-  }, [isAuthenticated, boards, router, analyses, applications]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]);
 
   const fetchJobs = useCallback(async () => {
     try {
@@ -406,7 +382,7 @@ export default function DashboardPage() {
     }, {} as Record<string, number>);
 
     // Group interviews by date
-    const interviewCounts = interviews.reduce((acc, interview) => {
+    const interviewCounts = Array.from(interviewMap.values()).reduce((acc, interview) => {
       if (interview.created_at) {
         const date = interview.created_at.split('T')[0];
         acc[date] = (acc[date] || 0) + 1;
@@ -420,7 +396,7 @@ export default function DashboardPage() {
       jobs: jobCounts[day.fullDate] || 0,
       interviews: interviewCounts[day.fullDate] || 0
     }));
-  }, [analyses, applications, interviews]);
+  }, [analyses, applications, interviewMap]);
 
   const funnelData = [
     { label: 'UPLOADED', value: totalAnalyses, percentage: totalAnalyses > 0 ? 100 : 0 },
@@ -628,15 +604,13 @@ export default function DashboardPage() {
                     </div>
                     <button
                       onClick={() => {
-                        const interview = interviews.find(i => i.job_id === job.id);
+                        const interview = interviewMap.get(job.id);
                         if (interview) {
                           router.push(`/interviews?id=${interview.id}`);
                         } else {
-                           interviewApi.create({
-                             job_id: job.id,
-                             status: 'active'
-                           }).then(interview => {
-                            router.push(`/interviews?id=${interview.id}`);
+                          interviewApi.create({ job_id: job.id, status: 'active' }).then(iv => {
+                            setInterviewMap(prev => new Map(prev).set(job.id, iv));
+                            router.push(`/interviews?id=${iv.id}`);
                           });
                         }
                       }}
