@@ -12,6 +12,7 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { useInterviewWebSocket } from "@/hooks/useInterviewWebSocket";
 import { useAudioPlayback } from "@/hooks/useAudioPlayback";
+import { useVideoCapture } from "@/hooks/useVideoCapture";
 import type { Interview, InterviewMessage, Job } from "@/types";
 import { SessionPicker, StageHeader, type Phase } from "./_components";
 import {
@@ -48,6 +49,7 @@ export default function InterviewsPage() {
   const [elapsed, setElapsed] = useState(0);
 
   const audioPlayback = useAudioPlayback();
+  const videoCapture = useVideoCapture();
 
   const fetchInterviewMessages = useCallback(async (interviewId: number) => {
     try {
@@ -193,12 +195,13 @@ export default function InterviewsPage() {
   const stopAudioInterview = useCallback(() => {
     stopAudioStream();
     disconnect();
+    videoCapture.stopCapture();
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       try { window.speechSynthesis.cancel(); } catch {}
     }
     setLocalAiSpeaking(false);
     setIsInterviewActive(false);
-  }, [stopAudioStream, disconnect]);
+  }, [stopAudioStream, disconnect, videoCapture]);
 
   const selectInterview = (interview: Interview) => {
     if (selectedInterview?.id === interview.id) return;
@@ -210,6 +213,8 @@ export default function InterviewsPage() {
   const startAudioInterview = async () => {
     if (!selectedInterview || isInterviewActive) return;
     setIsInterviewActive(true);
+    // Start camera alongside the interview
+    videoCapture.startCapture();
     showToast("Starting session…", "success");
 
     try {
@@ -314,11 +319,11 @@ export default function InterviewsPage() {
   /* Phase — single source of truth for the speaking indicator */
   const phase: Phase = !isInterviewActive
     ? "idle"
-    : isAiResponding || localAiSpeaking || isTtsActive
-      ? "ai_speaking"
-      : isUserSpeaking
-        ? "user_speaking"
-        : isStreaming && audioCapture.isListening
+    : isAiResponding && !localAiSpeaking && !isTtsActive
+      ? "processing"
+      : localAiSpeaking || isTtsActive
+        ? "ai_speaking"
+        : isUserSpeaking || (isStreaming && audioCapture.isListening)
           ? "user_speaking"
           : "ready";
 
@@ -391,6 +396,9 @@ export default function InterviewsPage() {
                   userName={userName}
                   onToggle={isInterviewActive ? stopAudioInterview : startAudioInterview}
                   disabled={!!audioCapture.error}
+                  attachVideo={videoCapture.attachVideo}
+                  isCameraOn={videoCapture.isStreaming}
+                  cameraError={videoCapture.error}
                 />
 
                 <PhaseCaption phase={phase} isActive={isInterviewActive} jobTitle={job?.title} />

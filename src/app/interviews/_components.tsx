@@ -335,7 +335,15 @@ function PhaseChip({ phase, isActive }: { phase: Phase; isActive: boolean }) {
     return (
       <div className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-medium text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 rounded-md">
         <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-        You're speaking
+        You&apos;re speaking
+      </div>
+    );
+  }
+  if (phase === "processing") {
+    return (
+      <div className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-medium text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 rounded-md">
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+        Processing…
       </div>
     );
   }

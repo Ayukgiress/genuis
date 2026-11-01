@@ -1,17 +1,225 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import type { Job } from "@/types";
 import type { Phase } from "./_components";
 
-/* ──────────────────────────────────────────────────────────────────────────
-   Sub-components for the interview page (part 2)
-   Dark theme + brand primary (#00f29c) — matches globals.css
-   ────────────────────────────────────────────────────────────────────────── */
-
 const PRIMARY = "#00f29c";
 
-/* ── INTERVIEW STAGE — 2-card centerpiece ────────────────────────────────── */
+/* ── AI VIDEO PANEL ─────────────────────────────────────────────────────── */
+
+export function AIVideoPanel({ phase, isActive }: { phase: Phase; isActive: boolean }) {
+  const speaking = phase === "ai_speaking";
+  const processing = phase === "processing";
+
+  return (
+    <div
+      className={`
+        relative w-full aspect-video rounded-2xl overflow-hidden border transition-all duration-300
+        ${speaking ? "border-primary/50 shadow-[0_0_32px_rgba(0,242,156,0.15)]" : "border-zinc-800"}
+        bg-zinc-950
+      `}
+    >
+      {/* Animated gradient background — simulates AI "presence" */}
+      <div
+        className="absolute inset-0 transition-opacity duration-500"
+        style={{
+          background: speaking
+            ? "radial-gradient(ellipse at 50% 40%, rgba(0,242,156,0.12) 0%, transparent 70%)"
+            : "radial-gradient(ellipse at 50% 40%, rgba(0,242,156,0.04) 0%, transparent 70%)",
+        }}
+      />
+
+      {/* AI avatar */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
+        <div className="relative">
+          {/* Pulse rings when speaking */}
+          {speaking && (
+            <>
+              <span
+                className="absolute inset-0 m-auto rounded-full bg-primary opacity-20"
+                style={{
+                  width: 80, height: 80,
+                  animation: "wf-pulse-ring 1.8s cubic-bezier(0.4,0,0.2,1) infinite",
+                }}
+              />
+              <span
+                className="absolute inset-0 m-auto rounded-full bg-primary opacity-10"
+                style={{
+                  width: 80, height: 80,
+                  animation: "wf-pulse-ring 1.8s cubic-bezier(0.4,0,0.2,1) infinite 0.6s",
+                }}
+              />
+            </>
+          )}
+          <div
+            className={`
+              relative z-10 w-20 h-20 rounded-full grid place-items-center transition-all duration-300
+              ${speaking ? "bg-primary text-black" : "bg-zinc-800 text-zinc-300"}
+            `}
+          >
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+              <circle cx="12" cy="8" r="4" />
+              <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" strokeLinecap="round" />
+            </svg>
+          </div>
+        </div>
+
+        {/* Waveform bars */}
+        <div className="flex items-end gap-[3px] h-6">
+          {[0, 0.15, 0.3, 0.1, 0.25, 0.05, 0.2, 0.12].map((delay, i) => (
+            <span
+              key={i}
+              className="w-[3px] rounded-full transition-all duration-300"
+              style={{
+                height: speaking ? `${10 + (i % 3) * 8}px` : "4px",
+                backgroundColor: speaking ? PRIMARY : "#3f3f46",
+                animation: speaking
+                  ? `wf-bar ${0.7 + (i % 3) * 0.15}s ease-in-out ${delay}s infinite`
+                  : undefined,
+                transformOrigin: "center",
+              }}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Status badge */}
+      <div className="absolute top-3 left-3">
+        <span
+          className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded-md"
+          style={{
+            backgroundColor: "rgba(0,0,0,0.6)",
+            color: speaking ? PRIMARY : "#71717a",
+            border: `1px solid ${speaking ? "rgba(0,242,156,0.3)" : "rgba(63,63,70,0.5)"}`,
+          }}
+        >
+          <span
+            className="w-1.5 h-1.5 rounded-full"
+            style={{
+              backgroundColor: speaking ? PRIMARY : processing ? "#f59e0b" : "#52525b",
+              animation: (speaking || processing) ? "wf-pulse-ring 1.2s ease-in-out infinite" : undefined,
+            }}
+          />
+          {speaking ? "AI speaking" : processing ? "Processing…" : isActive ? "Listening" : "AI Interviewer"}
+        </span>
+      </div>
+
+      {/* "AI" label bottom-right */}
+      <div className="absolute bottom-3 right-3">
+        <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">AI</span>
+      </div>
+    </div>
+  );
+}
+
+/* ── USER VIDEO PANEL ───────────────────────────────────────────────────── */
+
+export function UserVideoPanel({
+  phase,
+  isActive,
+  userInitial,
+  userName,
+  attachVideo,
+  isCameraOn,
+  cameraError,
+}: {
+  phase: Phase;
+  isActive: boolean;
+  userInitial: string;
+  userName: string;
+  attachVideo: (el: HTMLVideoElement | null) => void;
+  isCameraOn: boolean;
+  cameraError: string | null;
+}) {
+  const speaking = phase === "user_speaking";
+
+  return (
+    <div
+      className={`
+        relative w-full aspect-video rounded-2xl overflow-hidden border transition-all duration-300
+        ${speaking ? "border-amber-500/50 shadow-[0_0_32px_rgba(245,158,11,0.12)]" : "border-zinc-800"}
+        bg-zinc-950
+      `}
+    >
+      {/* Live webcam feed */}
+      {isCameraOn && (
+        <video
+          ref={attachVideo}
+          autoPlay
+          playsInline
+          muted
+          className="absolute inset-0 w-full h-full object-cover scale-x-[-1]"
+        />
+      )}
+
+      {/* Overlay when camera is off */}
+      {!isCameraOn && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+          <div
+            className={`
+              w-20 h-20 rounded-full grid place-items-center text-2xl font-bold transition-all duration-300
+              ${speaking ? "bg-amber-500/20 text-amber-300 ring-4 ring-amber-500/30" : "bg-zinc-800 text-white"}
+            `}
+          >
+            {userInitial}
+          </div>
+          {cameraError && (
+            <p className="text-[11px] text-zinc-500 text-center px-4">{cameraError}</p>
+          )}
+        </div>
+      )}
+
+      {/* Speaking pulse overlay */}
+      {speaking && (
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{ border: "2px solid rgba(245,158,11,0.4)", borderRadius: "inherit" }}
+        />
+      )}
+
+      {/* Status badge */}
+      <div className="absolute top-3 left-3">
+        <span
+          className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded-md"
+          style={{
+            backgroundColor: "rgba(0,0,0,0.6)",
+            color: speaking ? "#fcd34d" : "#71717a",
+            border: `1px solid ${speaking ? "rgba(245,158,11,0.3)" : "rgba(63,63,70,0.5)"}`,
+          }}
+        >
+          <span
+            className="w-1.5 h-1.5 rounded-full"
+            style={{
+              backgroundColor: speaking ? "#f59e0b" : isActive ? "#52525b" : "#3f3f46",
+              animation: speaking ? "wf-pulse-ring 1.2s ease-in-out infinite" : undefined,
+            }}
+          />
+          {speaking ? "You're speaking" : isActive ? "Mic active" : "You"}
+        </span>
+      </div>
+
+      {/* Name label */}
+      <div className="absolute bottom-3 left-3">
+        <span
+          className="text-[11px] font-semibold px-2 py-1 rounded-md"
+          style={{ backgroundColor: "rgba(0,0,0,0.6)", color: "#a1a1aa" }}
+        >
+          {userName}
+        </span>
+      </div>
+
+      {/* Camera off indicator */}
+      {!isCameraOn && isActive && (
+        <div className="absolute bottom-3 right-3">
+          <span className="text-[10px] text-zinc-600 uppercase tracking-widest">CAM OFF</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── INTERVIEW STAGE ────────────────────────────────────────────────────── */
 
 export function InterviewStage({
   phase,
@@ -21,6 +229,9 @@ export function InterviewStage({
   userName,
   onToggle,
   disabled,
+  attachVideo,
+  isCameraOn,
+  cameraError,
 }: {
   phase: Phase;
   isInterviewActive: boolean;
@@ -29,37 +240,23 @@ export function InterviewStage({
   userName: string;
   onToggle: () => void;
   disabled: boolean;
+  attachVideo: (el: HTMLVideoElement | null) => void;
+  isCameraOn: boolean;
+  cameraError: string | null;
 }) {
   return (
-    <div className="w-full max-w-3xl">
+    <div className="w-full max-w-4xl">
+      {/* Video grid — 2 columns on md+, stacked on mobile */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-        <ParticipantCard
-          kind="ai"
-          name="AI Interviewer"
-          role={job?.title || "Recruiter"}
-          avatar={<AIAvatar speaking={phase === "ai_speaking"} />}
-          speaking={phase === "ai_speaking"}
+        <AIVideoPanel phase={phase} isActive={isInterviewActive} />
+        <UserVideoPanel
+          phase={phase}
           isActive={isInterviewActive}
-        />
-        <ParticipantCard
-          kind="you"
-          name={userName}
-          role="Candidate"
-          avatar={
-            <div
-              className={`
-                w-20 h-20 sm:w-24 sm:h-24 rounded-full grid place-items-center
-                text-2xl sm:text-3xl font-bold transition-all duration-300
-                ${phase === "user_speaking"
-                  ? "bg-amber-500/15 text-amber-300 ring-4 ring-amber-500/30"
-                  : "bg-zinc-800 text-white"}
-              `}
-            >
-              {userInitial}
-            </div>
-          }
-          speaking={phase === "user_speaking"}
-          isActive={isInterviewActive}
+          userInitial={userInitial}
+          userName={userName}
+          attachVideo={attachVideo}
+          isCameraOn={isCameraOn}
+          cameraError={cameraError}
         />
       </div>
 
@@ -93,138 +290,7 @@ export function InterviewStage({
   );
 }
 
-/* ── PARTICIPANT CARD ─────────────────────────────────────────────────────── */
-
-function ParticipantCard({
-  kind,
-  name,
-  role,
-  avatar,
-  speaking,
-  isActive,
-}: {
-  kind: "ai" | "you";
-  name: string;
-  role: string;
-  avatar: React.ReactNode;
-  speaking: boolean;
-  isActive: boolean;
-}) {
-  const isYou = kind === "you";
-  // You: amber accent; AI: brand primary accent
-  const accentRing = isYou ? "ring-amber-500/40" : "ring-primary/40";
-  const accentBg = isYou ? "rgba(245,158,11,0.06)" : "rgba(0,242,156,0.06)";
-  const accentBorder = isYou ? "border-amber-500/40" : "border-primary/40";
-  const accentText = isYou ? "text-amber-300" : "text-primary";
-  const accentDot = isYou ? "bg-amber-400" : "bg-primary";
-  const speakingPill = isYou ? "You're speaking" : "AI is speaking";
-
-  return (
-    <div
-      className={`
-        relative rounded-2xl border bg-zinc-950 p-5 sm:p-6
-        transition-all duration-300
-        ${speaking
-          ? `${accentBorder} shadow-[0_0_24px_rgba(0,242,156,0.08)]`
-          : "border-zinc-800"}
-        ${!isActive ? "opacity-60" : ""}
-      `}
-      style={speaking ? { backgroundColor: accentBg } : undefined}
-    >
-      {/* Top row: role label + live dot */}
-      <div className="flex items-center justify-between mb-4">
-        <span className={`text-[11px] font-semibold uppercase tracking-wider ${accentText}`}>
-          {isYou ? "You" : "AI Interviewer"}
-        </span>
-        {speaking && isActive && (
-          <span className={`flex items-center gap-1.5 text-[11px] font-medium ${accentText}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${accentDot} animate-pulse`} />
-            speaking
-          </span>
-        )}
-      </div>
-
-      {/* Avatar with pulse rings when speaking */}
-      <div className="relative w-full flex justify-center my-4 sm:my-6">
-        {speaking && isActive && (
-          <>
-            <span
-              className={`absolute inset-0 m-auto w-20 h-20 sm:w-24 sm:h-24 rounded-full ${accentDot} opacity-30`}
-              style={{ animation: "wf-pulse-ring 1.8s cubic-bezier(0.4,0,0.2,1) infinite" }}
-            />
-            <span
-              className={`absolute inset-0 m-auto w-20 h-20 sm:w-24 sm:h-24 rounded-full ${accentDot} opacity-20`}
-              style={{ animation: "wf-pulse-ring 1.8s cubic-bezier(0.4,0,0.2,1) infinite 0.6s" }}
-            />
-          </>
-        )}
-        <div className="relative z-10">{avatar}</div>
-      </div>
-
-      {/* Name + role */}
-      <div className="text-center">
-        <p className="text-[15px] font-semibold text-white truncate">{name}</p>
-        <p className="text-[12px] text-zinc-500 truncate mt-0.5">{role}</p>
-      </div>
-
-      {/* Waveform / status */}
-      <div className="flex justify-center mt-4 h-7 items-end">
-        {speaking && isActive ? (
-          <div className="flex items-end gap-[3px] h-6">
-            {[0.0, 0.15, 0.3, 0.1, 0.25, 0.05, 0.2, 0.12].map((delay, i) => (
-              <span
-                key={i}
-                className={`w-[3px] rounded-full ${accentDot}`}
-                style={{
-                  height: `${10 + (i % 3) * 8}px`,
-                  animation: `wf-bar ${0.7 + (i % 3) * 0.15}s ease-in-out ${delay}s infinite`,
-                  transformOrigin: "center",
-                }}
-              />
-            ))}
-          </div>
-        ) : isActive ? (
-          <span className="text-[11px] text-zinc-500">
-            {isYou ? "Listening…" : "Waiting…"}
-          </span>
-        ) : (
-          <span className="text-[11px] text-zinc-600">Standby</span>
-        )}
-      </div>
-
-      {/* Mobile speaking label */}
-      {speaking && isActive && (
-        <div className="mt-3 flex justify-center sm:hidden">
-          <span className={`text-[10px] font-medium ${accentText}`}>{speakingPill}</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ── AI AVATAR ────────────────────────────────────────────────────────────── */
-
-function AIAvatar({ speaking }: { speaking: boolean }) {
-  return (
-    <div
-      className={`
-        w-20 h-20 sm:w-24 sm:h-24 rounded-full grid place-items-center transition-all duration-300
-        ${speaking
-          ? "bg-primary text-black ring-4 ring-primary/30"
-          : "bg-zinc-800 text-zinc-300"}
-      `}
-    >
-      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-        <circle cx="12" cy="12" r="9" />
-        <circle cx="12" cy="12" r="3" fill="currentColor" />
-        <path d="M12 3v3M12 18v3M3 12h3M18 12h3" strokeLinecap="round" />
-        <path d="M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1" strokeLinecap="round" />
-      </svg>
-    </div>
-  );
-}
-
-/* ── PHASE CAPTION ────────────────────────────────────────────────────────── */
+/* ── PHASE CAPTION ──────────────────────────────────────────────────────── */
 
 export function PhaseCaption({
   phase,
@@ -248,26 +314,33 @@ export function PhaseCaption({
   }
   if (phase === "ai_speaking") {
     return (
-      <p className="mt-6 text-center text-[13px] text-primary font-medium">
+      <p className="mt-6 text-center text-[13px] font-medium" style={{ color: PRIMARY }}>
         The AI interviewer is asking a question — listen carefully.
+      </p>
+    );
+  }
+  if (phase === "processing") {
+    return (
+      <p className="mt-6 text-center text-[13px] text-amber-400 font-medium">
+        Processing your answer…
       </p>
     );
   }
   if (phase === "user_speaking") {
     return (
       <p className="mt-6 text-center text-[13px] text-amber-300 font-medium">
-        You're speaking — your answer is being recorded.
+        You&apos;re speaking — your answer is being recorded.
       </p>
     );
   }
   return (
     <p className="mt-6 text-center text-[13px] text-zinc-400">
-      Your turn — speak when you're ready.
+      Your turn — speak when you&apos;re ready.
     </p>
   );
 }
 
-/* ── NOTICE PILL ──────────────────────────────────────────────────────────── */
+/* ── NOTICE PILL ────────────────────────────────────────────────────────── */
 
 export function Notice({ tone, msg }: { tone: "warn" | "error" | "info"; msg: string }) {
   const colors =
@@ -289,7 +362,7 @@ export function Notice({ tone, msg }: { tone: "warn" | "error" | "info"; msg: st
   );
 }
 
-/* ── STAGE FOOTER ─────────────────────────────────────────────────────────── */
+/* ── STAGE FOOTER ───────────────────────────────────────────────────────── */
 
 export function StageFooter({
   interviewId,
@@ -331,7 +404,7 @@ export function StageFooter({
   );
 }
 
-/* ── EMPTY STAGE ──────────────────────────────────────────────────────────── */
+/* ── EMPTY STAGE ────────────────────────────────────────────────────────── */
 
 export function EmptyStage({ onCreate }: { onCreate: () => void }) {
   return (
@@ -340,17 +413,15 @@ export function EmptyStage({ onCreate }: { onCreate: () => void }) {
         <div className="absolute inset-0 rounded-2xl rotate-6" style={{ backgroundColor: "rgba(0,242,156,0.1)" }} />
         <div className="absolute inset-0 rounded-2xl bg-zinc-900 border border-zinc-800 grid place-items-center">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-primary">
-            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-            <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
-            <line x1="12" y1="19" x2="12" y2="23" />
-            <line x1="8" y1="23" x2="16" y2="23" />
+            <path d="M15 10l4.553-2.069A1 1 0 0 1 21 8.82v6.36a1 1 0 0 1-1.447.89L15 14" />
+            <rect x="2" y="7" width="13" height="10" rx="2" />
           </svg>
         </div>
       </div>
 
       <h2 className="text-xl font-semibold text-white tracking-tight">Ready to practice?</h2>
       <p className="text-sm text-zinc-500 max-w-sm mt-2 leading-relaxed">
-        Start a session to do a voice mock interview with our AI. Get instant feedback on your answers.
+        Start a video interview session with our AI interviewer. Your camera and mic will be used for a realistic experience.
       </p>
       <button
         onClick={onCreate}
@@ -365,7 +436,7 @@ export function EmptyStage({ onCreate }: { onCreate: () => void }) {
   );
 }
 
-/* ── CREATE MODAL ─────────────────────────────────────────────────────────── */
+/* ── CREATE MODAL ───────────────────────────────────────────────────────── */
 
 export function CreateModal({
   jobs,
@@ -428,7 +499,7 @@ export function CreateModal({
             </select>
             {jobs.length === 0 && (
               <p className="mt-2 text-[12px] text-zinc-500">
-                You don't have any jobs saved yet. Add some from the Jobs page first.
+                You don&apos;t have any jobs saved yet. Add some from the Jobs page first.
               </p>
             )}
           </div>
