@@ -130,7 +130,6 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   }
 
   const token = getAuthToken();
-  console.log('🔑 Token check:', { endpoint, hasToken: !!token, tokenPreview: token?.substring(0, 10) });
 
   const headers: HeadersInit = {
     ...(fetchOptions.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
@@ -140,9 +139,6 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   // Add authorization header if token exists
   if (token) {
     (headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
-    console.log(`Sending request to ${API_BASE_URL}${endpoint} with token: ${token.substring(0, 20)}...`);
-  } else {
-    console.log(`Sending request to ${API_BASE_URL}${endpoint} without token`);
   }
 
   const response = await fetch(url, {

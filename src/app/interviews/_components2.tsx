@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef } from "react";
+import Link from "next/link";
 import type { Job } from "@/types";
 import type { Phase } from "./_components";
 import type { AiTurnMedia } from "@/hooks/useInterviewSession";
@@ -21,6 +22,24 @@ export function AIVideoPanel({
   const speaking = phase === "ai_speaking";
   const processing = phase === "processing";
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [videoFailed, setVideoFailed] = React.useState(false);
+
+  const videoSrc = media?.videoUrl
+    ? media.videoUrl
+    : media?.videoData
+      ? media.videoData.startsWith("data:")
+        ? media.videoData
+        : `data:${media.videoMimeType || "video/webm"};base64,${media.videoData}`
+      : null;
+  const avatarImageSrc = media?.avatarImageUrl
+    ? media.avatarImageUrl
+    : media?.avatarImageData
+      ? media.avatarImageData.startsWith("data:")
+        ? media.avatarImageData
+        : `data:${media.avatarImageMimeType || "image/png"};base64,${media.avatarImageData}`
+      : null;
+  const showVideo = !!videoSrc && !videoFailed && media?.avatarType !== "none";
+  const showImage = !!avatarImageSrc && !showVideo && media?.avatarType !== "none";
 
   // Play/pause the avatar video clip in sync with the speaking phase
   useEffect(() => {
@@ -31,14 +50,7 @@ export function AIVideoPanel({
     } else {
       el.pause();
     }
-  }, [speaking]);
-
-  // Resolve which video source to use (URL preferred over base64)
-  const videoSrc = media?.videoUrl
-    ? media.videoUrl
-    : media?.videoData
-      ? `data:video/webm;base64,${media.videoData}`
-      : null;
+  }, [speaking, videoSrc]);
 
   return (
     <div
@@ -59,14 +71,23 @@ export function AIVideoPanel({
       />
 
       {/* Avatar video clip — shown when backend provides video */}
-      {videoSrc ? (
+      {showVideo ? (
         <video
           ref={videoRef}
           src={videoSrc}
           loop
-          muted={false}
+          muted
           playsInline
+          onError={() => setVideoFailed(true)}
+          aria-label="AI interviewer video"
           className="absolute inset-0 w-full h-full object-cover"
+        />
+      ) : showImage ? (
+        <div
+          role="img"
+          aria-label="AI interviewer avatar"
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: `url("${avatarImageSrc}")` }}
         />
       ) : (
         /* Fallback: animated avatar (audio-only mode) */
@@ -94,11 +115,11 @@ export function AIVideoPanel({
               </svg>
             </div>
           </div>
-          <div className="flex items-end gap-[3px] h-6">
+          <div className="flex items-end gap-0.75 h-6">
             {[0, 0.15, 0.3, 0.1, 0.25, 0.05, 0.2, 0.12].map((delay, i) => (
               <span
                 key={i}
-                className="w-[3px] rounded-full transition-all duration-300"
+                className="w-0.75 rounded-full transition-all duration-300"
                 style={{
                   height: speaking ? `${10 + (i % 3) * 8}px` : "4px",
                   backgroundColor: speaking ? PRIMARY : "#3f3f46",
@@ -128,13 +149,18 @@ export function AIVideoPanel({
               animation: (speaking || processing) ? "wf-pulse-ring 1.2s ease-in-out infinite" : undefined,
             }}
           />
-          {speaking ? "AI speaking" : processing ? "Processing…" : isActive ? "Listening" : "AI Interviewer"}
+          {speaking ? "AI speaking" : processing ? "Processing…" : isActive ? "Listening" : showVideo || showImage ? "AI interviewer" : "AI voice · avatar fallback"}
         </span>
       </div>
 
       <div className="absolute bottom-3 right-3">
         <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">AI</span>
       </div>
+      {media?.transcript && (
+        <div aria-live="polite" className="absolute inset-x-3 bottom-9 rounded-lg border border-white/10 bg-black/70 px-3 py-2 text-center text-xs leading-relaxed text-white/90">
+          {media.transcript}
+        </div>
+      )}
     </div>
   );
 }
@@ -159,6 +185,15 @@ export function UserVideoPanel({
   cameraError: string | null;
 }) {
   const speaking = phase === "user_speaking";
+  const micStatus = speaking
+    ? "You’re speaking"
+    : phase === "preparing"
+      ? "Checking mic"
+      : phase === "ai_speaking" || phase === "processing"
+        ? "Mic paused"
+        : isActive
+          ? "Mic active"
+          : "You";
 
   return (
     <div
@@ -221,7 +256,7 @@ export function UserVideoPanel({
               animation: speaking ? "wf-pulse-ring 1.2s ease-in-out infinite" : undefined,
             }}
           />
-          {speaking ? "You're speaking" : isActive ? "Mic active" : "You"}
+          {micStatus}
         </span>
       </div>
 
@@ -250,7 +285,6 @@ export function UserVideoPanel({
 export function InterviewStage({
   phase,
   isInterviewActive,
-  job,
   userInitial,
   userName,
   onToggle,
@@ -262,7 +296,6 @@ export function InterviewStage({
 }: {
   phase: Phase;
   isInterviewActive: boolean;
-  job: Job | null | undefined;
   userInitial: string;
   userName: string;
   onToggle: () => void;
@@ -276,7 +309,12 @@ export function InterviewStage({
     <div className="w-full max-w-4xl">
       {/* Video grid — 2 columns on md+, stacked on mobile */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-        <AIVideoPanel phase={phase} isActive={isInterviewActive} media={aiMedia} />
+        <AIVideoPanel
+          key={aiMedia?.videoUrl ?? aiMedia?.videoData ?? aiMedia?.avatarImageUrl ?? aiMedia?.avatarImageData ?? "avatar-fallback"}
+          phase={phase}
+          isActive={isInterviewActive}
+          media={aiMedia}
+        />
         <UserVideoPanel
           phase={phase}
           isActive={isInterviewActive}
@@ -337,6 +375,13 @@ export function PhaseCaption({
           Start session
         </kbd>{" "}
         to begin your practice interview{jobTitle ? ` for the ${jobTitle} role` : ""}.
+      </p>
+    );
+  }
+  if (phase === "preparing") {
+    return (
+      <p role="status" className="mt-6 text-center text-[13px] text-primary">
+        Checking microphone access and preparing your practice session…
       </p>
     );
   }
@@ -449,7 +494,7 @@ export function EmptyStage({ onCreate }: { onCreate: () => void }) {
 
       <h2 className="text-xl font-semibold text-white tracking-tight">Ready to practice?</h2>
       <p className="text-sm text-zinc-500 max-w-sm mt-2 leading-relaxed">
-        Start a video interview session with our AI interviewer. Your camera and mic will be used for a realistic experience.
+        Create a practice session for a role, then rehearse answers with the AI interviewer. Your microphone is required; camera access is optional.
       </p>
       <button
         onClick={onCreate}
@@ -460,6 +505,7 @@ export function EmptyStage({ onCreate }: { onCreate: () => void }) {
         </svg>
         Start a session
       </button>
+      <p className="mt-4 text-xs text-zinc-600">No sessions yet? Your first session will appear here so you can pick up practice anytime.</p>
     </div>
   );
 }
@@ -471,6 +517,9 @@ export function CreateModal({
   selectedJobId,
   setSelectedJobId,
   isCreating,
+  jobsLoading,
+  jobsError,
+  onRetryJobs,
   onClose,
   onCreate,
 }: {
@@ -478,6 +527,9 @@ export function CreateModal({
   selectedJobId: string;
   setSelectedJobId: (s: string) => void;
   isCreating: boolean;
+  jobsLoading: boolean;
+  jobsError: string | null;
+  onRetryJobs: () => void;
   onClose: () => void;
   onCreate: () => void;
 }) {
@@ -525,10 +577,23 @@ export function CreateModal({
                 </option>
               ))}
             </select>
-            {jobs.length === 0 && (
-              <p className="mt-2 text-[12px] text-zinc-500">
-                You don&apos;t have any jobs saved yet. Add some from the Jobs page first.
+            {jobsLoading && (
+              <p role="status" className="mt-2 inline-flex items-center gap-2 text-[12px] text-zinc-400">
+                <span className="h-3 w-3 animate-spin rounded-full border border-zinc-600 border-t-primary" />
+                Loading your saved jobs…
               </p>
+            )}
+            {jobsError && (
+              <div role="alert" className="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
+                <p className="text-[12px] text-amber-200">{jobsError}</p>
+                <button onClick={onRetryJobs} className="mt-2 text-[12px] font-semibold text-primary hover:underline">Retry loading jobs</button>
+              </div>
+            )}
+            {!jobsLoading && !jobsError && jobs.length === 0 && (
+              <div className="mt-3 rounded-lg border border-zinc-800 bg-zinc-950/70 p-3">
+                <p className="text-[12px] text-zinc-400">No saved roles yet. Add a job first, then come back to tailor your practice.</p>
+                <Link href="/jobs" onClick={onClose} className="mt-2 inline-flex text-[12px] font-semibold text-primary hover:underline">Browse jobs →</Link>
+              </div>
             )}
           </div>
 

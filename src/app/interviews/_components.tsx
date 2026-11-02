@@ -8,7 +8,7 @@ import type { Interview, Job } from "@/types";
    Uses the global dark theme (bg-card, text-white, primary = #00f29c)
    ────────────────────────────────────────────────────────────────────────── */
 
-export type Phase = "idle" | "ai_speaking" | "user_speaking" | "processing" | "ready";
+export type Phase = "idle" | "preparing" | "ai_speaking" | "user_speaking" | "processing" | "ready";
 
 const PRIMARY = "#00f29c";
 
@@ -61,7 +61,7 @@ export function SessionPicker({
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-zinc-900/70 transition-colors group max-w-[260px]"
+        className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-zinc-900/70 transition-colors group max-w-65"
         aria-haspopup="listbox"
         aria-expanded={open}
       >
@@ -115,7 +115,7 @@ export function SessionPicker({
             </button>
           </div>
 
-          <div className="max-h-[320px] overflow-y-auto wf-scrollbar py-1">
+          <div className="max-h-80 overflow-y-auto wf-scrollbar py-1">
             {interviews.length === 0 ? (
               <div className="px-4 py-8 text-center">
                 <p className="text-[12px] text-zinc-500">No sessions yet</p>
@@ -228,7 +228,6 @@ export function StageHeader({
   onComplete,
   getJob,
   formatRelative,
-  job,
   isInterviewActive,
   phase,
   elapsed,
@@ -244,7 +243,6 @@ export function StageHeader({
   onComplete: (id: number) => void;
   getJob: (jobId: string) => Job | undefined;
   formatRelative: (d: string) => string;
-  job: Job | null | undefined;
   isInterviewActive: boolean;
   phase: Phase;
   elapsed: number;
@@ -317,6 +315,14 @@ function PhaseChip({ phase, isActive }: { phase: Phase; isActive: boolean }) {
       <div className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-medium text-zinc-500 bg-zinc-900 border border-zinc-800 px-2.5 py-1 rounded-md">
         <span className="w-1.5 h-1.5 rounded-full bg-zinc-600" />
         Ready
+      </div>
+    );
+  }
+  if (phase === "preparing") {
+    return (
+      <div className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-medium text-primary bg-primary/10 border border-primary/30 px-2.5 py-1 rounded-md">
+        <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+        Checking devices…
       </div>
     );
   }

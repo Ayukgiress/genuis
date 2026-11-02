@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { api, setAuthToken, getAuthToken, ApiError } from "@/lib/api";
+import { queryClient } from "@/lib/query-client";
 import type { AuthUser, Token, UserCreate, VerificationResponse, RegisterResponse, GoogleOAuthResponse } from "@/types";
 
 interface AuthState {
@@ -74,6 +75,7 @@ export const useAuthStore = create<AuthState>()(
           console.error('Logout failed:', error);
         } finally {
           setAuthToken(null);
+          queryClient.clear();
           set({
             user: null,
             token: null,

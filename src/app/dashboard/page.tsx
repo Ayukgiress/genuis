@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   AreaChart,
   Area,
@@ -11,254 +12,56 @@ import {
   Tooltip,
   ResponsiveContainer
 } from 'recharts';
-import { analysisApi, analyticsApi, jobApi, kanbanApi, ApiError, getAuthToken, interviewApi } from '@/lib/api';
+import { getAuthToken } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { useApplicationStore } from '@/store/applicationStore';
-import type { Analysis, Analytics, AnalyticsSummary, Job, KanbanBoard, Interview } from '@/types';
+import { useDashboardData } from '@/hooks/useDashboardData';
+import { createOrReuseInterview, interviewKeys, normalizeInterviewJobId } from '@/hooks/useInterviewsData';
 import { toast } from 'react-toastify';
 import Link from 'next/link';
 
 const COLORS = ['#00f29c', '#6366f1', '#f59e0b', '#ef4444'];
+// used by recharts gradient stops above
+void COLORS;
+const subscribeToNothing = () => () => {};
+const getClientMountedSnapshot = () => true;
+const getServerMountedSnapshot = () => false;
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading: authLoading, fetchCurrentUser } = useAuth();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const queryClient = useQueryClient();
   const { applications } = useApplicationStore();
-  const [analyses, setAnalyses] = useState<Analysis[]>([]);
-  const [analyticsSummary, setAnalyticsSummary] = useState<AnalyticsSummary | null>(null);
-  const [analytics, setAnalytics] = useState<Analytics[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [dataLoaded, setDataLoaded] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  const fetchInitiated = useRef(false);
-  const interviewDataLoaded = useRef(false);
-
-  // Interview state
-  // Map of job_id -> interview for O(1) lookup
-  const [interviewMap, setInterviewMap] = useState<Map<string, Interview>>(new Map());
-  const [appliedJobs, setAppliedJobs] = useState<Job[]>([]);
-  
-  // Kanban state
-  const [boards, setBoards] = useState<KanbanBoard[]>([]);
-  const [selectedBoard, setSelectedBoard] = useState<string>('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [jobFilters, setJobFilters] = useState({ remote: false, location: '' });
-
-  // Interview coach pagination
+  const mounted = useSyncExternalStore(
+    subscribeToNothing,
+    getClientMountedSnapshot,
+    getServerMountedSnapshot,
+  );
   const [interviewPage, setInterviewPage] = useState(0);
+  const [creatingJobId, setCreatingJobId] = useState<string | null>(null);
   const interviewsPerPage = 3;
 
-  // Unused job search state - kept for compatibility
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [isLoadingJobs, setIsLoadingJobs] = useState(false);
+  const queryEnabled = !authLoading && isAuthenticated && !!getAuthToken();
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const {
+    analyses,
+    analyticsSummary,
+    interviewMap: remoteInterviewMap,
+    appliedJobs,
+    isLoading,
+    isInterviewDataReady,
+    error,
+  } = useDashboardData(queryEnabled);
 
+  const interviewMap = remoteInterviewMap;
+
+  // Auth redirect
   useEffect(() => {
     if (authLoading) return;
-    if (!isAuthenticated || !getAuthToken()) {
-      router.push('/login');
-      return;
-    }
+    if (!isAuthenticated || !getAuthToken()) { router.push('/login'); return; }
+  }, [authLoading, isAuthenticated, router]);
 
-    if (fetchInitiated.current) return;
-    fetchInitiated.current = true;
-
-    // Refresh user data once to ensure subscription status is up to date
-    fetchCurrentUser();
-
-    const fetchDashboardData = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        // Use Promise.allSettled to prevent one failing API call from blocking others
-        const [analysesResult, summaryResult, analyticsResult, boardsResult] = await Promise.allSettled([
-          analysisApi.list(),
-          analyticsApi.getSummary(),
-          analyticsApi.list(),
-          kanbanApi.listBoards()
-        ]);
-
-        if (analysesResult.status === 'fulfilled') {
-          setAnalyses(analysesResult.value);
-        }
-
-        if (summaryResult.status === 'fulfilled') {
-          setAnalyticsSummary(summaryResult.value);
-        }
-
-        if (analyticsResult.status === 'fulfilled') {
-          setAnalytics(analyticsResult.value);
-        }
-
-        if (boardsResult.status === 'fulfilled') {
-          setBoards(boardsResult.value);
-          if (boardsResult.value.length > 0) {
-            setSelectedBoard(boardsResult.value[0].id);
-          }
-        }
-
-        setDataLoaded(true);
-      } catch (err) {
-        console.error('Failed to fetch dashboard data:', err);
-        // Don't set error for auth issues, just show empty dashboard
-        if (!(err instanceof ApiError && (err.status === 401 || err.status === 403))) {
-          setError('Failed to load some dashboard data. Please try refreshing the page.');
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchDashboardData();
-  }, [authLoading, isAuthenticated, router, dataLoaded, fetchCurrentUser]);
-
-  // Load interviews and applied jobs for interview prep alerts — runs once only
-  useEffect(() => {
-    if (!isAuthenticated || !getAuthToken()) return;
-    if (interviewDataLoaded.current) return;
-    interviewDataLoaded.current = true;
-
-    const loadInterviewData = async () => {
-      try {
-        // Fetch all interviews once
-        const interviewsData = await interviewApi.list();
-        const activeInterviews = interviewsData.filter((i) => i.status === 'active');
-
-        // Build job_id -> interview map (deduped by job_id, keep first)
-        const newInterviewMap = new Map<string, Interview>();
-        for (const iv of activeInterviews) {
-          if (!newInterviewMap.has(iv.job_id)) newInterviewMap.set(iv.job_id, iv);
-        }
-
-        // Derive unique job IDs strictly from applicationStore (real job IDs only)
-        const seenJobIds = new Set<string>();
-        const uniqueApps: typeof applications[number][] = [];
-        for (const app of applications) {
-          if (app.jobId && !seenJobIds.has(app.jobId)) {
-            seenJobIds.add(app.jobId);
-            uniqueApps.push(app);
-          }
-        }
-
-        // Fetch job details in parallel; fall back to store data on failure
-        const jobDetailResults = await Promise.allSettled(
-          uniqueApps.map(app => jobApi.getById(app.jobId))
-        );
-
-        const appliedJobList: Job[] = [];
-        jobDetailResults.forEach((result, index) => {
-          const app = uniqueApps[index];
-          if (result.status === 'fulfilled') {
-            appliedJobList.push(result.value);
-          } else {
-            appliedJobList.push({
-              id: app.jobId,
-              title: app.title,
-              company: app.company,
-              location: 'Remote',
-              description: '',
-              requirements: [],
-              source: 'Applied',
-              source_url: '',
-              posted_at: app.appliedAt,
-            });
-          }
-        });
-
-        setAppliedJobs(appliedJobList);
-
-        // Create missing prep sessions for jobs without an active interview
-        const jobsMissingPrep = appliedJobList.filter(job => !newInterviewMap.has(job.id));
-
-        await Promise.allSettled(
-          jobsMissingPrep.map(async (job) => {
-            try {
-              const interview = await interviewApi.create({ job_id: job.id, status: 'active' });
-              newInterviewMap.set(job.id, interview);
-            } catch {
-              // Skip silently
-            }
-          })
-        );
-
-        setInterviewMap(new Map(newInterviewMap));
-
-        // Fire a single toast if any new prep sessions were needed
-        if (jobsMissingPrep.length > 0) {
-          const firstNewInterview = newInterviewMap.get(jobsMissingPrep[0].id);
-          toast.info(
-            `Interview prep ready for ${jobsMissingPrep.length} application${jobsMissingPrep.length > 1 ? 's' : ''}! Click to start practicing.`,
-            {
-              autoClose: 6000,
-              onClick: firstNewInterview
-                ? () => router.push(`/interviews?id=${firstNewInterview.id}`)
-                : undefined,
-            }
-          );
-        }
-      } catch (err) {
-        console.error('Failed to load interviews/applied jobs:', err);
-      }
-    };
-
-    const timeoutId = setTimeout(loadInterviewData, 800);
-    return () => clearTimeout(timeoutId);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated]);
-
-  const fetchJobs = useCallback(async () => {
-    try {
-      setIsLoadingJobs(true);
-      const jobsData = await jobApi.search({
-        query: searchQuery || undefined,
-        remote: jobFilters.remote,
-        location: jobFilters.location || undefined,
-        limit: 6
-      });
-      setJobs(jobsData);
-    } catch (err) {
-      console.error('Failed to fetch jobs:', err);
-      setJobs([]);
-      // If jobs fetch fails due to auth, don't show error since dashboard might still work
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
-        console.log('Jobs fetch failed due to auth, but continuing...');
-      }
-    } finally {
-      setIsLoadingJobs(false);
-    }
-  }, [searchQuery, jobFilters.remote, jobFilters.location]);
-
-  const jobsFetched = useRef(false);
-
-  useEffect(() => {
-    if (authLoading || !isAuthenticated || !getAuthToken()) return;
-    
-    if (jobsFetched.current) return;
-    jobsFetched.current = true;
-
-    // Initial jobs fetch
-    fetchJobs();
-  }, [authLoading, isAuthenticated, fetchJobs]);
-
-  const handleAddToKanban = async (job: Job) => {
-    if (!selectedBoard) {
-      toast.warn('Please select a board first');
-      return;
-    }
-    try {
-      await jobApi.addToKanban(job.id, parseInt(selectedBoard), 'todo');
-      toast.success('Job added to pipeline!');
-    } catch (err) {
-      console.error('Failed to add job to kanban:', err);
-      toast.error('Failed to add job');
-    }
-  };
-
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const getMatchColor = (score?: number) => {
     if (!score) return 'text-zinc-500';
     if (score >= 80) return 'text-primary';
@@ -266,6 +69,7 @@ export default function DashboardPage() {
     return 'text-red-500';
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const getMatchBg = (score?: number) => {
     if (!score) return 'bg-zinc-800';
     if (score >= 80) return 'bg-primary/20 border-primary/30';
@@ -273,6 +77,7 @@ export default function DashboardPage() {
     return 'bg-red-500/20 border-red-500/30';
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     const now = new Date();
@@ -346,7 +151,7 @@ export default function DashboardPage() {
     },
   ];
 
-  const chartData = React.useMemo(() => {
+  const chartData = useMemo(() => {
     // Generate last 7 days
     const days = [];
     const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
@@ -398,43 +203,12 @@ export default function DashboardPage() {
     }));
   }, [analyses, applications, interviewMap]);
 
-  const funnelData = [
-    { label: 'UPLOADED', value: totalAnalyses, percentage: totalAnalyses > 0 ? 100 : 0 },
-    { label: 'ANALYZED', value: completedAnalyses, percentage: totalAnalyses > 0 ? Math.round((completedAnalyses / totalAnalyses) * 100) : 0 },
-    { label: 'OPTIMIZED', value: Math.floor(completedAnalyses * 0.7), percentage: totalAnalyses > 0 ? Math.floor((completedAnalyses / totalAnalyses) * 70) : 0 },
-    { label: 'APPLYING', value: Math.floor(completedAnalyses * 0.5), percentage: totalAnalyses > 0 ? Math.floor((completedAnalyses / totalAnalyses) * 50) : 0 },
-  ];
-
-  if (isLoading && !dataLoaded) {
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex items-center justify-center min-h-100">
         <div className="flex flex-col items-center gap-4">
           <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
           <p className="text-zinc-500 text-sm">Loading dashboard...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="flex flex-col items-center gap-4 text-center">
-          <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center">
-            <svg viewBox="0 0 24 24" className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="15" y1="9" x2="9" y2="15" />
-              <line x1="9" y1="9" x2="15" y2="15" />
-            </svg>
-          </div>
-          <h2 className="text-xl font-bold text-white mb-2">Something went wrong</h2>
-          <p className="text-zinc-400 mb-6">{error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-6 py-3 bg-primary text-black font-bold rounded-xl hover:opacity-90 transition-all"
-          >
-            Try Again
-          </button>
         </div>
       </div>
     );
@@ -446,6 +220,42 @@ export default function DashboardPage() {
         <h1 className="text-3xl font-bold tracking-tight">Dashboard Overview</h1>
         <p className="text-zinc-500 text-sm">Welcome back! Here&apos;s your AI-powered job search workspace.</p>
       </div>
+
+      {error && (
+        <div role="alert" className="flex flex-col gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="font-semibold">Some dashboard data is unavailable.</p>
+            <p className="mt-0.5 text-xs text-amber-100/70">Your workspace is still usable; retry to refresh the missing information.</p>
+          </div>
+          <button
+            onClick={() => void Promise.all([
+              queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
+              queryClient.invalidateQueries({ queryKey: interviewKeys.list }),
+              queryClient.invalidateQueries({ queryKey: interviewKeys.boards }),
+            ])}
+            className="shrink-0 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-bold text-amber-100 transition hover:bg-amber-400/20"
+          >
+            Retry loading
+          </button>
+        </div>
+      )}
+
+      <section aria-labelledby="prep-journey-title" className="rounded-3xl border border-primary/20 bg-linear-to-br from-primary/8 via-zinc-900/70 to-zinc-950 p-6 sm:p-8">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="max-w-xl">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Your next steps</p>
+            <h2 id="prep-journey-title" className="mt-2 text-xl font-bold text-white">Turn an application into interview confidence</h2>
+            <p className="mt-2 text-sm leading-relaxed text-zinc-400">Prepare for a role, practice with the AI interviewer, then review your session and keep improving.</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
+            <span className="rounded-full border border-zinc-700 bg-zinc-900/80 px-3 py-2 text-zinc-200"><span className="mr-2 text-primary">01</span>Choose a role</span>
+            <span aria-hidden="true" className="text-zinc-600">→</span>
+            <span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-2 text-primary"><span className="mr-2">02</span>Practice</span>
+            <span aria-hidden="true" className="text-zinc-600">→</span>
+            <span className="rounded-full border border-zinc-700 bg-zinc-900/80 px-3 py-2 text-zinc-200"><span className="mr-2 text-zinc-500">03</span>Review</span>
+          </div>
+        </div>
+      </section>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
         {stats.map((stat) => (
@@ -486,7 +296,7 @@ export default function DashboardPage() {
               </svg>
             </button>
           </div>
-          <div className="h-[250px] w-full">
+          <div className="h-62.5 w-full">
             {mounted ? (
                <ResponsiveContainer width="100%" height={250}>
                 <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -582,7 +392,7 @@ export default function DashboardPage() {
 
           {appliedJobs.length > 0 ? (
             <div className="space-y-4 flex-1 flex flex-col">
-              <p className="text-[10px] uppercase tracking-widest text-zinc-600 font-bold">Active Interview Prep Sessions ({appliedJobs.length})</p>
+              <p className="text-[10px] uppercase tracking-widest text-zinc-600 font-bold">Applied jobs ready for interview prep ({appliedJobs.length})</p>
               <div className="grid gap-3 flex-1">
                 {appliedJobs.slice(interviewPage * interviewsPerPage, (interviewPage + 1) * interviewsPerPage).map((job) => (
                   <div key={job.id} className="flex items-center justify-between p-4 rounded-xl bg-zinc-800/50 border border-zinc-800 hover:border-primary/30 transition-all group">
@@ -603,20 +413,31 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <button
-                      onClick={() => {
-                        const interview = interviewMap.get(job.id);
-                        if (interview) {
+                      disabled={!isInterviewDataReady || creatingJobId !== null}
+                      onClick={async () => {
+                        const requestedJobId = normalizeInterviewJobId(job.id);
+                        if (!requestedJobId || creatingJobId) return;
+                        setCreatingJobId(requestedJobId);
+                        try {
+                          const interview = await createOrReuseInterview(queryClient, requestedJobId);
+                          if (normalizeInterviewJobId(interview.job_id) !== requestedJobId) {
+                            throw new Error('The saved interview does not match this job.');
+                          }
                           router.push(`/interviews?id=${interview.id}`);
-                        } else {
-                          interviewApi.create({ job_id: job.id, status: 'active' }).then(iv => {
-                            setInterviewMap(prev => new Map(prev).set(job.id, iv));
-                            router.push(`/interviews?id=${iv.id}`);
-                          });
+                        } catch (createError) {
+                          const message = createError instanceof Error
+                            ? createError.message
+                            : 'Could not start interview prep. Please try again.';
+                          toast.error(message, { toastId: 'dashboard-interview-prep-error' });
+                        } finally {
+                          setCreatingJobId(null);
                         }
                       }}
-                      className="px-4 py-2 bg-primary text-black font-bold text-[10px] rounded-lg hover:opacity-90 transition-all"
+                      className="px-4 py-2 bg-primary text-black font-bold text-[10px] rounded-lg hover:opacity-90 transition-all disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      Start Prep
+                      {creatingJobId === normalizeInterviewJobId(job.id)
+                        ? 'Opening…'
+                        : isInterviewDataReady ? 'Start Prep' : 'Retry data above'}
                     </button>
                   </div>
                 ))}
@@ -643,23 +464,12 @@ export default function DashboardPage() {
                 </div>
               )}
               <div className="pt-4 border-t border-zinc-800/50">
-                <p className="text-[10px] uppercase tracking-widest text-zinc-600 font-bold mb-3">Stripe Interview Prep</p>
-                <div className="p-4 rounded-xl bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20">
-                  <p className="text-[10px] text-zinc-400 mb-3">Ready to practice for your Stripe interview? I've prepared 5 behavioral questions based on the job description:</p>
-                  <ul className="text-[10px] text-zinc-500 space-y-2 list-disc list-inside">
-                    <li>Tell me about a time you solved a complex technical problem under pressure</li>
-                    <li>Describe a situation where you had to collaborate with a difficult team member</li>
-                    <li>How do you approach designing scalable systems?</li>
-                    <li>Tell me about a project where you had to make trade-offs between speed and quality</li>
-                    <li>Describe a time you took initiative to improve a process or system</li>
-                  </ul>
-                  <button
-                    onClick={() => router.push('/interviews?action=new')}
-                    className="w-full mt-4 px-4 py-2 bg-primary text-black font-bold rounded-lg hover:opacity-90 transition-all text-[10px]"
-                  >
-                    Start Stripe Prep Session
-                  </button>
-                </div>
+                <button
+                  onClick={() => router.push('/interviews?action=new')}
+                  className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 text-white font-bold rounded-lg hover:bg-zinc-700 transition-all text-[10px]"
+                >
+                  + New Interview Session
+                </button>
               </div>
             </div>
           ) : (
@@ -669,8 +479,8 @@ export default function DashboardPage() {
                   <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                 </svg>
               </div>
-              <p className="text-zinc-500 text-sm">No active job applications found</p>
-              <p className="text-zinc-600 text-[10px] mt-1">Apply to jobs to get interview prep sessions</p>
+              <p className="text-zinc-200 text-sm font-semibold">No applied jobs yet</p>
+              <p className="text-zinc-500 text-xs mt-1 max-w-xs mx-auto">Save a role you&apos;ve applied to and it will appear here, ready for a tailored practice session.</p>
               <Link href="/jobs" className="inline-block mt-4 px-4 py-2 bg-zinc-800 text-white text-[10px] font-bold rounded-lg hover:bg-zinc-700 transition-all">
                 Find Jobs to Apply
               </Link>

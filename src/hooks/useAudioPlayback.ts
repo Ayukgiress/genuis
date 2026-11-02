@@ -2,46 +2,77 @@ import { useRef, useCallback } from 'react';
 
 export const useAudioPlayback = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
+  const objectUrlRef = useRef<string | null>(null);
 
-  const playAudio = useCallback(async (base64Audio: string, mimeType: string = 'audio/webm', onEnded?: () => void) => {
+  const playAudio = useCallback(async (
+    audioSource: string,
+    mimeType: string = 'audio/webm',
+    onEnded?: () => void,
+    onPlaybackError?: () => void,
+  ) => {
     try {
       // Stop any currently playing audio
       if (audioRef.current) {
+        audioRef.current.onended = null;
+        audioRef.current.onerror = null;
         audioRef.current.pause();
-        audioRef.current.currentTime = 0;
+        audioRef.current.src = '';
+        audioRef.current = null;
+      }
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
+
+      const isDirectUrl = /^(https?:|blob:)/i.test(audioSource);
+      const dataUrlMatch = audioSource.match(/^data:([^;,]+)?;base64,([\s\S]+)$/);
+      let audioUrl = audioSource;
+      if (!isDirectUrl && !audioSource.startsWith('data:')) {
+        const binaryString = atob(audioSource);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        objectUrlRef.current = URL.createObjectURL(new Blob([bytes], { type: mimeType }));
+        audioUrl = objectUrlRef.current;
+      } else if (dataUrlMatch) {
+        const binaryString = atob(dataUrlMatch[2]);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        objectUrlRef.current = URL.createObjectURL(new Blob([bytes], { type: dataUrlMatch[1] || mimeType }));
+        audioUrl = objectUrlRef.current;
       }
 
-      // Convert base64 to blob
-      const binaryString = atob(base64Audio);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-      const blob = new Blob([bytes], { type: mimeType });
-
-      // Create object URL and play
-      const audioUrl = URL.createObjectURL(blob);
       const audio = new Audio(audioUrl);
       audioRef.current = audio;
-
-      // Initialize AudioContext if needed (for better control)
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-      }
+      let playbackStarted = false;
+      const releaseObjectUrl = () => {
+        if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
+        audio.onended = null;
+        audio.onerror = null;
+        if (audioRef.current === audio) audioRef.current = null;
+      };
 
       // Clean up when done
       audio.onended = () => {
-        URL.revokeObjectURL(audioUrl);
+        releaseObjectUrl();
         onEnded?.();
+      };
+      audio.onerror = () => {
+        releaseObjectUrl();
+        if (playbackStarted) onPlaybackError?.();
       };
 
       await audio.play();
+      playbackStarted = true;
 
       return true;
     } catch (error) {
       console.error('Audio playback error:', error);
-      onEnded?.(); // Ensure we unlock if playback fails
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
+      audioRef.current = null;
       return false;
     }
   }, []);
@@ -49,9 +80,13 @@ export const useAudioPlayback = () => {
   const stopAudio = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause();
-      audioRef.current.currentTime = 0;
+      audioRef.current.onended = null;
+      audioRef.current.onerror = null;
+      audioRef.current.src = '';
       audioRef.current = null;
     }
+    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+    objectUrlRef.current = null;
   }, []);
 
   return {

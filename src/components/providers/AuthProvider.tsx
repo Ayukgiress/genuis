@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuthStore } from "@/store/auth-store";
 import { setAuthToken } from "@/lib/api";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "@/lib/query-client";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
@@ -55,5 +57,5 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return <>{children}</>;
+  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 }
