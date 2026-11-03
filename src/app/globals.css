@@ -1,15 +1,26 @@
 @import "tailwindcss";
 
+@layer base {
+  :root {
+    --space-xs: 0.25rem; --space-sm: 0.5rem; --space-md: 1rem; --space-lg: 1.5rem; --space-xl: 2rem; --space-2xl: 3rem;
+    --radius-sm: 8px; --radius-md: 16px; --radius-xl: 32px; --radius-2xl: 48px;
+    --elevation-1: 0 1px 2px 0 rgba(0,0,0,0.05);
+    --elevation-2: 0 4px 12px 0 rgba(0,0,0,0.1);
+    --glow-primary: 0 0 24px rgba(0,242,156,0.3);
+    --font-size-xs: 0.75rem; --font-size-sm: 0.875rem; --font-size-base: 1rem; --font-size-lg: 1.125rem;
+  }
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --primary: #3b82f6;
-  --primary-foreground: #ffffff;
-  --card: #ffffff;
-  --card-foreground: #171717;
-  --muted: #f5f5f5;
-  --muted-foreground: #737373;
-  --border: #e5e5e5;
+  --background: #000000;
+  --foreground: #ffffff;
+  --primary: #00f29c;
+  --primary-foreground: #000000;
+  --card: #121212;
+  --card-foreground: #ffffff;
+  --muted: #1a1a1a;
+  --muted-foreground: #a1a1aa;
+  --border: #27272a;
 }
 
 @theme inline {
@@ -28,13 +39,13 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-    --card: #0a0a0a;
-    --card-foreground: #ededed;
-    --muted: #171717;
-    --muted-foreground: #a3a3a3;
-    --border: #262626;
+    --background: #000000;
+    --foreground: #ffffff;
+    --card: #121212;
+    --card-foreground: #ffffff;
+    --muted: #1a1a1a;
+    --muted-foreground: #a1a1aa;
+    --border: #27272a;
   }
 }
 

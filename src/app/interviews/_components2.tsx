@@ -1,0 +1,644 @@
+"use client";
+
+import React, { useEffect, useRef } from "react";
+import Link from "next/link";
+import type { Job } from "@/types";
+import type { Phase } from "./_components";
+import type { AiTurnMedia } from "@/hooks/useInterviewSession";
+
+const PRIMARY = "#00f29c";
+
+/* ── AI VIDEO PANEL ─────────────────────────────────────────────────────── */
+
+export function AIVideoPanel({
+  phase,
+  isActive,
+  media,
+  audioAmplitude = 0,
+}: {
+  phase: Phase;
+  isActive: boolean;
+  media?: AiTurnMedia;
+  audioAmplitude?: number;
+}) {
+  const speaking = phase === "ai_speaking";
+  const processing = phase === "processing";
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [videoFailed, setVideoFailed] = React.useState(false);
+
+  const videoSrc = media?.videoUrl
+    ? media.videoUrl
+    : media?.videoData
+      ? media.videoData.startsWith("data:")
+        ? media.videoData
+        : `data:${media.videoMimeType || "video/webm"};base64,${media.videoData}`
+      : null;
+  const avatarImageSrc = media?.avatarImageUrl
+    ? media.avatarImageUrl
+    : media?.avatarImageData
+      ? media.avatarImageData.startsWith("data:")
+        ? media.avatarImageData
+        : `data:${media.avatarImageMimeType || "image/png"};base64,${media.avatarImageData}`
+      : null;
+  const showVideo = !!videoSrc && !videoFailed && media?.avatarType !== "none";
+  const showImage = !!avatarImageSrc && !showVideo && media?.avatarType !== "none";
+
+  // Play/pause the avatar video clip in sync with the speaking phase
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+    if (speaking) {
+      el.play().catch(() => {});
+    } else {
+      el.pause();
+    }
+  }, [speaking, videoSrc]);
+
+  return (
+    <div
+      className={`
+        relative w-full aspect-video rounded-2xl overflow-hidden border transition-all duration-300
+        ${speaking ? "border-primary/50 shadow-[0_0_32px_rgba(0,242,156,0.15)]" : "border-zinc-800"}
+        bg-zinc-950
+      `}
+    >
+      {/* Animated gradient background */}
+      <div
+        className="absolute inset-0 transition-opacity duration-500"
+        style={{
+          background: speaking
+            ? "radial-gradient(ellipse at 50% 40%, rgba(0,242,156,0.12) 0%, transparent 70%)"
+            : "radial-gradient(ellipse at 50% 40%, rgba(0,242,156,0.04) 0%, transparent 70%)",
+        }}
+      />
+
+      {/* Avatar video clip — shown when backend provides video */}
+      {showVideo ? (
+        <video
+          ref={videoRef}
+          src={videoSrc}
+          loop
+          muted
+          playsInline
+          onError={() => setVideoFailed(true)}
+          aria-label="AI interviewer video"
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+      ) : showImage ? (
+        <div
+          role="img"
+          aria-label="AI interviewer avatar"
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: `url("${avatarImageSrc}")` }}
+        />
+      ) : (
+        /* Fallback: animated avatar (audio-only mode) */
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
+          <div className="relative">
+            {speaking && (
+              <>
+                <span
+                  className="absolute inset-0 m-auto rounded-full bg-primary opacity-20"
+                  style={{ width: 80, height: 80, animation: "wf-pulse-ring 1.8s cubic-bezier(0.4,0,0.2,1) infinite" }}
+                />
+                <span
+                  className="absolute inset-0 m-auto rounded-full bg-primary opacity-10"
+                  style={{ width: 80, height: 80, animation: "wf-pulse-ring 1.8s cubic-bezier(0.4,0,0.2,1) infinite 0.6s" }}
+                />
+              </>
+            )}
+            <div className={`relative z-10 h-28 w-28 overflow-hidden rounded-full border ${speaking ? "border-primary/60 shadow-[0_0_34px_rgba(0,242,156,0.28)]" : "border-zinc-700"}`}>
+              <svg viewBox="0 0 160 160" role="img" aria-label="Animated AI interviewer avatar" className={`h-full w-full ${speaking ? "wf-face-speaking" : "wf-face-idle"}`}>
+                <defs>
+                  <radialGradient id="avatar-bg" cx="45%" cy="30%" r="80%"><stop offset="0%" stopColor="#1d4739" /><stop offset="100%" stopColor="#101515" /></radialGradient>
+                  <linearGradient id="avatar-skin" x1="0" x2="1" y1="0" y2="1"><stop offset="0%" stopColor="#d9a77f" /><stop offset="100%" stopColor="#a96f54" /></linearGradient>
+                </defs>
+                <rect width="160" height="160" fill="url(#avatar-bg)" />
+                <path d="M23 160c3-29 23-45 57-45s54 16 57 45" fill="#17372e" />
+                <path d="M56 111V94h48v19c-10 12-38 12-48-2Z" fill="#b98260" />
+                <ellipse cx="80" cy="68" rx="41" ry="49" fill="url(#avatar-skin)" />
+                <path d="M40 68c-4-40 12-57 43-57 29 0 42 17 38 49-9-5-16-16-19-29-12 15-33 23-61 24l-1 13Z" fill="#171b1a" />
+                <path d="M54 62c6-4 14-4 20 0M87 62c6-4 14-4 20 0" fill="none" stroke="#503729" strokeWidth="3" strokeLinecap="round" />
+                <ellipse cx="65" cy="73" rx="4" ry="3" fill="#211b18" className="wf-avatar-blink" />
+                <ellipse cx="96" cy="73" rx="4" ry="3" fill="#211b18" className="wf-avatar-blink" />
+                <path d="m80 72-5 17 8 2" fill="none" stroke="#8d5b44" strokeWidth="2.5" strokeLinecap="round" />
+                {speaking ? <ellipse cx="81" cy="101" rx="8" ry="5" fill="#542d2c" className="wf-avatar-mouth" style={{ "--mouth-amplitude": Math.max(0.35, Math.min(1.5, audioAmplitude * 6)) } as React.CSSProperties} /> : <path d="M70 100c7 5 15 5 22 0" fill="none" stroke="#713c36" strokeWidth="3" strokeLinecap="round" />}
+                <path d="M44 76c-8 1-10 13-2 17M116 76c8 1 10 13 2 17" fill="none" stroke="#b98260" strokeWidth="6" strokeLinecap="round" />
+                <path d="M56 124c14 10 34 10 48 0" fill="none" stroke="#00f29c" strokeOpacity=".4" strokeWidth="2" />
+              </svg>
+            </div>
+          </div>
+          <div className="flex items-end gap-0.75 h-6">
+            {[0, 0.15, 0.3, 0.1, 0.25, 0.05, 0.2, 0.12].map((delay, i) => (
+              <span
+                key={i}
+                className="w-0.75 rounded-full transition-all duration-300"
+                style={{
+                  height: speaking ? `${10 + (i % 3) * 8}px` : "4px",
+                  backgroundColor: speaking ? PRIMARY : "#3f3f46",
+                  animation: speaking ? `wf-bar ${0.7 + (i % 3) * 0.15}s ease-in-out ${delay}s infinite` : undefined,
+                  transformOrigin: "center",
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Status badge */}
+      <div className="absolute top-3 left-3">
+        <span
+          className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded-md"
+          style={{
+            backgroundColor: "rgba(0,0,0,0.6)",
+            color: speaking ? PRIMARY : "#71717a",
+            border: `1px solid ${speaking ? "rgba(0,242,156,0.3)" : "rgba(63,63,70,0.5)"}`,
+          }}
+        >
+          <span
+            className="w-1.5 h-1.5 rounded-full"
+            style={{
+              backgroundColor: speaking ? PRIMARY : processing ? "#f59e0b" : "#52525b",
+              animation: (speaking || processing) ? "wf-pulse-ring 1.2s ease-in-out infinite" : undefined,
+            }}
+          />
+          {speaking ? "AI speaking" : processing ? "Processing…" : isActive ? "Listening" : showVideo || showImage ? "AI interviewer" : "AI voice · avatar fallback"}
+        </span>
+      </div>
+
+      <div className="absolute bottom-3 right-3">
+        <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">AI</span>
+      </div>
+      {media?.transcript && (
+        <div aria-live="polite" className="absolute inset-x-3 bottom-9 rounded-lg border border-white/10 bg-black/70 px-3 py-2 text-center text-xs leading-relaxed text-white/90">
+          {media.transcript}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── USER VIDEO PANEL ───────────────────────────────────────────────────── */
+
+export function UserVideoPanel({
+  phase,
+  isActive,
+  userInitial,
+  userName,
+  attachVideo,
+  isCameraOn,
+  cameraError,
+}: {
+  phase: Phase;
+  isActive: boolean;
+  userInitial: string;
+  userName: string;
+  attachVideo: (el: HTMLVideoElement | null) => void;
+  isCameraOn: boolean;
+  cameraError: string | null;
+}) {
+  const speaking = phase === "user_speaking";
+  const micStatus = speaking
+    ? "You’re speaking"
+    : phase === "preparing"
+      ? "Checking mic"
+      : phase === "ai_speaking" || phase === "processing"
+        ? "Mic paused"
+        : isActive
+          ? "Mic active"
+          : "You";
+
+  return (
+    <div
+      className={`
+        relative w-full aspect-video rounded-2xl overflow-hidden border transition-all duration-300
+        ${speaking ? "border-amber-500/50 shadow-[0_0_32px_rgba(245,158,11,0.12)]" : "border-zinc-800"}
+        bg-zinc-950
+      `}
+    >
+      {/* Live webcam feed */}
+      {isCameraOn && (
+        <video
+          ref={attachVideo}
+          autoPlay
+          playsInline
+          muted
+          className="absolute inset-0 w-full h-full object-cover scale-x-[-1]"
+        />
+      )}
+
+      {/* Overlay when camera is off */}
+      {!isCameraOn && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+          <div
+            className={`
+              w-20 h-20 rounded-full grid place-items-center text-2xl font-bold transition-all duration-300
+              ${speaking ? "bg-amber-500/20 text-amber-300 ring-4 ring-amber-500/30" : "bg-zinc-800 text-white"}
+            `}
+          >
+            {userInitial}
+          </div>
+          {cameraError && (
+            <p className="text-[11px] text-zinc-500 text-center px-4">{cameraError}</p>
+          )}
+        </div>
+      )}
+
+      {/* Speaking pulse overlay */}
+      {speaking && (
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{ border: "2px solid rgba(245,158,11,0.4)", borderRadius: "inherit" }}
+        />
+      )}
+
+      {/* Status badge */}
+      <div className="absolute top-3 left-3">
+        <span
+          className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded-md"
+          style={{
+            backgroundColor: "rgba(0,0,0,0.6)",
+            color: speaking ? "#fcd34d" : "#71717a",
+            border: `1px solid ${speaking ? "rgba(245,158,11,0.3)" : "rgba(63,63,70,0.5)"}`,
+          }}
+        >
+          <span
+            className="w-1.5 h-1.5 rounded-full"
+            style={{
+              backgroundColor: speaking ? "#f59e0b" : isActive ? "#52525b" : "#3f3f46",
+              animation: speaking ? "wf-pulse-ring 1.2s ease-in-out infinite" : undefined,
+            }}
+          />
+          {micStatus}
+        </span>
+      </div>
+
+      {/* Name label */}
+      <div className="absolute bottom-3 left-3">
+        <span
+          className="text-[11px] font-semibold px-2 py-1 rounded-md"
+          style={{ backgroundColor: "rgba(0,0,0,0.6)", color: "#a1a1aa" }}
+        >
+          {userName}
+        </span>
+      </div>
+
+      {/* Camera off indicator */}
+      {!isCameraOn && isActive && (
+        <div className="absolute bottom-3 right-3">
+          <span className="text-[10px] text-zinc-600 uppercase tracking-widest">CAM OFF</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── INTERVIEW STAGE ────────────────────────────────────────────────────── */
+
+export function InterviewStage({
+  phase,
+  isInterviewActive,
+  userInitial,
+  userName,
+  onToggle,
+  disabled,
+  attachVideo,
+  isCameraOn,
+  cameraError,
+  aiMedia,
+}: {
+  phase: Phase;
+  isInterviewActive: boolean;
+  userInitial: string;
+  userName: string;
+  onToggle: () => void;
+  disabled: boolean;
+  attachVideo: (el: HTMLVideoElement | null) => void;
+  isCameraOn: boolean;
+  cameraError: string | null;
+  aiMedia?: AiTurnMedia;
+}) {
+  return (
+    <div className="w-full max-w-4xl">
+      {/* Video grid — 2 columns on md+, stacked on mobile */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+        <AIVideoPanel
+          key={aiMedia?.videoUrl ?? aiMedia?.videoData ?? aiMedia?.avatarImageUrl ?? aiMedia?.avatarImageData ?? "avatar-fallback"}
+          phase={phase}
+          isActive={isInterviewActive}
+          media={aiMedia}
+        />
+        <UserVideoPanel
+          phase={phase}
+          isActive={isInterviewActive}
+          userInitial={userInitial}
+          userName={userName}
+          attachVideo={attachVideo}
+          isCameraOn={isCameraOn}
+          cameraError={cameraError}
+        />
+      </div>
+
+      {/* Central play/stop */}
+      <div className="mt-8 sm:mt-10 flex justify-center">
+        <button
+          onClick={onToggle}
+          disabled={disabled}
+          aria-label={isInterviewActive ? "End session" : "Start session"}
+          className={`
+            group relative w-16 h-16 sm:w-20 sm:h-20 rounded-full grid place-items-center
+            transition-all duration-200
+            ${isInterviewActive
+              ? "bg-zinc-900 border-2 border-red-500/40 text-red-400 hover:bg-red-500/10 hover:border-red-500/60"
+              : "bg-primary text-black border-2 border-primary hover:scale-105 hover:shadow-[0_0_30px_rgba(0,242,156,0.4)]"}
+            disabled:opacity-50 disabled:cursor-not-allowed
+          `}
+        >
+          {isInterviewActive ? (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="6" y="6" width="12" height="12" rx="2" />
+            </svg>
+          ) : (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ── PHASE CAPTION ──────────────────────────────────────────────────────── */
+
+export function PhaseCaption({
+  phase,
+  isActive,
+  jobTitle,
+}: {
+  phase: Phase;
+  isActive: boolean;
+  jobTitle?: string;
+}) {
+  if (!isActive) {
+    return (
+      <p className="mt-6 text-center text-[13px] text-zinc-500 max-w-md">
+        Press{" "}
+        <kbd className="px-1.5 py-0.5 rounded border border-zinc-800 bg-zinc-900 text-[11px] font-medium text-zinc-300">
+          Start session
+        </kbd>{" "}
+        to begin your practice interview{jobTitle ? ` for the ${jobTitle} role` : ""}.
+      </p>
+    );
+  }
+  if (phase === "preparing") {
+    return (
+      <p role="status" className="mt-6 text-center text-[13px] text-primary">
+        Checking microphone access and preparing your practice session…
+      </p>
+    );
+  }
+  if (phase === "ai_speaking") {
+    return (
+      <p className="mt-6 text-center text-[13px] font-medium" style={{ color: PRIMARY }}>
+        The AI interviewer is asking a question — listen carefully.
+      </p>
+    );
+  }
+  if (phase === "processing") {
+    return (
+      <p className="mt-6 text-center text-[13px] text-amber-400 font-medium">
+        Processing your answer…
+      </p>
+    );
+  }
+  if (phase === "user_speaking") {
+    return (
+      <p className="mt-6 text-center text-[13px] text-amber-300 font-medium">
+        You&apos;re speaking — your answer is being recorded.
+      </p>
+    );
+  }
+  return (
+    <p className="mt-6 text-center text-[13px] text-zinc-400">
+      Your turn — speak when you&apos;re ready.
+    </p>
+  );
+}
+
+/* ── NOTICE PILL ────────────────────────────────────────────────────────── */
+
+export function Notice({ tone, msg }: { tone: "warn" | "error" | "info"; msg: string }) {
+  const colors =
+    tone === "warn"
+      ? "bg-amber-500/10 border-amber-500/30 text-amber-300"
+      : tone === "error"
+        ? "bg-red-500/10 border-red-500/30 text-red-400"
+        : "bg-zinc-900 border-zinc-800 text-zinc-400";
+
+  return (
+    <div className={`flex items-center gap-2 text-[12px] px-3 py-2 rounded-lg border ${colors}`}>
+      <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+        <circle cx="12" cy="12" r="10" />
+        <line x1="12" y1="8" x2="12" y2="12" />
+        <line x1="12" y1="16" x2="12.01" y2="16" />
+      </svg>
+      <span>{msg}</span>
+    </div>
+  );
+}
+
+/* ── STAGE FOOTER ───────────────────────────────────────────────────────── */
+
+export function StageFooter({
+  interviewId,
+  createdAt,
+  messageCount,
+  status,
+  onComplete,
+}: {
+  interviewId: number;
+  createdAt: string;
+  messageCount: number;
+  status: string;
+  onComplete: () => void;
+}) {
+  return (
+    <div className="border-t border-zinc-800/70 px-4 sm:px-8 py-3 flex items-center gap-3 flex-wrap text-[12px] text-zinc-500">
+      <span className="font-medium text-zinc-400">Session #{interviewId}</span>
+      <span>·</span>
+      <span>{new Date(createdAt).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}</span>
+      <span>·</span>
+      <span>{messageCount} message{messageCount !== 1 ? "s" : ""}</span>
+
+      {status === "completed" ? (
+        <div className="ml-auto flex items-center gap-3">
+          <span className="inline-flex items-center gap-1.5 text-zinc-500 bg-zinc-900 px-2.5 py-1 rounded-md text-[11px] font-medium">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+            Completed
+          </span>
+          <Link href={`/interviews/${interviewId}/report`} className="text-[12px] font-semibold text-primary hover:opacity-80">View report →</Link>
+        </div>
+      ) : (
+        <button
+          onClick={onComplete}
+          className="ml-auto text-[12px] font-medium text-primary hover:opacity-80"
+        >
+          Mark as complete →
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* ── EMPTY STAGE ────────────────────────────────────────────────────────── */
+
+export function EmptyStage({ onCreate }: { onCreate: () => void }) {
+  return (
+    <div className="h-full flex flex-col items-center justify-center px-8 py-16 text-center">
+      <div className="relative w-20 h-20 mb-6">
+        <div className="absolute inset-0 rounded-2xl rotate-6" style={{ backgroundColor: "rgba(0,242,156,0.1)" }} />
+        <div className="absolute inset-0 rounded-2xl bg-zinc-900 border border-zinc-800 grid place-items-center">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-primary">
+            <path d="M15 10l4.553-2.069A1 1 0 0 1 21 8.82v6.36a1 1 0 0 1-1.447.89L15 14" />
+            <rect x="2" y="7" width="13" height="10" rx="2" />
+          </svg>
+        </div>
+      </div>
+
+      <h2 className="text-xl font-semibold text-white tracking-tight">Ready to practice?</h2>
+      <p className="text-sm text-zinc-500 max-w-sm mt-2 leading-relaxed">
+        Create a practice session for a role, then rehearse answers with the AI interviewer. Your microphone is required; camera access is optional.
+      </p>
+      <button
+        onClick={onCreate}
+        className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-black text-sm font-semibold hover:opacity-90 transition-opacity"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+        Start a session
+      </button>
+      <p className="mt-4 text-xs text-zinc-600">No sessions yet? Your first session will appear here so you can pick up practice anytime.</p>
+    </div>
+  );
+}
+
+/* ── CREATE MODAL ───────────────────────────────────────────────────────── */
+
+export function CreateModal({
+  jobs,
+  selectedJobId,
+  setSelectedJobId,
+  isCreating,
+  jobsLoading,
+  jobsError,
+  onRetryJobs,
+  onClose,
+  onCreate,
+}: {
+  jobs: Job[];
+  selectedJobId: string;
+  setSelectedJobId: (s: string) => void;
+  isCreating: boolean;
+  jobsLoading: boolean;
+  jobsError: string | null;
+  onRetryJobs: () => void;
+  onClose: () => void;
+  onCreate: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+        <div className="px-6 pt-6 pb-4 border-b border-zinc-800">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-primary">New session</p>
+              <h3 className="text-base font-semibold text-white mt-0.5">Choose a job position</h3>
+            </div>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 grid place-items-center rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800 transition-colors text-lg leading-none"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="block text-[12px] font-medium text-zinc-400 mb-2">
+              Job position
+            </label>
+            <select
+              value={selectedJobId}
+              onChange={(e) => setSelectedJobId(e.target.value)}
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2.5 text-[14px] text-white outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all appearance-none cursor-pointer"
+              style={{
+                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2371717a' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")`,
+                backgroundRepeat: "no-repeat",
+                backgroundPosition: "right 12px center",
+                paddingRight: "36px",
+              }}
+            >
+              <option value="">Select a role…</option>
+              {jobs.map((j) => (
+                <option key={j.id} value={j.id}>
+                  {j.title} @ {j.company}
+                </option>
+              ))}
+            </select>
+            {jobsLoading && (
+              <p role="status" className="mt-2 inline-flex items-center gap-2 text-[12px] text-zinc-400">
+                <span className="h-3 w-3 animate-spin rounded-full border border-zinc-600 border-t-primary" />
+                Loading your saved jobs…
+              </p>
+            )}
+            {jobsError && (
+              <div role="alert" className="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
+                <p className="text-[12px] text-amber-200">{jobsError}</p>
+                <button onClick={onRetryJobs} className="mt-2 text-[12px] font-semibold text-primary hover:underline">Retry loading jobs</button>
+              </div>
+            )}
+            {!jobsLoading && !jobsError && jobs.length === 0 && (
+              <div className="mt-3 rounded-lg border border-zinc-800 bg-zinc-950/70 p-3">
+                <p className="text-[12px] text-zinc-400">No saved roles yet. Add a job first, then come back to tailor your practice.</p>
+                <Link href="/jobs" onClick={onClose} className="mt-2 inline-flex text-[12px] font-semibold text-primary hover:underline">Browse jobs →</Link>
+              </div>
+            )}
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            <button
+              onClick={onClose}
+              className="flex-1 px-4 py-2.5 rounded-lg border border-zinc-800 text-[14px] font-medium text-zinc-300 hover:bg-zinc-800 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onCreate}
+              disabled={!selectedJobId || isCreating}
+              className="flex-1 px-4 py-2.5 rounded-lg bg-primary text-black text-[14px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isCreating ? (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31.4" strokeDashoffset="10" strokeLinecap="round" />
+                  </svg>
+                  Creating…
+                </span>
+              ) : (
+                "Create session"
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

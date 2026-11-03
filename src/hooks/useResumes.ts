@@ -29,13 +29,13 @@ export function useResumes() {
       // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 1000));
       const newResume: Resume = {
-        id: "1",
-        name: file.name,
-        fileUrl: URL.createObjectURL(file),
-        fileType: file.type,
-        fileSize: file.size,
-        uploadedAt: new Date(),
-        analysis: null,
+        id: Date.now(),
+        user_id: 1,
+        file_name: file.name,
+        file_path: URL.createObjectURL(file),
+        file_type: file.type,
+        file_size: file.size,
+        created_at: new Date().toISOString(),
       };
       setResumes((prev) => [...prev, newResume]);
       return newResume;
@@ -47,7 +47,7 @@ export function useResumes() {
     }
   }, []);
 
-  const deleteResume = useCallback(async (id: string) => {
+  const deleteResume = useCallback(async (id: number) => {
     setIsLoading(true);
     setError(null);
     try {
