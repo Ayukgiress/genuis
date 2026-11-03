@@ -252,16 +252,19 @@ export const useAuthStore = create<AuthState>()(
         const { user, isNewUser } = get();
         if (!user) return '/login';
 
-        // Only redirect new users to plans if they don't have a subscription plan
         if (isNewUser && !user.subscription_plan) {
           return '/plans';
         }
 
-        if (!user.career_profile?.onboarding_completed && !user.career_preferences?.onboarding_completed) {
+        const profile = user.career_profile || user.career_preferences;
+        const onboardingDone =
+          profile?.onboarding_completed === true ||
+          Boolean(profile?.target_role);
+
+        if (!onboardingDone) {
           return '/onboarding';
         }
 
-        // Otherwise, go to dashboard
         return '/dashboard';
       },
 

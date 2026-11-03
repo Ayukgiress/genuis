@@ -17,7 +17,7 @@ const STEPS = ['Resume', 'Target role', 'Goals'];
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { user, isAuthenticated, isLoading, fetchCurrentUser } = useAuthStore();
+  const { user, isAuthenticated, isLoading } = useAuthStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState(0);
   const [file, setFile] = useState<File | null>(null);
@@ -80,15 +80,24 @@ export default function OnboardingPage() {
       setIsSaving(true);
       setError(null);
       const currentProfile: CareerPreferences = user?.career_profile || user?.career_preferences || {};
-      await authApi.updateCareerProfile({
-          ...currentProfile,
-          target_role: role,
-          desired_roles: [role],
-          goals,
-          resume_id: uploadedResume?.id ?? currentProfile.resume_id,
-          onboarding_completed: true,
-      });
-      await fetchCurrentUser();
+      const updatedProfile = {
+        ...currentProfile,
+        target_role: role,
+        desired_roles: [role],
+        goals,
+        resume_id: uploadedResume?.id ?? currentProfile.resume_id,
+        onboarding_completed: true,
+      };
+      const updatedUser = await authApi.updateCareerProfile(updatedProfile);
+      // Update store directly so getRedirectPath sees the flag immediately
+      useAuthStore.setState((state) => ({
+        user: {
+          ...state.user!,
+          ...updatedUser,
+          career_profile: updatedProfile,
+          career_preferences: updatedProfile,
+        },
+      }));
       router.replace('/dashboard');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not save your profile. Please try again.');

@@ -320,12 +320,11 @@ export default function InterviewsPage() {
     creationLockRef.current = true;
     try {
       setIsCreating(true);
-      if (boards.length > 0)
-        await jobApi.addToKanban(
-          selectedJobId,
-          parseInt(boards[0].id),
-          "review",
-        );
+      if (boards.length > 0) {
+        jobApi.addToKanban(selectedJobId, parseInt(boards[0].id), "review").catch(() => {
+          // Non-critical: kanban add failed (e.g. external job ID not in backend DB)
+        });
+      }
       const newInterview = await createOrReuseInterview(
         queryClient,
         selectedJobId,
@@ -491,11 +490,22 @@ export default function InterviewsPage() {
 
       const focusInstruction = practiceFocus ? ` Please focus this practice on ${practiceFocus}; ask targeted questions and give me opportunities to improve in this area.` : "";
       const trigger = `Hello, I'm ready to begin a ${callSettings.difficulty}-level ${callSettings.interviewType} interview for about ${callSettings.durationMinutes} minutes.${focusInstruction} Please start by introducing yourself and asking your first question. Please speak in ${callSettings.language === "fr-CM" ? "French" : "English"}.`;
-      const aiResponse = await interviewApi.sendMessage(selectedInterview.id, {
-        role: "user",
-        content: trigger,
-        generate_audio: true,
-      });
+      const sendWithRetry = async (retries = 2): Promise<InterviewMessage> => {
+        try {
+          return await interviewApi.sendMessage(selectedInterview.id, {
+            role: "user",
+            content: trigger,
+            generate_audio: true,
+          });
+        } catch (err) {
+          if (retries > 0 && err instanceof ApiError && [502, 503, 504].includes(err.status)) {
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+            return sendWithRetry(retries - 1);
+          }
+          throw err;
+        }
+      };
+      const aiResponse = await sendWithRetry();
       if (generation !== startGenerationRef.current) return;
 
       const updatedMessages = [

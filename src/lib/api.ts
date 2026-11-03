@@ -61,46 +61,38 @@ export const setAuthToken = (token: string | null) => {
 };
 
 export const getAuthToken = (): string | null => {
-  if (authToken) {
-    console.log('Returning in-memory token');
-    return authToken;
-  }
+  if (authToken) return authToken;
 
   if (typeof window !== "undefined") {
-    // Check localStorage first
     const localToken = localStorage.getItem("auth_token");
     if (localToken && localToken !== "null" && localToken !== "undefined") {
-      console.log('Returning localStorage token');
+      authToken = localToken; // sync back into memory
       return localToken;
     }
 
-    // Check persist storage as fallback
     try {
       const persistData = localStorage.getItem("auth-storage");
       if (persistData) {
         const parsed = JSON.parse(persistData);
-        // Handle both possible structures (with or without .state)
         const token = parsed.state?.token || parsed.token;
         if (token && token !== "null" && token !== "undefined") {
-          console.log('Returning persist token');
+          authToken = token; // sync back into memory
           return token;
         }
       }
     } catch {
-      // Ignore parse errors
+      // ignore
     }
 
-    // Check cookies for server-side token (client_token for JavaScript access)
     const cookies = document.cookie.split(';');
     for (const cookie of cookies) {
       const [name, value] = cookie.trim().split('=');
       if (name === 'client_token' && value && value !== "null" && value !== "undefined") {
-        console.log('Returning cookie token');
+        authToken = value; // sync back into memory
         return value;
       }
     }
   }
-  console.log('No token found');
   return null;
 };
 
