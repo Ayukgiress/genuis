@@ -54,7 +54,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const queryClient = useQueryClient();
-  const { applications } = useApplicationStore();
+  const applications = useApplicationStore((s) => s.applications);
   const mounted = useSyncExternalStore(
     subscribeToNothing,
     getClientMountedSnapshot,
@@ -378,8 +378,8 @@ export default function DashboardPage() {
                 <div><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Interview practice</p><h2 id="interview-trends-title" className="mt-1 text-lg font-bold text-white">Score trends by interview type</h2></div>
                 <span className="text-xs text-zinc-500">Completed sessions · local report data</span>
               </div>
-              <div className="mt-5 h-64 w-full">
-                {mounted && scoreTrendData.length ? <ResponsiveContainer width="100%" height="100%">
+              <div className="mt-5 w-full" style={{ height: 256 }}>
+                {mounted && scoreTrendData.length ? <ResponsiveContainer width="100%" height={256}>
                   <LineChart data={scoreTrendData} margin={{ top: 8, right: 12, left: -18, bottom: 4 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#27272a" />
                     <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: '#71717a', fontSize: 10 }} />
@@ -485,8 +485,8 @@ export default function DashboardPage() {
             <div><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Pipeline health</p><h2 id="conversion-title" className="mt-1 text-lg font-bold text-white">Application funnel</h2></div>
             <span className="text-xs text-zinc-600">From your saved applications</span>
           </div>
-          <div className="mt-4 h-64">
-            {mounted && applicationFunnel.stages[0].value > 0 ? <ResponsiveContainer width="100%" height="100%">
+          <div className="mt-4" style={{ height: 256 }}>
+            {mounted && applicationFunnel.stages[0].value > 0 ? <ResponsiveContainer width="100%" height={256}>
               <FunnelChart>
                 <Tooltip contentStyle={{ backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '12px' }} />
                 <Funnel dataKey="value" data={applicationFunnel.stages} isAnimationActive>
@@ -499,8 +499,8 @@ export default function DashboardPage() {
         </div>
         <div className="rounded-3xl border border-zinc-800 bg-zinc-900/45 p-6 sm:p-8">
           <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Stage conversion</p><h2 className="mt-1 text-lg font-bold text-white">Where momentum builds</h2></div><span className="text-xs text-zinc-600">Conversion rate</span></div>
-          <div className="mt-5 h-56">
-            {mounted ? <ResponsiveContainer width="100%" height="100%">
+          <div className="mt-5" style={{ height: 224 }}>
+            {mounted ? <ResponsiveContainer width="100%" height={224}>
               <BarChart data={applicationFunnel.conversions} layout="vertical" margin={{ top: 8, right: 22, left: 8, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#27272a" />
                 <XAxis type="number" domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fill: '#71717a', fontSize: 10 }} tickFormatter={(value) => `${value}%`} />
@@ -526,7 +526,7 @@ export default function DashboardPage() {
               </svg>
             </button>
           </div>
-          <div className="h-62.5 w-full">
+          <div className="w-full" style={{ height: 250 }}>
             {mounted ? (
                <ResponsiveContainer width="100%" height={250}>
                 <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>

@@ -15,7 +15,7 @@ export const dashboardKeys = {
 
 // ── Main hook ─────────────────────────────────────────────────────────────────
 export function useDashboardData(enabled: boolean) {
-  const { applications } = useApplicationStore();
+  const applications = useApplicationStore((s) => s.applications);
 
   // Parallel top-level fetches — each fails independently
   const [analysesQ, summaryQ, boardsQ, interviewsQ] = useQueries({
