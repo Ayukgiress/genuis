@@ -67,15 +67,14 @@ export default function KanbanPage() {
       setIsLoading(true);
       setError(null);
       const data = await kanbanApi.listBoards();
-      // Normalize ids to strings
       const normalizedBoards = data.map((board) => ({
         ...board,
         id: String(board.id),
         user_id: String(board.user_id),
       }));
       setBoards(normalizedBoards);
-      if (normalizedBoards.length > 0 && !currentBoard) {
-        setCurrentBoard(normalizedBoards[0]);
+      if (normalizedBoards.length > 0) {
+        setCurrentBoard((prev) => prev ?? normalizedBoards[0]);
       }
     } catch (err) {
       console.error("Failed to fetch boards:", err);
@@ -90,7 +89,7 @@ export default function KanbanPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [logout, router, currentBoard]);
+  }, [logout, router]);
 
   useEffect(() => {
     if (authLoading) return;
