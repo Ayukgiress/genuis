@@ -9,13 +9,10 @@ import { queryClient } from "@/lib/query-client";
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
-  const fetchCurrentUser = useAuthStore((state: any) => state.fetchCurrentUser);
   const hasCheckedRef = useRef(false);
 
   useEffect(() => {
-    // Sync token from localStorage/store to the API module on mount
     const syncToken = () => {
-      // Try cookies first
       const cookies = document.cookie.split(';');
       for (const cookie of cookies) {
         const [name, value] = cookie.trim().split('=');
@@ -25,25 +22,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
       }
-
-      // Then try store state (hydrated by persist)
       const state = useAuthStore.getState();
-      if (state.token) {
-        setAuthToken(state.token);
-      }
+      if (state.token) setAuthToken(state.token);
     };
 
     const checkAuth = async () => {
       if (hasCheckedRef.current) return;
       hasCheckedRef.current = true;
       syncToken();
-      await fetchCurrentUser();
+      await useAuthStore.getState().fetchCurrentUser();
       setAuthChecked(true);
     };
 
     checkAuth();
     setMounted(true);
-  }, [fetchCurrentUser]);
+  }, []);
 
   if (!mounted || !authChecked) {
     // Show loading while checking authentication
