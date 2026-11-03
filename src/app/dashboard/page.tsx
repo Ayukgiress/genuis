@@ -6,11 +6,20 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   AreaChart,
   Area,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  Legend,
+  FunnelChart,
+  Funnel,
+  LabelList,
+  Cell,
 } from 'recharts';
 import { getAuthToken } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
@@ -19,6 +28,8 @@ import { useDashboardData } from '@/hooks/useDashboardData';
 import { createOrReuseInterview, interviewKeys, normalizeInterviewJobId } from '@/hooks/useInterviewsData';
 import { toast } from 'react-toastify';
 import Link from 'next/link';
+import { loadInterviewReport, type InterviewReportData } from '@/lib/interview-report';
+import { UsageMeter } from '@/components/usage/UsageMeter';
 
 const COLORS = ['#00f29c', '#6366f1', '#f59e0b', '#ef4444'];
 // used by recharts gradient stops above
@@ -26,10 +37,22 @@ void COLORS;
 const subscribeToNothing = () => () => {};
 const getClientMountedSnapshot = () => true;
 const getServerMountedSnapshot = () => false;
+const WEEKLY_GOAL_KEY = 'genuis:weekly-action-goal';
+const subscribeToWeeklyGoal = (callback: () => void) => {
+  window.addEventListener('storage', callback);
+  window.addEventListener('genuis:weekly-goal-updated', callback);
+  return () => {
+    window.removeEventListener('storage', callback);
+    window.removeEventListener('genuis:weekly-goal-updated', callback);
+  };
+};
+const getWeeklyGoalSnapshot = () => window.localStorage.getItem(WEEKLY_GOAL_KEY) ?? '5';
+const getWeeklyGoalServerSnapshot = () => '5';
+const dateKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const queryClient = useQueryClient();
   const { applications } = useApplicationStore();
   const mounted = useSyncExternalStore(
@@ -39,6 +62,7 @@ export default function DashboardPage() {
   );
   const [interviewPage, setInterviewPage] = useState(0);
   const [creatingJobId, setCreatingJobId] = useState<string | null>(null);
+  const [interviewReports, setInterviewReports] = useState<InterviewReportData[]>([]);
   const interviewsPerPage = 3;
 
   const queryEnabled = !authLoading && isAuthenticated && !!getAuthToken();
@@ -47,6 +71,7 @@ export default function DashboardPage() {
     analyses,
     analyticsSummary,
     interviewMap: remoteInterviewMap,
+    interviews,
     appliedJobs,
     isLoading,
     isInterviewDataReady,
@@ -54,6 +79,16 @@ export default function DashboardPage() {
   } = useDashboardData(queryEnabled);
 
   const interviewMap = remoteInterviewMap;
+  const weeklyGoalSnapshot = useSyncExternalStore(subscribeToWeeklyGoal, getWeeklyGoalSnapshot, getWeeklyGoalServerSnapshot);
+  const weeklyGoal = Math.min(20, Math.max(1, Number.parseInt(weeklyGoalSnapshot, 10) || 5));
+
+  useEffect(() => {
+    if (!mounted) return;
+    setInterviewReports(interviews
+      .filter((interview) => interview.status === 'completed')
+      .map((interview) => loadInterviewReport(interview.id))
+      .filter((report): report is InterviewReportData => report !== null));
+  }, [interviews, mounted]);
 
   // Auth redirect
   useEffect(() => {
@@ -203,6 +238,117 @@ export default function DashboardPage() {
     }));
   }, [analyses, applications, interviewMap]);
 
+  const scoreTrendData = useMemo(() => {
+    const byDate = new Map<string, { behavioral?: number[]; technical?: number[]; general?: number[] }>();
+    for (const report of interviewReports) {
+      const interview = interviews.find((item) => item.id === report.interviewId);
+      if (!interview?.created_at) continue;
+      const date = new Date(interview.created_at).toISOString().slice(0, 10);
+      const row = byDate.get(date) ?? {};
+      const scores = row[report.interviewType] ?? [];
+      scores.push(report.metrics.overallScore);
+      row[report.interviewType] = scores;
+      byDate.set(date, row);
+    }
+    const average = (scores?: number[]) => scores?.length
+      ? scores.reduce((sum, score) => sum + score, 0) / scores.length
+      : null;
+    return [...byDate.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, row]) => ({
+      date: new Date(`${date}T12:00:00`).toLocaleDateString([], { month: 'short', day: 'numeric' }),
+      behavioral: average(row.behavioral),
+      technical: average(row.technical),
+      general: average(row.general),
+    }));
+  }, [interviewReports, interviews]);
+
+  const applicationFunnel = useMemo(() => {
+    const applied = applications.filter((application) => application.status !== 'wishlist' && application.status !== 'rejected').length;
+    const applicationJobIds = new Set(applications.map((application) => application.jobId));
+    const interviewedIds = new Set(interviews
+      .filter((interview) => applicationJobIds.has(String(interview.job_id)))
+      .map((interview) => String(interview.job_id)));
+    const interviewCount = Math.min(applied, Math.max(interviewedIds.size, applications.filter((application) => application.status === 'interview' || application.status === 'offer').length));
+    const offerCount = Math.min(interviewCount, applications.filter((application) => application.status === 'offer').length);
+    const rate = (count: number, total: number) => total ? Math.round((count / total) * 100) : 0;
+    return {
+      stages: [
+        { name: 'Applied', value: applied, fill: '#00f29c' },
+        { name: 'Interview', value: interviewCount, fill: '#818cf8' },
+        { name: 'Offer', value: offerCount, fill: '#fbbf24' },
+      ],
+      conversions: [
+        { stage: 'Applied → interview', rate: rate(interviewCount, applied) },
+        { stage: 'Interview → offer', rate: rate(offerCount, interviewCount) },
+      ],
+    };
+  }, [applications, interviews]);
+
+  const weakPracticeItems = useMemo(() => interviewReports
+    .flatMap((report) => report.weakAreas.slice(0, 2).map((area) => ({ ...area, report })))
+    .sort((a, b) => a.score - b.score)
+    .slice(0, 3), [interviewReports]);
+
+  const activitySummary = useMemo(() => {
+    const activityDates: string[] = [];
+    analyses.filter((analysis) => analysis.status === 'completed').forEach((analysis) => {
+      if (analysis.created_at) activityDates.push(dateKey(new Date(analysis.created_at)));
+    });
+    applications.forEach((application) => {
+      if (application.appliedAt) activityDates.push(dateKey(new Date(application.appliedAt)));
+    });
+    interviews.filter((interview) => interview.status === 'completed').forEach((interview) => {
+      const completedAt = interview.updated_at || interview.created_at;
+      if (completedAt) activityDates.push(dateKey(new Date(completedAt)));
+    });
+    const uniqueDays = new Set(activityDates);
+    const today = new Date();
+    const todayKey = dateKey(today);
+    const weekStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const mondayOffset = (weekStart.getDay() + 6) % 7;
+    weekStart.setDate(weekStart.getDate() - mondayOffset);
+    const actionsThisWeek = activityDates.filter((day) => day >= dateKey(weekStart) && day <= todayKey).length;
+    const cursor = new Date(today);
+    if (!uniqueDays.has(todayKey)) cursor.setDate(cursor.getDate() - 1);
+    let streak = 0;
+    while (uniqueDays.has(dateKey(cursor))) {
+      streak += 1;
+      cursor.setDate(cursor.getDate() - 1);
+    }
+    return { actionsThisWeek, streak, progress: Math.min(100, Math.round((actionsThisWeek / weeklyGoal) * 100)) };
+  }, [analyses, applications, interviews, weeklyGoal]);
+
+  const setWeeklyGoal = (goal: number) => {
+    const safeGoal = Math.min(20, Math.max(1, goal));
+    window.localStorage.setItem(WEEKLY_GOAL_KEY, String(safeGoal));
+    window.dispatchEvent(new Event('genuis:weekly-goal-updated'));
+  };
+
+  const startTodayInterview = async () => {
+    const job = appliedJobs[0];
+    if (!job) {
+      router.push('/interviews?action=new');
+      return;
+    }
+    const requestedJobId = normalizeInterviewJobId(job.id);
+    if (!requestedJobId || creatingJobId) return;
+    setCreatingJobId(requestedJobId);
+    try {
+      const interview = await createOrReuseInterview(queryClient, requestedJobId);
+      if (normalizeInterviewJobId(interview.job_id) !== requestedJobId) throw new Error('The saved interview does not match the selected role.');
+      router.push(`/interviews?id=${interview.id}`);
+    } catch (createError) {
+      toast.error(createError instanceof Error ? createError.message : 'Could not start interview practice.', { toastId: 'today-interview-error' });
+    } finally {
+      setCreatingJobId(null);
+    }
+  };
+
+  const followUpHref = (() => {
+    const params = new URLSearchParams({ type: 'follow_up_letter' });
+    if (appliedJobs[0]?.id) params.set('jobId', appliedJobs[0].id);
+    return `/letters?${params.toString()}`;
+  })();
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-100">
@@ -217,15 +363,45 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="space-y-1">
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard Overview</h1>
-        <p className="text-zinc-500 text-sm">Welcome back! Here&apos;s your AI-powered job search workspace.</p>
+        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Your career workspace</p>
+        <h1 className="text-3xl font-bold tracking-tight">Today</h1>
+        <p className="text-zinc-500 text-sm">A short list of high-impact moves to keep your search moving.</p>
       </div>
 
       {error && (
         <div role="alert" className="flex flex-col gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="font-semibold">Some dashboard data is unavailable.</p>
-            <p className="mt-0.5 text-xs text-amber-100/70">Your workspace is still usable; retry to refresh the missing information.</p>
+          <section className="grid gap-6 rounded-3xl border border-zinc-800/70 bg-zinc-900/40 p-6 lg:grid-cols-[minmax(0,2fr)_minmax(15rem,1fr)] sm:p-8" aria-labelledby="interview-trends-title">
+            <div>
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Interview practice</p><h2 id="interview-trends-title" className="mt-1 text-lg font-bold text-white">Score trends by interview type</h2></div>
+                <span className="text-xs text-zinc-500">Completed sessions · local report data</span>
+              </div>
+              <div className="mt-5 h-64 w-full">
+                {mounted && scoreTrendData.length ? <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={scoreTrendData} margin={{ top: 8, right: 12, left: -18, bottom: 4 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#27272a" />
+                    <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: '#71717a', fontSize: 10 }} />
+                    <YAxis domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fill: '#71717a', fontSize: 10 }} />
+                    <Tooltip contentStyle={{ backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '12px' }} formatter={(value) => [`${Math.round(Number(value))}%`, 'Score']} />
+                    <Legend wrapperStyle={{ fontSize: '11px', color: '#a1a1aa' }} />
+                    <Line type="monotone" dataKey="behavioral" name="Behavioral" stroke="#00f29c" strokeWidth={2.5} connectNulls dot={{ r: 3 }} />
+                    <Line type="monotone" dataKey="technical" name="Technical" stroke="#818cf8" strokeWidth={2.5} connectNulls dot={{ r: 3 }} />
+                    <Line type="monotone" dataKey="general" name="General" stroke="#fbbf24" strokeWidth={2.5} connectNulls dot={{ r: 3 }} />
+                  </LineChart>
+                </ResponsiveContainer> : <div className="flex h-full flex-col items-center justify-center rounded-2xl border border-dashed border-zinc-800 text-center"><p className="text-sm font-semibold text-zinc-300">Your score trend starts with a completed report</p><p className="mt-1 text-xs text-zinc-600">Complete a practice session to see scores by interview type.</p><button onClick={() => router.push('/interviews?action=new')} className="mt-4 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-black">Start practice</button></div>}
+              </div>
+            </div>
+            <div className="border-t border-zinc-800 pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Keep improving</p>
+              <h3 className="mt-1 text-base font-bold text-white">Practice a weak area</h3>
+              <div className="mt-4 space-y-3">
+                {weakPracticeItems.length ? weakPracticeItems.map(({ label, score, report }) => <div key={`${report.interviewId}-${label}`} className="rounded-xl border border-zinc-800 bg-black/20 p-3"><div className="flex items-center justify-between gap-2"><p className="text-sm font-semibold text-zinc-200">{label}</p><span className="text-xs font-mono text-amber-300">{score}%</span></div><button onClick={() => { const params = new URLSearchParams({ action: 'new', jobId: report.jobId, type: report.interviewType, focus: label }); router.push(`/interviews?${params.toString()}`); }} className="mt-2 text-[11px] font-bold text-primary hover:underline">Practice again →</button></div>) : <p className="rounded-xl border border-dashed border-zinc-800 p-4 text-xs leading-relaxed text-zinc-500">Complete an interview and save its report to get focused practice suggestions here.</p>}
+              </div>
+            </div>
+          </section>
+
           </div>
           <button
             onClick={() => void Promise.all([
@@ -257,6 +433,24 @@ export default function DashboardPage() {
         </div>
       </section>
 
+      <section aria-labelledby="today-actions-title" className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(19rem,0.9fr)]">
+        <div className="rounded-3xl border border-zinc-800 bg-zinc-900/45 p-6 sm:p-8">
+          <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Next actions</p><h2 id="today-actions-title" className="mt-1 text-xl font-bold text-white">Make today count</h2></div><span className="text-xs text-zinc-600">One click to get moving</span></div>
+          <div className="mt-5 grid gap-3 md:grid-cols-3">
+            <TodayAction icon="✦" title="Start mock interview" description={appliedJobs[0] ? `Practice for ${appliedJobs[0].title}` : 'Choose a role and rehearse out loud'} actionLabel={creatingJobId ? 'Opening…' : 'Start practice'} onClick={() => void startTodayInterview()} disabled={creatingJobId !== null} />
+            <TodayAction icon="↗" title="Draft follow-up" description={appliedJobs[0] ? `Reconnect with ${appliedJobs[0].company}` : 'Write a thoughtful post-interview note'} actionLabel="Draft letter" href={followUpHref} />
+            <TodayAction icon="⌁" title="Fix your resume" description="Run a fresh check and focus your next edits" actionLabel="Review resume" href="/resumes?fix=1" />
+          </div>
+        </div>
+
+        <div className="rounded-3xl border border-primary/15 bg-linear-to-br from-primary/8 to-zinc-950 p-6 sm:p-8">
+          <div className="flex items-start justify-between gap-4"><div><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Weekly rhythm</p><h2 className="mt-1 text-xl font-bold text-white">Build momentum</h2></div><div className="rounded-2xl border border-primary/20 bg-primary/10 px-3 py-2 text-center"><p className="text-2xl font-black text-primary">{activitySummary.streak}</p><p className="text-[9px] font-bold uppercase tracking-wider text-zinc-500">day streak</p></div></div>
+          <div className="mt-5 flex items-center justify-between gap-3"><p className="text-sm font-semibold text-zinc-200">{activitySummary.actionsThisWeek} of {weeklyGoal} actions this week</p><label className="flex items-center gap-2 text-[10px] text-zinc-500">Goal <select aria-label="Weekly action goal" value={weeklyGoal} onChange={(event) => setWeeklyGoal(Number(event.target.value))} className="rounded-lg border border-zinc-700 bg-black px-2 py-1.5 text-xs font-bold text-white outline-none focus:border-primary/50">{[3, 5, 7, 10, 14].map((goal) => <option key={goal} value={goal}>{goal}</option>)}</select></label></div>
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-zinc-800"><div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${activitySummary.progress}%` }} /></div>
+          <p className="mt-3 text-xs leading-relaxed text-zinc-500">Progress counts completed practice, resume analyses, and applications logged this week.</p>
+        </div>
+      </section>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
         {stats.map((stat) => (
           <div key={stat.label} className="p-6 rounded-2xl bg-zinc-900/50 border border-zinc-800/50 hover:border-zinc-700 transition-all group">
@@ -283,6 +477,42 @@ export default function DashboardPage() {
         ))}
       </div>
 
+      <UsageMeter analyses={analyses} user={user} />
+
+      <section aria-labelledby="conversion-title" className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+        <div className="rounded-3xl border border-zinc-800 bg-zinc-900/45 p-6 sm:p-8">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Pipeline health</p><h2 id="conversion-title" className="mt-1 text-lg font-bold text-white">Application funnel</h2></div>
+            <span className="text-xs text-zinc-600">From your saved applications</span>
+          </div>
+          <div className="mt-4 h-64">
+            {mounted && applicationFunnel.stages[0].value > 0 ? <ResponsiveContainer width="100%" height="100%">
+              <FunnelChart>
+                <Tooltip contentStyle={{ backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '12px' }} />
+                <Funnel dataKey="value" data={applicationFunnel.stages} isAnimationActive>
+                  <LabelList position="right" fill="#d4d4d8" stroke="none" dataKey="name" fontSize={11} />
+                  {applicationFunnel.stages.map((stage) => <Cell key={stage.name} fill={stage.fill} />)}
+                </Funnel>
+              </FunnelChart>
+            </ResponsiveContainer> : <div className="flex h-full flex-col items-center justify-center rounded-2xl border border-dashed border-zinc-800 text-center"><p className="text-sm font-semibold text-zinc-300">Your funnel starts with an application</p><p className="mt-1 text-xs text-zinc-600">Log applications to track progress from applied to offer.</p><Link href="/jobs" className="mt-4 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-black">Explore jobs</Link></div>}
+          </div>
+        </div>
+        <div className="rounded-3xl border border-zinc-800 bg-zinc-900/45 p-6 sm:p-8">
+          <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Stage conversion</p><h2 className="mt-1 text-lg font-bold text-white">Where momentum builds</h2></div><span className="text-xs text-zinc-600">Conversion rate</span></div>
+          <div className="mt-5 h-56">
+            {mounted ? <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={applicationFunnel.conversions} layout="vertical" margin={{ top: 8, right: 22, left: 8, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#27272a" />
+                <XAxis type="number" domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fill: '#71717a', fontSize: 10 }} tickFormatter={(value) => `${value}%`} />
+                <YAxis type="category" dataKey="stage" width={142} axisLine={false} tickLine={false} tick={{ fill: '#a1a1aa', fontSize: 10 }} />
+                <Tooltip contentStyle={{ backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '12px' }} formatter={(value) => [`${Number(value)}%`, 'Conversion']} />
+                <Bar dataKey="rate" fill="#00f29c" radius={[0, 6, 6, 0]} barSize={24} />
+              </BarChart>
+            </ResponsiveContainer> : <div className="h-full" />}
+          </div>
+          <p className="mt-2 text-[11px] leading-relaxed text-zinc-600">Rates use locally saved applications and interview sessions. Offers are capped to recorded interviews for a consistent funnel.</p>
+        </div>
+      </section>
 
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -490,4 +720,23 @@ export default function DashboardPage() {
         </div>
     </div>
   );
+}
+
+function TodayAction({ icon, title, description, actionLabel, onClick, href, disabled = false }: {
+  icon: string;
+  title: string;
+  description: string;
+  actionLabel: string;
+  onClick?: () => void;
+  href?: string;
+  disabled?: boolean;
+}) {
+  const content = <>
+    <span className="grid h-10 w-10 place-items-center rounded-xl border border-primary/15 bg-primary/10 text-lg text-primary">{icon}</span>
+    <span className="mt-4 block text-sm font-bold text-white">{title}</span>
+    <span className="mt-1 block min-h-10 text-xs leading-relaxed text-zinc-500">{description}</span>
+    <span className="mt-4 inline-flex items-center gap-1 text-[11px] font-bold text-primary">{actionLabel} <span aria-hidden="true">→</span></span>
+  </>;
+  const className = `rounded-2xl border border-zinc-800 bg-black/25 p-4 text-left transition hover:border-primary/30 hover:bg-primary/5 ${disabled ? 'cursor-wait opacity-70' : ''}`;
+  return href ? <Link href={href} className={className}>{content}</Link> : <button type="button" onClick={onClick} disabled={disabled} className={`w-full ${className}`}>{content}</button>;
 }

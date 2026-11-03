@@ -5,6 +5,8 @@ import { letterApi } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import type { Job, Resume, LetterGenerateRequest } from '@/types';
 import { useApplicationStore } from '@/store/applicationStore';
+import { isProActive } from '@/lib/usage';
+import { UpgradePrompt } from '@/components/usage/UpgradePrompt';
 
 interface ApplyJobModalProps {
   isOpen: boolean;
@@ -87,7 +89,7 @@ export const ApplyJobModal: React.FC<ApplyJobModalProps> = ({
     }
 
     // Check subscription
-    if (user?.subscription_plan !== 'pro') {
+    if (!isProActive(user)) {
       setStep('error');
       setError('Custom letter generation is available for Pro users only. Please upgrade your subscription.');
       return;
@@ -147,6 +149,7 @@ export const ApplyJobModal: React.FC<ApplyJobModalProps> = ({
         {/* Step: Ask */}
         {step === 'ask' && (
           <div className="space-y-6">
+            {!isProActive(user) && <UpgradePrompt title="Custom letters are a Pro feature" message="You can still apply directly, or upgrade to generate a tailored cover letter." />}
             <div className="p-4 bg-zinc-950 border border-zinc-800 rounded-xl">
               <p className="text-zinc-300 text-sm leading-relaxed">
                 Would you like to generate a custom cover letter for this position before applying?
@@ -258,6 +261,7 @@ export const ApplyJobModal: React.FC<ApplyJobModalProps> = ({
         {/* Step: Error */}
         {step === 'error' && (
           <div className="space-y-6">
+            {!isProActive(user) && <UpgradePrompt title="Custom letters are a Pro feature" message="Upgrade to Pro to generate a tailored cover letter. You can also apply directly." />}
             <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
               <div className="flex items-center gap-3">
                 <svg viewBox="0 0 24 24" className="w-5 h-5 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2">

@@ -1,21 +1,40 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { Suspense, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { letterApi } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { GenerateLetterModal } from '@/components/letters/GenerateLetterModal';
-import type { Letter, Resume } from '@/types';
+import type { Letter } from '@/types';
 import Link from 'next/link';
+import { useApplicationStore } from '@/store/applicationStore';
 
 export default function LettersPage() {
+  return <Suspense fallback={<div className="min-h-[60vh]" />}><LettersWorkspace /></Suspense>;
+}
+
+function LettersWorkspace() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const applications = useApplicationStore((state) => state.applications);
   const { isAuthenticated, isLoading } = useAuth();
   const [letters, setLetters] = useState<Letter[]>([]);
   const [isLoadingLetters, setIsLoadingLetters] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const routeLetterType = searchParams.get('type');
+  const shouldOpenFollowUp = routeLetterType === 'follow_up_letter';
+  const shouldOpenCompose = searchParams.get('compose') === '1';
+  const targetJobId = searchParams.get('jobId');
+  const routeJobTitle = searchParams.get('jobTitle') || '';
+  const routeCompany = searchParams.get('company') || '';
+  const targetApplication = applications.find((application) => application.jobId === targetJobId);
+  const initialLetterData = useMemo(() => ({
+    letter_type: shouldOpenFollowUp ? 'follow_up_letter' as const : 'cover_letter' as const,
+    job_title: targetApplication?.title ?? routeJobTitle,
+    company_name: targetApplication?.company ?? routeCompany,
+  }), [shouldOpenFollowUp, targetApplication?.company, targetApplication?.title, routeJobTitle, routeCompany]);
 
   useEffect(() => {
     if (isLoading) return;
@@ -175,9 +194,11 @@ export default function LettersPage() {
       )}
 
       <GenerateLetterModal
-        isOpen={showGenerateModal}
-        onClose={() => setShowGenerateModal(false)}
+        key={`${showGenerateModal || shouldOpenFollowUp || shouldOpenCompose}-${initialLetterData.letter_type}-${initialLetterData.job_title}-${initialLetterData.company_name}`}
+        isOpen={showGenerateModal || shouldOpenFollowUp || shouldOpenCompose}
+        onClose={() => { setShowGenerateModal(false); if (shouldOpenFollowUp || shouldOpenCompose) router.replace('/letters'); }}
         onSuccess={fetchLetters}
+        initialData={initialLetterData}
       />
     </div>
   );

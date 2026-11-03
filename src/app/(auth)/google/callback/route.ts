@@ -16,8 +16,9 @@ export async function GET(request: Request) {
         `/auth/google/callback?code=${code}&redirect_uri=${encodeURIComponent(redirectUri)}`
       );
       
-      // Create response with redirect to dashboard
-      const nextResponse = NextResponse.redirect(new URL('/dashboard', request.url));
+      const careerProfile = response.user.career_profile || response.user.career_preferences;
+      const destination = careerProfile?.onboarding_completed ? '/dashboard' : '/onboarding';
+      const nextResponse = NextResponse.redirect(new URL(destination, request.url));
       
       // Set HTTP-only cookie with the token (for server components)
       nextResponse.cookies.set('auth_token', response.access_token, {

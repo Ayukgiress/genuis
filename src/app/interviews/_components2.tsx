@@ -14,10 +14,12 @@ export function AIVideoPanel({
   phase,
   isActive,
   media,
+  audioAmplitude = 0,
 }: {
   phase: Phase;
   isActive: boolean;
   media?: AiTurnMedia;
+  audioAmplitude?: number;
 }) {
   const speaking = phase === "ai_speaking";
   const processing = phase === "processing";
@@ -105,13 +107,24 @@ export function AIVideoPanel({
                 />
               </>
             )}
-            <div
-              className={`relative z-10 w-20 h-20 rounded-full grid place-items-center transition-all duration-300
-                ${speaking ? "bg-primary text-black" : "bg-zinc-800 text-zinc-300"}`}
-            >
-              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-                <circle cx="12" cy="8" r="4" />
-                <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" strokeLinecap="round" />
+            <div className={`relative z-10 h-28 w-28 overflow-hidden rounded-full border ${speaking ? "border-primary/60 shadow-[0_0_34px_rgba(0,242,156,0.28)]" : "border-zinc-700"}`}>
+              <svg viewBox="0 0 160 160" role="img" aria-label="Animated AI interviewer avatar" className={`h-full w-full ${speaking ? "wf-face-speaking" : "wf-face-idle"}`}>
+                <defs>
+                  <radialGradient id="avatar-bg" cx="45%" cy="30%" r="80%"><stop offset="0%" stopColor="#1d4739" /><stop offset="100%" stopColor="#101515" /></radialGradient>
+                  <linearGradient id="avatar-skin" x1="0" x2="1" y1="0" y2="1"><stop offset="0%" stopColor="#d9a77f" /><stop offset="100%" stopColor="#a96f54" /></linearGradient>
+                </defs>
+                <rect width="160" height="160" fill="url(#avatar-bg)" />
+                <path d="M23 160c3-29 23-45 57-45s54 16 57 45" fill="#17372e" />
+                <path d="M56 111V94h48v19c-10 12-38 12-48-2Z" fill="#b98260" />
+                <ellipse cx="80" cy="68" rx="41" ry="49" fill="url(#avatar-skin)" />
+                <path d="M40 68c-4-40 12-57 43-57 29 0 42 17 38 49-9-5-16-16-19-29-12 15-33 23-61 24l-1 13Z" fill="#171b1a" />
+                <path d="M54 62c6-4 14-4 20 0M87 62c6-4 14-4 20 0" fill="none" stroke="#503729" strokeWidth="3" strokeLinecap="round" />
+                <ellipse cx="65" cy="73" rx="4" ry="3" fill="#211b18" className="wf-avatar-blink" />
+                <ellipse cx="96" cy="73" rx="4" ry="3" fill="#211b18" className="wf-avatar-blink" />
+                <path d="m80 72-5 17 8 2" fill="none" stroke="#8d5b44" strokeWidth="2.5" strokeLinecap="round" />
+                {speaking ? <ellipse cx="81" cy="101" rx="8" ry="5" fill="#542d2c" className="wf-avatar-mouth" style={{ "--mouth-amplitude": Math.max(0.35, Math.min(1.5, audioAmplitude * 6)) } as React.CSSProperties} /> : <path d="M70 100c7 5 15 5 22 0" fill="none" stroke="#713c36" strokeWidth="3" strokeLinecap="round" />}
+                <path d="M44 76c-8 1-10 13-2 17M116 76c8 1 10 13 2 17" fill="none" stroke="#b98260" strokeWidth="6" strokeLinecap="round" />
+                <path d="M56 124c14 10 34 10 48 0" fill="none" stroke="#00f29c" strokeOpacity=".4" strokeWidth="2" />
               </svg>
             </div>
           </div>
@@ -459,12 +472,15 @@ export function StageFooter({
       <span>{messageCount} message{messageCount !== 1 ? "s" : ""}</span>
 
       {status === "completed" ? (
-        <span className="ml-auto inline-flex items-center gap-1.5 text-zinc-500 bg-zinc-900 px-2.5 py-1 rounded-md text-[11px] font-medium">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-          Completed
-        </span>
+        <div className="ml-auto flex items-center gap-3">
+          <span className="inline-flex items-center gap-1.5 text-zinc-500 bg-zinc-900 px-2.5 py-1 rounded-md text-[11px] font-medium">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+            Completed
+          </span>
+          <Link href={`/interviews/${interviewId}/report`} className="text-[12px] font-semibold text-primary hover:opacity-80">View report →</Link>
+        </div>
       ) : (
         <button
           onClick={onComplete}

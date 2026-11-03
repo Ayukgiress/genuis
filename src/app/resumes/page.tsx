@@ -5,10 +5,13 @@ import { useRouter } from 'next/navigation';
 import { resumeApi, analysisApi, ApiError, getAuthToken } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import type { Resume, Analysis } from '@/types';
+import { addInAppNotification } from '@/lib/in-app-notifications';
+import { UpgradePrompt } from '@/components/usage/UpgradePrompt';
+import { countCurrentMonthAnalyses, FREE_RESUME_ANALYSIS_LIMIT, isProActive, isUsageLimitError } from '@/lib/usage';
 
 export default function ResumesPage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading: authLoading, logout } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, logout, user } = useAuth();
   const [resumes, setResumes] = useState<Resume[]>([]);
   const [selectedResume, setSelectedResume] = useState<Resume | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
@@ -17,7 +20,9 @@ export default function ResumesPage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [upgradeRequired, setUpgradeRequired] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const autoAnalyzeStarted = useRef(false);
 
   const fetchResumes = useCallback(async () => {
     try {
@@ -112,18 +117,30 @@ export default function ResumesPage() {
     }
   };
 
-  const handleAnalyzeResume = async (resumeId: string | number) => {
+  const handleAnalyzeResume = useCallback(async (resumeId: string | number) => {
     try {
       setIsAnalyzing(true);
       setError(null);
       setSuccess(null);
+
+      if (!isProActive(user) && FREE_RESUME_ANALYSIS_LIMIT !== null) {
+        const allAnalyses = await analysisApi.list();
+        if (countCurrentMonthAnalyses(allAnalyses) >= FREE_RESUME_ANALYSIS_LIMIT) {
+          setUpgradeRequired(true);
+          return;
+        }
+      }
+      setUpgradeRequired(false);
       
       const result = await analysisApi.analyze(resumeId);
       setAnalysis(result);
       setSuccess('Resume analyzed successfully!');
+      addInAppNotification({ title: 'Resume analysis ready', body: 'Your resume review is ready to revisit.', href: '/resumes' });
     } catch (err) {
       console.error('Failed to analyze resume:', err);
-      if (err instanceof ApiError) {
+      if (isUsageLimitError(err)) {
+        setUpgradeRequired(true);
+      } else if (err instanceof ApiError) {
         setError(err.message);
       } else {
         setError('Failed to analyze resume. Please try again.');
@@ -131,7 +148,14 @@ export default function ResumesPage() {
     } finally {
       setIsAnalyzing(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !new URLSearchParams(window.location.search).has('fix') || !selectedResume || autoAnalyzeStarted.current) return;
+    autoAnalyzeStarted.current = true;
+    const frame = window.requestAnimationFrame(() => { void handleAnalyzeResume(selectedResume.id); });
+    return () => window.cancelAnimationFrame(frame);
+  }, [handleAnalyzeResume, selectedResume]);
 
 
 
@@ -183,6 +207,7 @@ export default function ResumesPage() {
             {success}
           </div>
         )}
+        {upgradeRequired && <UpgradePrompt title="Resume analysis limit reached" message="Your Free plan includes a limited number of resume analyses each month. Upgrade to Pro to continue." />}
 
         {/* Upload Section */}
         <div className="relative group">

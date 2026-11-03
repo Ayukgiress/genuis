@@ -82,8 +82,8 @@ function CardIcon({ id }: { id: KanbanColumnId }) {
 }
 
 function SortableCard({
-  card, columnId, onDelete,
-}: { card: KanbanCard; columnId: KanbanColumnId; onDelete: (id: string) => void }) {
+  card, columnId, onDelete, onSelect,
+}: { card: KanbanCard; columnId: KanbanColumnId; onDelete: (id: string) => void; onSelect: (card: KanbanCard) => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: card.id, data: { type: "card", card, columnId } });
 
@@ -97,7 +97,7 @@ function SortableCard({
       ref={setNodeRef}
       style={style}
       className={`
-        group p-6 rounded-[2rem] bg-zinc-950 border border-zinc-900
+        group p-6 rounded-4xl bg-zinc-950 border border-zinc-900
         hover:border-primary/30 transition-[border-color,box-shadow] duration-200
         relative overflow-hidden touch-none select-none
         ${isDragging ? "opacity-30" : "shadow-sm hover:shadow-md"}
@@ -140,6 +140,13 @@ function SortableCard({
             </div>
           )}
         </div>
+        <button
+          type="button"
+          onClick={(event) => { event.stopPropagation(); onSelect(card); }}
+          className="relative z-20 pointer-events-auto w-full rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-primary transition hover:bg-primary/10"
+        >
+          Open prep workspace
+        </button>
       </div>
     </div>
   );
@@ -147,7 +154,7 @@ function SortableCard({
 
 function CardPreview({ card, columnId }: { card: KanbanCard; columnId: KanbanColumnId }) {
   return (
-    <div className="p-6 rounded-[2rem] bg-zinc-900 border border-primary/40 shadow-2xl shadow-primary/20 rotate-2 max-w-sm">
+    <div className="p-6 rounded-4xl bg-zinc-900 border border-primary/40 shadow-2xl shadow-primary/20 rotate-2 max-w-sm">
       <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-[50px] rounded-full -mr-16 -mt-16" />
       <div className="relative space-y-6">
         <div className="flex justify-between items-start">
@@ -169,15 +176,15 @@ function CardPreview({ card, columnId }: { card: KanbanCard; columnId: KanbanCol
 /* ── Column drop zone (empty-space droppable) ─────────────────────────── */
 
 function ColumnView({
-  id, title, count, cards, isOver, onAddCard, onDelete,
+  id, title, count, cards, isOver, onAddCard, onDelete, onSelect,
 }: {
   id: KanbanColumnId; title: string; count: number; cards: KanbanCard[];
-  isOver: boolean; onAddCard: (id: KanbanColumnId) => void; onDelete: (id: string) => void;
+  isOver: boolean; onAddCard: (id: KanbanColumnId) => void; onDelete: (id: string) => void; onSelect: (card: KanbanCard) => void;
 }) {
   return (
     <div
       data-column={id}
-      className={`flex flex-col rounded-2xl transition-colors duration-200 ${isOver ? "bg-primary/[0.04] ring-2 ring-primary/40 ring-inset" : ""}`}
+      className={`flex flex-col rounded-2xl transition-colors duration-200 ${isOver ? "bg-primary/4 ring-2 ring-primary/40 ring-inset" : ""}`}
     >
       <div className="flex items-center justify-between px-2 mb-4 shrink-0">
         <div className="flex items-center gap-3">
@@ -193,7 +200,7 @@ function ColumnView({
         </button>
       </div>
 
-      <ColumnDropZone id={id} cards={cards} onAddCard={onAddCard} onDelete={onDelete} />
+      <ColumnDropZone id={id} cards={cards} onAddCard={onAddCard} onDelete={onDelete} onSelect={onSelect} />
     </div>
   );
 }
@@ -206,25 +213,26 @@ function ColumnView({
  *  - "empty droppable": a useDroppable for the whole zone when no cards
  */
 function ColumnDropZone({
-  id, cards, onAddCard, onDelete,
+  id, cards, onAddCard, onDelete, onSelect,
 }: {
   id: KanbanColumnId;
   cards: KanbanCard[];
   onAddCard: (id: KanbanColumnId) => void;
   onDelete: (id: string) => void;
+  onSelect: (card: KanbanCard) => void;
 }) {
   // Always register a fallback "column" droppable so empty columns can accept drops.
-  const empty = useDroppable({
+  const { setNodeRef: setEmptyNodeRef } = useDroppable({
     id: `column-${id}`,
     data: { type: "column", columnId: id },
   });
 
   return (
-    <div ref={empty.setNodeRef} className="flex-1 min-h-[160px] flex flex-col">
+    <div ref={setEmptyNodeRef} className="flex-1 min-h-40 flex flex-col">
       <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
         <div className="flex-1 space-y-4">
           {cards.map((card) => (
-            <SortableCard key={card.id} card={card} columnId={id} onDelete={onDelete} />
+            <SortableCard key={card.id} card={card} columnId={id} onDelete={onDelete} onSelect={onSelect} />
           ))}
         </div>
       </SortableContext>
@@ -236,7 +244,7 @@ function ColumnDropZone({
       {id === "todo" && (
         <button
           onClick={() => onAddCard("todo")}
-          className="mt-4 w-full py-4 border-2 border-dashed border-zinc-900 rounded-[2rem] text-xs font-black tracking-[0.2em] text-zinc-600 hover:border-zinc-800 hover:text-zinc-400 transition-all uppercase flex items-center justify-center gap-2"
+          className="mt-4 w-full py-4 border-2 border-dashed border-zinc-900 rounded-4xl text-xs font-black tracking-[0.2em] text-zinc-600 hover:border-zinc-800 hover:text-zinc-400 transition-all uppercase flex items-center justify-center gap-2"
         >
           <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="3">
             <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
@@ -263,13 +271,14 @@ function TailDroppable({ columnId }: { columnId: KanbanColumnId }) {
 }
 
 export function KanbanBoard({
-  cards, setCards, onAddCard, onDeleteCard, onMoveCard,
+  cards, setCards, onAddCard, onDeleteCard, onMoveCard, onSelectCard,
 }: {
   cards: KanbanCard[];
   setCards: React.Dispatch<React.SetStateAction<KanbanCard[]>>;
   onAddCard: (id: KanbanColumnId) => void;
   onDeleteCard: (id: string) => void;
   onMoveCard: (cardId: string, newColumnId: KanbanColumnId, newIndex: number) => Promise<void> | void;
+  onSelectCard: (card: KanbanCard) => void;
 }) {
   const buckets = useMemo(() => bucketCardsByColumn(cards), [cards]);
   const [activeCard, setActiveCard] = useState<KanbanCard | null>(null);
@@ -403,6 +412,7 @@ export function KanbanBoard({
             isOver={overColumn === column.id && activeCard != null}
             onAddCard={onAddCard}
             onDelete={onDeleteCard}
+            onSelect={onSelectCard}
           />
         ))}
       </div>

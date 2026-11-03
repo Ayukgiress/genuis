@@ -2,21 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import * as Icons from '@radix-ui/react-icons';
-import { api, ApiError } from '@/lib/api';
-
-interface CareerPreferences {
-  desired_roles?: string[];
-  min_salary?: number;
-  work_mode?: string;
-  relocation?: boolean;
-}
-
-interface UserWithPreferences {
-  id: number;
-  email: string;
-  name?: string;
-  career_preferences?: CareerPreferences;
-}
+import { authApi, ApiError } from '@/lib/api';
+import type { CareerPreferences } from '@/types';
 
 const Tag = ({ label, active = false, onRemove }: { label: string, active?: boolean, onRemove?: () => void }) => (
   <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium border ${
@@ -40,8 +27,9 @@ export const CareerSection = () => {
   const [desiredRoles, setDesiredRoles] = useState<string[]>([]);
   const [newRole, setNewRole] = useState('');
   const [minSalary, setMinSalary] = useState('');
-  const [workMode, setWorkMode] = useState('hybrid');
+  const [workMode, setWorkMode] = useState<NonNullable<CareerPreferences['work_mode']>>('hybrid');
   const [relocation, setRelocation] = useState(false);
+  const [careerProfile, setCareerProfile] = useState<CareerPreferences>({});
 
   useEffect(() => {
     loadPreferences();
@@ -50,10 +38,12 @@ export const CareerSection = () => {
   const loadPreferences = async () => {
     try {
       setIsLoading(true);
-      const userData = await api.get<UserWithPreferences>('/auth/me');
-      
-      if (userData.career_preferences) {
-        const prefs = userData.career_preferences;
+      const userData = await authApi.getMe();
+      const profile = userData.career_profile || userData.career_preferences || {};
+      setCareerProfile(profile);
+
+      if (profile) {
+        const prefs = profile;
         setDesiredRoles(prefs.desired_roles || []);
         setMinSalary(prefs.min_salary?.toString() || '');
         setWorkMode(prefs.work_mode || 'hybrid');
@@ -61,6 +51,7 @@ export const CareerSection = () => {
       }
     } catch (err) {
       console.error('Failed to load preferences:', err);
+      setError(err instanceof ApiError ? err.message : 'Failed to load career preferences');
     } finally {
       setIsLoading(false);
     }
@@ -83,13 +74,12 @@ export const CareerSection = () => {
       setError(null);
       setSuccess(null);
       
-      await api.patch("/auth/me", {
-        career_preferences: {
+      await authApi.updateCareerProfile({
+          ...careerProfile,
           desired_roles: desiredRoles,
           min_salary: minSalary ? parseInt(minSalary.replace(/,/g, '')) : undefined,
           work_mode: workMode,
           relocation,
-        },
       });
       
       setSuccess('Career preferences saved successfully!');
@@ -147,7 +137,8 @@ export const CareerSection = () => {
             ))}
             <div className="flex items-center gap-1.5">
               <input
-                type="text"
+                type="number"
+                min="0"
                 value={newRole}
                 onChange={(e) => setNewRole(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleAddRole()}
@@ -183,7 +174,7 @@ export const CareerSection = () => {
             <div className="relative">
               <select 
                 value={workMode}
-                onChange={(e) => setWorkMode(e.target.value)}
+                onChange={(e) => setWorkMode(e.target.value as NonNullable<CareerPreferences['work_mode']>)}
                 className="w-full appearance-none bg-zinc-900/50 border border-zinc-800 rounded-xl py-3 px-4 text-sm text-zinc-300 focus:outline-none focus:border-zinc-700 transition-all cursor-pointer"
               >
                 <option value="remote">Fully Remote</option>

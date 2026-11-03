@@ -4,6 +4,7 @@ import React from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth-store';
 import Link from 'next/link';
+import { FREE_RESUME_ANALYSIS_LIMIT } from '@/lib/usage';
 
 export default function PlansPage() {
   const router = useRouter();
@@ -20,7 +21,7 @@ export default function PlansPage() {
     setIsNewUser(false);
 
     if (plan === 'free') {
-      router.push('/dashboard');
+      router.push('/onboarding');
     } else {
       // Handle pro plan selection - redirect to payment
       router.push('/payment?plan=pro');
@@ -98,7 +99,7 @@ export default function PlansPage() {
                 <svg viewBox="0 0 24 24" className="w-5 h-5 text-primary" fill="none" stroke="currentColor" strokeWidth="2">
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
-                <span>Limited AI optimizations</span>
+                <span>{FREE_RESUME_ANALYSIS_LIMIT ? `${FREE_RESUME_ANALYSIS_LIMIT} resume analyses per month` : 'Limited AI optimizations'}</span>
               </li>
             </ul>
 
@@ -127,7 +128,7 @@ export default function PlansPage() {
                 <svg viewBox="0 0 24 24" className="w-5 h-5 text-primary" fill="none" stroke="currentColor" strokeWidth="2">
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
-                <span>Unlimited AI Optimization</span>
+                <span>Unlimited resume analyses</span>
               </li>
               <li className="flex items-center gap-3">
                 <svg viewBox="0 0 24 24" className="w-5 h-5 text-primary" fill="none" stroke="currentColor" strokeWidth="2">

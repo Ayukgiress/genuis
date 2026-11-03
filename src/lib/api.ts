@@ -43,7 +43,7 @@ import type {
   Interview, InterviewCreate, InterviewMessage, InterviewMessageCreate,
   Letter, LetterCreate, LetterUpdate, LetterGenerateRequest,
   AuthUser, Token, UserCreate, VerificationResponse, RegisterResponse,
-  GoogleOAuthResponse, GoogleOAuthCallbackResponse
+  GoogleOAuthResponse, GoogleOAuthCallbackResponse, CareerPreferences
 } from "@/types";
 
 // Token management
@@ -86,7 +86,7 @@ export const getAuthToken = (): string | null => {
           return token;
         }
       }
-    } catch (e) {
+    } catch {
       // Ignore parse errors
     }
 
@@ -248,19 +248,23 @@ export const authApi = {
   googleCallback: (code: string) => api.get<GoogleOAuthCallbackResponse>(`/auth/google/callback`, { code }),
   register: (data: UserCreate) => api.post<RegisterResponse>("/auth/register", data),
   verifyEmail: (token: string) => api.post<VerificationResponse>(`/auth/verify-email?token=${token}`),
-  verifyEmailPage: (token: string) => api.get<any>(`/auth/verify-email-page?token=${token}`),
+  verifyEmailPage: (token: string) => api.get<unknown>(`/auth/verify-email-page?token=${token}`),
   verifyEmailHtml: (token: string) => api.get<string>(`/auth/verify-email-html?token=${token}`),
   resendVerification: (email: string) => api.post<VerificationResponse>(`/auth/resend-verification?email=${email}`),
   login: (data: Record<string, string>) => api.postForm<Token>("/auth/token", data),
   getMe: () => api.get<AuthUser>("/auth/me"),
-  updateMe: (data: { name?: string; bio?: string; profile_picture?: string; career_preferences?: any }) => {
+  updateMe: (data: { name?: string; bio?: string; profile_picture?: string; career_preferences?: unknown; career_profile?: unknown }) => {
     const params: Record<string, string> = {};
     if (data.name !== undefined) params.name = data.name;
     if (data.bio !== undefined) params.bio = data.bio;
     if (data.profile_picture !== undefined) params.profile_picture = data.profile_picture;
     if (data.career_preferences !== undefined) params.career_preferences = JSON.stringify(data.career_preferences);
+    if (data.career_profile !== undefined) params.career_profile = JSON.stringify(data.career_profile);
     return api.put<AuthUser>("/auth/me", undefined, params);
   },
+  updateCareerProfile: (careerProfile: CareerPreferences) =>
+    api.patch<AuthUser>("/auth/me", { career_profile: careerProfile }),
+  deleteAccount: () => api.delete<void>("/auth/me"),
   uploadProfilePicture: (file: File) => {
     const formData = new FormData();
     formData.append('file', file);

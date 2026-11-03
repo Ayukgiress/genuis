@@ -4,6 +4,9 @@ import React, { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { resumeApi, analysisApi, ApiError } from '@/lib/api';
 import type { Resume, Analysis } from '@/types';
+import { useAuth } from '@/hooks/useAuth';
+import { UpgradePrompt } from '@/components/usage/UpgradePrompt';
+import { countCurrentMonthAnalyses, FREE_RESUME_ANALYSIS_LIMIT, isProActive, isUsageLimitError } from '@/lib/usage';
 
 interface EditPageProps {
   params: Promise<{ id: string }>;
@@ -12,6 +15,7 @@ interface EditPageProps {
 export default function EditMasterPage({ params }: EditPageProps) {
   const resolvedParams = use(params);
   const router = useRouter();
+  const { user } = useAuth();
   
   const [resume, setResume] = useState<Resume | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
@@ -22,6 +26,7 @@ export default function EditMasterPage({ params }: EditPageProps) {
   const [editFileName, setEditFileName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [upgradeRequired, setUpgradeRequired] = useState(false);
   const [activeTab, setActiveTab] = useState<'content' | 'suggestions' | 'preview' | 'original'>('original');
   const [charCount, setCharCount] = useState(0);
 
@@ -91,6 +96,15 @@ export default function EditMasterPage({ params }: EditPageProps) {
       setIsAnalyzing(true);
       setError(null);
       setSuccess(null);
+
+      if (!isProActive(user) && FREE_RESUME_ANALYSIS_LIMIT !== null) {
+        const allAnalyses = await analysisApi.list();
+        if (countCurrentMonthAnalyses(allAnalyses) >= FREE_RESUME_ANALYSIS_LIMIT) {
+          setUpgradeRequired(true);
+          return;
+        }
+      }
+      setUpgradeRequired(false);
       
       const result = await analysisApi.analyze(resume.id);
       setAnalysis(result);
@@ -98,7 +112,9 @@ export default function EditMasterPage({ params }: EditPageProps) {
       setSuccess('Resume analyzed! Review the suggestions below.');
     } catch (err) {
       console.error('Failed to analyze resume:', err);
-      if (err instanceof ApiError) {
+      if (isUsageLimitError(err)) {
+        setUpgradeRequired(true);
+      } else if (err instanceof ApiError) {
         setError(err.message);
       } else {
         setError('Failed to analyze resume. Please try again.');
@@ -230,6 +246,7 @@ export default function EditMasterPage({ params }: EditPageProps) {
             {success}
           </div>
         )}
+        {upgradeRequired && <UpgradePrompt title="Resume analysis limit reached" message="Your Free plan includes a limited number of resume analyses each month. Upgrade to Pro to continue." />}
 
         <div className="flex gap-1 p-1 bg-zinc-900/50 rounded-2xl w-fit">
           <button
@@ -333,7 +350,7 @@ export default function EditMasterPage({ params }: EditPageProps) {
                   </div>
                   <div>
                     <p className="text-zinc-400 text-lg font-semibold">No analysis yet</p>
-                    <p className="text-zinc-500 text-sm mt-1">Click "AI Analyze" to get personalized suggestions</p>
+                    <p className="text-zinc-500 text-sm mt-1">Click &quot;AI Analyze&quot; to get personalized suggestions</p>
                   </div>
                   <button 
                     onClick={handleAnalyze}

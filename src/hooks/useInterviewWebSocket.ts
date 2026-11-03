@@ -40,8 +40,12 @@ export interface InterviewRuntimeState {
 
 interface UseInterviewRuntimeOptions {
   interviewId: number | null;
+  audioDeviceId?: string;
+  videoDeviceId?: string;
+  language?: string;
   onMessage?: (message: InterviewMessage) => void;
   onAiTurnMedia?: (media: AiTurnMedia) => void;
+  onAiAmplitude?: (level: number) => void;
 }
 
 export function extractMedia(msg: InterviewMessage): AiTurnMedia {
@@ -64,18 +68,23 @@ export function extractMedia(msg: InterviewMessage): AiTurnMedia {
 
 export const useInterviewRuntime = ({
   interviewId,
+  audioDeviceId,
+  videoDeviceId,
+  language,
   onMessage,
   onAiTurnMedia,
+  onAiAmplitude,
 }: UseInterviewRuntimeOptions) => {
   const [phase, setPhase] = useState<InterviewRuntimePhase>("idle");
   const [error, setError] = useState<string | null>(null);
 
-  const audioPlayback = useAudioPlayback();
-  const videoCapture = useVideoCapture();
+  const audioPlayback = useAudioPlayback(onAiAmplitude);
+  const videoCapture = useVideoCapture(videoDeviceId);
   const audioCaptureRef = useRef<((paused: boolean) => void) | null>(null);
   const phaseRef = useRef<InterviewRuntimePhase>("idle");
   const runtimeGenerationRef = useRef(0);
   const currentUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const mutedRef = useRef(false);
   const { playAudio, stopAudio } = audioPlayback;
   const stopVideoCapture = videoCapture.stopCapture;
 
@@ -84,12 +93,21 @@ export const useInterviewRuntime = ({
     setPhase(next);
   }, []);
 
+  const setCapturePaused = useCallback((paused: boolean) => {
+    audioCaptureRef.current?.(paused || mutedRef.current);
+  }, []);
+
+  const setMuted = useCallback((muted: boolean) => {
+    mutedRef.current = muted;
+    setCapturePaused(muted || phaseRef.current !== "user_listening");
+  }, [setCapturePaused]);
+
   const resumeListening = useCallback((generation: number) => {
     if (generation !== runtimeGenerationRef.current) return;
     currentUtteranceRef.current = null;
-    audioCaptureRef.current?.(false);
+    setCapturePaused(false);
     transition("user_listening");
-  }, [transition]);
+  }, [setCapturePaused, transition]);
 
   const speakWithBrowserTts = useCallback((content: string, generation: number) => {
     if (generation !== runtimeGenerationRef.current) return;
@@ -102,26 +120,36 @@ export const useInterviewRuntime = ({
       window.speechSynthesis.cancel();
     }
 
-    const utterance = new SpeechSynthesisUtterance(content);
-    currentUtteranceRef.current = utterance;
-    utterance.onend = () => {
-      if (currentUtteranceRef.current === utterance) resumeListening(generation);
-    };
-    utterance.onerror = (event) => {
-      const benign = event?.error === "interrupted" || event?.error === "canceled";
-      if (generation === runtimeGenerationRef.current &&
-        (benign || currentUtteranceRef.current === utterance)) {
+    const sentences = content.match(/[^.!?]+[.!?]+|[^.!?]+$/g)?.map((sentence) => sentence.trim()).filter(Boolean) ?? [content];
+    let sentenceIndex = 0;
+    const speakNext = () => {
+      if (generation !== runtimeGenerationRef.current) return;
+      const sentence = sentences[sentenceIndex++];
+      if (!sentence) {
+        currentUtteranceRef.current = null;
         resumeListening(generation);
+        return;
       }
+      const utterance = new SpeechSynthesisUtterance(sentence);
+      if (language) utterance.lang = language;
+      currentUtteranceRef.current = utterance;
+      utterance.onend = () => {
+        if (currentUtteranceRef.current === utterance) speakNext();
+      };
+      utterance.onerror = (event) => {
+        const benign = event?.error === "interrupted" || event?.error === "canceled";
+        if (generation === runtimeGenerationRef.current && currentUtteranceRef.current === utterance && !benign) speakNext();
+      };
+      window.speechSynthesis.speak(utterance);
     };
-    window.speechSynthesis.speak(utterance);
-  }, [resumeListening]);
+    speakNext();
+  }, [language, resumeListening]);
 
   const playAiResponse = useCallback(
     async (content: string, media: AiTurnMedia, generation: number) => {
       if (generation !== runtimeGenerationRef.current) return;
       transition("interviewer_speaking");
-      audioCaptureRef.current?.(true);
+      setCapturePaused(true);
       onAiTurnMedia?.(media);
 
       const audioSource = media.audioUrl ?? media.audioData;
@@ -145,7 +173,7 @@ export const useInterviewRuntime = ({
 
       speakWithBrowserTts(content, generation);
     },
-    [onAiTurnMedia, playAudio, resumeListening, speakWithBrowserTts, transition],
+    [onAiTurnMedia, playAudio, resumeListening, setCapturePaused, speakWithBrowserTts, transition],
   );
 
   const onUserChunk = useCallback(
@@ -154,7 +182,7 @@ export const useInterviewRuntime = ({
       const generation = runtimeGenerationRef.current;
 
       transition("processing");
-      audioCaptureRef.current?.(true);
+      setCapturePaused(true);
 
       try {
         const response = await interviewApi.sendAudioMessage(
@@ -164,7 +192,7 @@ export const useInterviewRuntime = ({
         if (generation !== runtimeGenerationRef.current) return;
 
         if ("status" in response && response.status === "no_speech") {
-          audioCaptureRef.current?.(false);
+          setCapturePaused(false);
           transition("user_listening");
           return;
         }
@@ -181,20 +209,62 @@ export const useInterviewRuntime = ({
             `Failed to process speech (${status ?? "unknown"}). Please try again.`,
           );
         }
-        audioCaptureRef.current?.(false);
+        setCapturePaused(false);
         transition("user_listening");
       }
     },
-    [interviewId, onMessage, playAiResponse, transition],
+    [interviewId, onMessage, playAiResponse, setCapturePaused, transition],
   );
 
-  const audioCapture = useAudioCapture(onUserChunk);
+  const audioCapture = useAudioCapture(onUserChunk, audioDeviceId);
   const startAudioCapture = audioCapture.startCapture;
   const stopAudioCapture = audioCapture.stopCapture;
   const setAudioPaused = audioCapture.setPaused;
   useEffect(() => {
     audioCaptureRef.current = setAudioPaused;
   }, [setAudioPaused]);
+
+  const submitText = useCallback(async (content: string) => {
+    if (!interviewId || phaseRef.current !== "user_listening") return;
+    const text = content.trim();
+    if (!text) return;
+    const generation = runtimeGenerationRef.current;
+    setCapturePaused(true);
+    transition("processing");
+    onMessage?.({
+      id: Date.now(),
+      interview_id: interviewId,
+      role: "user",
+      content: text,
+      transcript: text,
+      created_at: new Date().toISOString(),
+    });
+    try {
+      const response = await interviewApi.sendMessage(interviewId, {
+        role: "user",
+        content: text,
+        generate_audio: false,
+      });
+      if (generation !== runtimeGenerationRef.current) return;
+      onMessage?.(response);
+      await playAiResponse(response.content, extractMedia(response), generation);
+    } catch (reason) {
+      if (generation !== runtimeGenerationRef.current) return;
+      setError(reason instanceof Error ? reason.message : "Could not send your answer. Try again or use text chat.");
+      setCapturePaused(false);
+      transition("user_listening");
+    }
+  }, [interviewId, onMessage, playAiResponse, setCapturePaused, transition]);
+
+  const interruptAi = useCallback(() => {
+    if (phaseRef.current !== "interviewer_speaking") return;
+    runtimeGenerationRef.current += 1;
+    stopAudio();
+    if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
+    currentUtteranceRef.current = null;
+    transition("user_listening");
+    setCapturePaused(false);
+  }, [setCapturePaused, stopAudio, transition]);
 
   const start = useCallback(async () => {
     const generation = ++runtimeGenerationRef.current;
@@ -242,8 +312,8 @@ export const useInterviewRuntime = ({
 
   const beginListening = useCallback(() => {
     transition("user_listening");
-    audioCaptureRef.current?.(false);
-  }, [transition]);
+    setCapturePaused(false);
+  }, [setCapturePaused, transition]);
 
   useEffect(() => {
     return () => {
@@ -275,6 +345,9 @@ export const useInterviewRuntime = ({
     speakOpening,
     beginListening,
     transition,
+    submitText,
+    interruptAi,
+    setMuted,
   };
 };
 

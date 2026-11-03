@@ -1,6 +1,10 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 
-export const useAudioCapture = (onChunkReady?: (base64: string) => void) => {
+export const useAudioCapture = (
+  onChunkReady?: (base64: string) => void,
+  deviceId?: string,
+  onSpeechStart?: () => void,
+) => {
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -89,6 +93,7 @@ export const useAudioCapture = (onChunkReady?: (base64: string) => void) => {
               isSpeaking = true;
               vadIsSpeakingRef.current = true;
               setIsListening(true);
+              onSpeechStart?.();
               console.log(
                 `🎙️ Speech detected (lvl: ${average.toFixed(1)}), listening...`,
               );
@@ -126,7 +131,7 @@ export const useAudioCapture = (onChunkReady?: (base64: string) => void) => {
         return false;
       }
     },
-    [],
+    [onSpeechStart],
   );
 
   const stopCapture = useCallback(() => {
@@ -198,6 +203,7 @@ export const useAudioCapture = (onChunkReady?: (base64: string) => void) => {
           autoGainControl: true,
           sampleRate: 44100,
           channelCount: 1,
+          ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
         },
       });
 
@@ -317,7 +323,7 @@ export const useAudioCapture = (onChunkReady?: (base64: string) => void) => {
       setError(errorMessage);
       return false;
     }
-  }, [onChunkReady, startVoiceActivityDetection]);
+  }, [deviceId, onChunkReady, startVoiceActivityDetection]);
 
   const setPaused = useCallback((paused: boolean) => {
     const wasPaused = isPausedRef.current;

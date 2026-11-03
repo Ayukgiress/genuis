@@ -6,6 +6,7 @@ import { jobApi, resumeApi, analysisApi, kanbanApi, ApiError, getAuthToken } fro
 import { useAuth } from '@/hooks/useAuth';
 import type { Job, Resume, Analysis, KanbanBoard } from '@/types';
 import { ApplyJobModal } from '@/components/jobs/ApplyJobModal';
+import { TailorResumeModal } from '@/components/jobs/TailorResumeModal';
 import { useApplicationStore } from '@/store/applicationStore';
 import Link from 'next/link';
 
@@ -33,6 +34,7 @@ export default function JobsPage() {
   const [page, setPage] = useState(1);
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [selectedJobForApply, setSelectedJobForApply] = useState<Job | null>(null);
+  const [selectedJobForTailoring, setSelectedJobForTailoring] = useState<Job | null>(null);
   const [boards, setBoards] = useState<KanbanBoard[]>([]);
   const { applications, addApplication } = useApplicationStore();
 
@@ -391,6 +393,16 @@ export default function JobsPage() {
                         }
                       </button>
 
+                      <button
+                        type="button"
+                        onClick={() => setSelectedJobForTailoring(job)}
+                        disabled={!selectedResume}
+                        className="w-full rounded-xl border border-primary/30 bg-primary/5 px-4 py-2.5 text-xs font-bold text-primary transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-40"
+                        title={selectedResume ? 'Compare a role-focused copy against your original resume' : 'Select a resume to tailor it'}
+                      >
+                        Tailor resume for this job
+                      </button>
+
                       {applications.some(app => app.jobId === job.id) && (
                         <Link href="/interviews">
                           <button className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-blue-600/10 border border-blue-600/30 text-blue-400 text-xs font-bold hover:bg-blue-600/20 transition-all">
@@ -502,6 +514,16 @@ export default function JobsPage() {
         onClose={handleCloseApplyModal}
         job={selectedJobForApply}
         resumes={resumes}
+      />
+      <TailorResumeModal
+        isOpen={selectedJobForTailoring !== null}
+        job={selectedJobForTailoring}
+        resume={selectedResume}
+        onClose={() => setSelectedJobForTailoring(null)}
+        onSaved={(tailoredResume) => {
+          setResumes((current) => [tailoredResume, ...current]);
+          setSuccess(`Saved a tailored copy for ${selectedJobForTailoring?.company || 'this role'}.`);
+        }}
       />
     </div>
   );

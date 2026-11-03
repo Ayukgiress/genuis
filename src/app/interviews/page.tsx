@@ -18,15 +18,18 @@ import {
   useInterviewsData,
 } from "@/hooks/useInterviewsData";
 import type { Interview, InterviewMessage, Job } from "@/types";
+import { useInterviewCallStore } from "@/store/interviewCallStore";
+import { useShallow } from "zustand/react/shallow";
+import { useInterviewSpeechRecognition } from "@/hooks/useInterviewSpeechRecognition";
+import { useInterviewVad } from "@/hooks/useInterviewVad";
+import { calculateInterviewMetrics, getWeakAreas, loadInterviewReport, saveInterviewReport, type InterviewType } from "@/lib/interview-report";
+import type { PresenceMetrics } from "@/hooks/useInterviewPresenceMetrics";
+import { addInAppNotification } from "@/lib/in-app-notifications";
+import { useLowBandwidth } from "@/lib/network-preferences";
 import { StageHeader, type Phase } from "./_components";
-import {
-  InterviewStage,
-  PhaseCaption,
-  Notice,
-  StageFooter,
-  EmptyStage,
-  CreateModal,
-} from "./_components2";
+import { InterviewLobby } from "./InterviewLobby";
+import { InterviewCallScreen } from "./InterviewCallScreen";
+import { Notice, StageFooter, EmptyStage, CreateModal } from "./_components2";
 
 /* ──────────────────────────────────────────────────────────────────────────
    Clean interview page — single-column, focused stage
@@ -34,9 +37,28 @@ import {
 
 export default function InterviewsPage() {
   const router = useRouter();
+  const { lowBandwidth } = useLowBandwidth();
   const searchParams = useSearchParams();
   const interviewIdParam = searchParams.get("id");
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
+  const callSettings = useInterviewCallStore(useShallow((state) => ({
+    interviewType: state.interviewType,
+    difficulty: state.difficulty,
+    durationMinutes: state.durationMinutes,
+    language: state.language,
+    setInterviewType: state.setInterviewType,
+    captionsEnabled: state.captionsEnabled,
+    muted: state.muted,
+    cameraEnabled: state.cameraEnabled,
+    audioDeviceId: state.audioDeviceId,
+    videoDeviceId: state.videoDeviceId,
+    setPhase: state.setPhase,
+    setMuted: state.setMuted,
+    setCameraEnabled: state.setCameraEnabled,
+    setCaptionsEnabled: state.setCaptionsEnabled,
+  })));
+  const setCallPhase = callSettings.setPhase;
+  const setInterviewType = callSettings.setInterviewType;
 
   const [selectedInterview, setSelectedInterview] = useState<Interview | null>(
     null,
@@ -50,7 +72,11 @@ export default function InterviewsPage() {
   const [modalJobsLoading, setModalJobsLoading] = useState(false);
   const [modalJobsError, setModalJobsError] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
+  const [presenceMetrics, setPresenceMetrics] = useState<PresenceMetrics>({});
+  const [practiceFocus, setPracticeFocus] = useState("");
   const [aiMedia, setAiMedia] = useState<AiTurnMedia>({});
+  const [aiAmplitude, setAiAmplitude] = useState(0);
+  const [isTextOnlyMode, setIsTextOnlyMode] = useState(false);
   const creationLockRef = useRef(false);
   const startLockRef = useRef(false);
   const startGenerationRef = useRef(0);
@@ -135,6 +161,9 @@ export default function InterviewsPage() {
 
   const session = useInterviewRuntime({
     interviewId: selectedInterview?.id || null,
+    audioDeviceId: callSettings.audioDeviceId,
+    videoDeviceId: callSettings.videoDeviceId,
+    language: callSettings.language,
     onMessage: useCallback(
       (message: InterviewMessage) => {
         if (!selectedInterview?.id) return;
@@ -144,17 +173,37 @@ export default function InterviewsPage() {
       [selectedInterview?.id, appendMessage, invalidateMessages],
     ),
     onAiTurnMedia: useCallback((media: AiTurnMedia) => setAiMedia(media), []),
+    onAiAmplitude: useCallback((level: number) => setAiAmplitude(level), []),
   });
-
+  const sessionActive = session.isActive;
+  const runtimePhase = session.phase;
+  const submitText = session.submitText;
+  const interruptAi = session.interruptAi;
+  const stopSession = session.stop;
+  const submitRecognizedText = useCallback(
+    (text: string) => {
+      if (sessionActive) void submitText(text);
+    },
+    [sessionActive, submitText],
+  );
+  const speech = useInterviewSpeechRecognition(
+    callSettings.language,
+    submitRecognizedText,
+  );
+  const startSpeech = speech.start;
+  const stopSpeech = speech.stop;
+  const bargeIn = useCallback(() => {
+    if (runtimePhase === "interviewer_speaking") interruptAi();
+  }, [interruptAi, runtimePhase]);
+  const vad = useInterviewVad(bargeIn);
+  const startVad = vad.start;
+  const stopVad = vad.stop;
   const showToast = useCallback((msg: string, type: "error" | "success") => {
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
     setError(null);
     setSuccess(null);
-    if (type === "error") {
-      setError(msg);
-    } else {
-      setSuccess(msg);
-    }
+    if (type === "error") setError(msg);
+    else setSuccess(msg);
     toastTimeoutRef.current = setTimeout(() => {
       setError(null);
       setSuccess(null);
@@ -178,8 +227,17 @@ export default function InterviewsPage() {
   }, [authLoading, isAuthenticated, router]);
 
   useEffect(() => {
-    if (searchParams.get("action") === "new") setShowCreateModal(true);
-  }, [searchParams]);
+    if (searchParams.get("action") !== "new") return;
+    setShowCreateModal(true);
+    const jobId = searchParams.get("jobId");
+    const focus = searchParams.get("focus") || "";
+    const requestedType = searchParams.get("type");
+    if (jobId) setSelectedJobId(jobId);
+    setPracticeFocus(focus);
+    if (requestedType === "behavioral" || requestedType === "technical" || requestedType === "general") {
+      setInterviewType(requestedType as InterviewType);
+    }
+  }, [searchParams, setInterviewType]);
 
   useEffect(() => {
     if (isLoading) return;
@@ -224,13 +282,37 @@ export default function InterviewsPage() {
 
   /* Elapsed timer */
   useEffect(() => {
-    if (!session.isActive) {
-      setElapsed(0);
+    if (!sessionActive) {
+      setCallPhase("listening");
       return;
     }
     const t = setInterval(() => setElapsed((s) => s + 1), 1000);
     return () => clearInterval(t);
-  }, [session.isActive]);
+  }, [sessionActive, setCallPhase]);
+
+  useEffect(() => {
+    const mappedPhase =
+      runtimePhase === "interviewer_speaking"
+        ? "ai_speaking"
+        : runtimePhase === "processing"
+          ? "waiting_for_user"
+          : "listening";
+    setCallPhase(mappedPhase);
+  }, [setCallPhase, runtimePhase]);
+
+  useEffect(() => {
+    if (!sessionActive || isTextOnlyMode) return;
+    void startVad();
+    return () => {
+      void stopVad();
+    };
+  }, [sessionActive, isTextOnlyMode, startVad, stopVad]);
+
+  useEffect(() => {
+    if (runtimePhase === "user_listening" && sessionActive && !isTextOnlyMode) startSpeech();
+    else stopSpeech();
+    return () => stopSpeech();
+  }, [sessionActive, isTextOnlyMode, runtimePhase, startSpeech, stopSpeech]);
 
   /* Actions */
   const handleCreateInterview = useCallback(async () => {
@@ -257,6 +339,8 @@ export default function InterviewsPage() {
         );
       }
       setSelectedInterview(newInterview);
+      setElapsed(0);
+      setPresenceMetrics({});
       setShowCreateModal(false);
       setSelectedJobId("");
       showToast("Session ready", "success");
@@ -294,7 +378,23 @@ export default function InterviewsPage() {
 
   const handleCompleteInterview = async (interviewId: number) => {
     try {
+      const current = selectedInterview?.id === interviewId ? selectedInterview : interviews.find((item) => item.id === interviewId);
+      const messages = current?.messages ?? await prefetchMessages(interviewId);
+      const isSelected = selectedInterview?.id === interviewId;
+      const fallbackDuration = current?.updated_at
+        ? Math.max(0, Math.round((Date.parse(current.updated_at) - Date.parse(current.created_at)) / 1000))
+        : 0;
       await interviewApi.complete(interviewId);
+      const reportMetrics = calculateInterviewMetrics(messages, isSelected ? elapsed : fallbackDuration, isSelected ? presenceMetrics : undefined);
+      saveInterviewReport({
+        interviewId,
+        jobId: current?.job_id ?? "",
+        interviewType: isSelected ? callSettings.interviewType : loadInterviewReport(interviewId)?.interviewType ?? "general",
+        metrics: reportMetrics,
+        weakAreas: getWeakAreas(messages),
+      });
+      addInAppNotification({ title: "Interview report ready", body: "Your practice scores, transcript, and next-step suggestions are ready.", href: `/interviews/${interviewId}/report` });
+      if (sessionActive && selectedInterview?.id === interviewId) stopAudioInterview();
       queryClient.setQueryData<Interview[]>(
         interviewKeys.list,
         (previous) =>
@@ -304,7 +404,7 @@ export default function InterviewsPage() {
       );
       if (selectedInterview?.id === interviewId)
         setSelectedInterview({ ...selectedInterview, status: "completed" });
-      showToast("Marked complete", "success");
+      router.push(`/interviews/${interviewId}/report`);
     } catch {
       showToast("Failed", "error");
     }
@@ -313,27 +413,51 @@ export default function InterviewsPage() {
   const stopAudioInterview = useCallback(() => {
     startGenerationRef.current += 1;
     startLockRef.current = false;
-    session.stop();
-  }, [session]);
+    setIsTextOnlyMode(false);
+    stopSpeech();
+    void stopVad();
+    stopSession();
+  }, [stopSession, stopSpeech, stopVad]);
+
+  useEffect(() => {
+    if (sessionActive && elapsed >= callSettings.durationMinutes * 60) {
+      stopAudioInterview();
+      showToast(
+        "Your practice time is up. Your session has been saved.",
+        "success",
+      );
+    }
+  }, [
+    callSettings.durationMinutes,
+    elapsed,
+    sessionActive,
+    showToast,
+    stopAudioInterview,
+  ]);
 
   const selectInterview = (interview: Interview) => {
     if (selectedInterview?.id === interview.id) return;
     stopAudioInterview();
     setAiMedia({});
+    setElapsed(0);
+    setPresenceMetrics({});
     setSelectedInterview(interview);
     if (!interview.messages) fetchInterviewMessages(interview.id);
   };
 
-  const startAudioInterview = async () => {
+  const startAudioInterview = async (textOnly = false) => {
     if (!selectedInterview || session.isActive || startLockRef.current) return;
     startLockRef.current = true;
+    setElapsed(0);
+    setPresenceMetrics({});
     const generation = ++startGenerationRef.current;
+    setIsTextOnlyMode(textOnly);
     setAiMedia({});
-    session.videoCapture.startCapture();
+    if (!textOnly && callSettings.cameraEnabled && !lowBandwidth) void session.videoCapture.startCapture();
     showToast("Starting session…", "success");
 
     try {
-      const microphoneReady = await session.start();
+      const microphoneReady = textOnly ? (session.beginListening(), true) : await session.start();
       if (!microphoneReady) {
         session.videoCapture.stopCapture();
         return;
@@ -365,8 +489,8 @@ export default function InterviewsPage() {
         return;
       }
 
-      const trigger =
-        "Hello, I'm ready to begin the interview. Please start by introducing yourself and asking your first question.";
+      const focusInstruction = practiceFocus ? ` Please focus this practice on ${practiceFocus}; ask targeted questions and give me opportunities to improve in this area.` : "";
+      const trigger = `Hello, I'm ready to begin a ${callSettings.difficulty}-level ${callSettings.interviewType} interview for about ${callSettings.durationMinutes} minutes.${focusInstruction} Please start by introducing yourself and asking your first question. Please speak in ${callSettings.language === "fr-CM" ? "French" : "English"}.`;
       const aiResponse = await interviewApi.sendMessage(selectedInterview.id, {
         role: "user",
         content: trigger,
@@ -491,6 +615,14 @@ export default function InterviewsPage() {
     !interviews.some((interview) => interview.id === Number(interviewIdParam));
   const userInitial = (user?.name || user?.email || "Y")[0].toUpperCase();
   const userName = user?.name || "You";
+  const assistantTurns =
+    selectedInterview?.messages?.filter(
+      (message) => message.role === "assistant",
+    ).length || 0;
+  const latestAssistantText =
+    [...(selectedInterview?.messages || [])]
+      .reverse()
+      .find((message) => message.role === "assistant")?.content || "";
 
   /* ── Loading ─────────────────────────────────────────────────────────── */
   if (isLoading) {
@@ -523,6 +655,12 @@ export default function InterviewsPage() {
           0%, 100% { transform: scaleY(0.35); }
           50%      { transform: scaleY(1);    }
         }
+        @keyframes wf-face-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+        @keyframes wf-avatar-blink { 0%, 46%, 50%, 100% { transform: scaleY(1); } 48% { transform: scaleY(0.08); } }
+        .wf-face-idle { animation: wf-face-float 4s ease-in-out infinite; }
+        .wf-avatar-blink { transform-box: fill-box; transform-origin: center; animation: wf-avatar-blink 5.2s ease-in-out infinite; }
+        .wf-avatar-mouth { transform-box: fill-box; transform-origin: center; animation: wf-avatar-talk .34s ease-in-out infinite alternate; }
+        @keyframes wf-avatar-talk { 0%, 100% { transform: scaleY(calc(var(--mouth-amplitude, .35) * .75)); } 50% { transform: scaleY(var(--mouth-amplitude, .35)); } }
         .wf-scrollbar::-webkit-scrollbar { width: 6px; }
         .wf-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .wf-scrollbar::-webkit-scrollbar-thumb { background: #27272a; border-radius: 6px; }
@@ -544,8 +682,8 @@ export default function InterviewsPage() {
           phase={phase}
           elapsed={elapsed}
           formatElapsed={formatElapsed}
-          onToggle={session.isActive ? stopAudioInterview : startAudioInterview}
-          disabled={false}
+          onToggle={session.isActive ? stopAudioInterview : () => undefined}
+          disabled={!session.isActive}
         />
 
         <main className="flex-1 min-h-0 overflow-y-auto wf-scrollbar">
@@ -588,48 +726,112 @@ export default function InterviewsPage() {
           {selectedInterview ? (
             <div className="min-h-full flex flex-col">
               <div className="flex-1 px-4 sm:px-8 py-10 sm:py-14 flex flex-col items-center justify-center">
-                <InterviewStage
-                  phase={phase}
-                  isInterviewActive={session.isActive}
-                  userInitial={userInitial}
-                  userName={userName}
-                  onToggle={
-                    session.isActive ? stopAudioInterview : startAudioInterview
-                  }
-                  disabled={false}
-                  attachVideo={session.videoCapture.attachVideo}
-                  isCameraOn={session.videoCapture.isStreaming}
-                  cameraError={session.videoCapture.error}
-                  aiMedia={aiMedia}
-                />
+                {session.isActive ? (
+                  <InterviewCallScreen
+                    phase={phase}
+                    elapsed={elapsed}
+                    durationMinutes={callSettings.durationMinutes}
+                    questionCount={assistantTurns}
+                    totalQuestions={Math.max(
+                      4,
+                      Math.ceil(callSettings.durationMinutes / 5),
+                    )}
+                    userInitial={userInitial}
+                    userName={userName}
+                    attachVideo={session.videoCapture.attachVideo}
+                    isCameraOn={session.videoCapture.isStreaming}
+                    cameraError={session.videoCapture.error}
+                    lowBandwidth={lowBandwidth}
+                    aiMedia={{
+                      ...aiMedia,
+                      ...(lowBandwidth ? {
+                        videoUrl: null,
+                        videoData: null,
+                        avatarImageUrl: null,
+                        avatarImageData: null,
+                      } : {}),
+                      transcript:
+                        aiMedia.transcript ||
+                        (callSettings.captionsEnabled
+                          ? latestAssistantText
+                          : null),
+                    }}
+                    audioAmplitude={aiAmplitude}
+                    captionsEnabled={callSettings.captionsEnabled}
+                    onToggleCaptions={() =>
+                      callSettings.setCaptionsEnabled(
+                        !callSettings.captionsEnabled,
+                      )
+                    }
+                    muted={callSettings.muted}
+                    onToggleMute={() => {
+                      const nextMuted = !callSettings.muted;
+                      callSettings.setMuted(nextMuted);
+                      session.setMuted(nextMuted);
+                    }}
+                    onToggleCamera={() => {
+                      if (lowBandwidth) return;
+                      const nextEnabled = !session.videoCapture.isStreaming;
+                      callSettings.setCameraEnabled(nextEnabled);
+                      if (nextEnabled) void session.videoCapture.startCapture();
+                      else session.videoCapture.stopCapture();
+                    }}
+                    onEnd={stopAudioInterview}
+                    isTextMode={speech.isTextFallback}
+                    transcript={speech.transcript}
+                    onSubmitText={session.submitText}
+                    onPresenceMetrics={setPresenceMetrics}
+                    connectionLabel={
+                      isTextOnlyMode
+                        ? "Text chat"
+                        : speech.isTextFallback
+                        ? "Text fallback"
+                        : vad.isAvailable
+                          ? "Voice connected"
+                          : "Audio connected"
+                    }
+                  />
+                ) : (
+                  <InterviewLobby
+                    jobTitle={job?.title}
+                    onStart={() => startAudioInterview()}
+                    onStartTextOnly={() => startAudioInterview(true)}
+                  />
+                )}
 
-                <PhaseCaption
-                  phase={phase}
-                  isActive={session.isActive}
-                  jobTitle={job?.title}
-                />
-
-                <div className="mt-6 w-full max-w-md space-y-2">
-                  {selectedJobQuery.isLoading && (
-                    <Notice
-                      tone="info"
-                      msg="Loading role details for this session…"
-                    />
-                  )}
-                  {selectedJobQuery.error && (
-                    <Notice
-                      tone="warn"
-                      msg="Role details are unavailable right now. You can still practice in this session."
-                    />
-                  )}
-                  {session.error && <Notice tone="warn" msg={session.error} />}
-                  {session.audioCapture.error && (
-                    <Notice tone="error" msg={session.audioCapture.error} />
-                  )}
-                  {session.videoCapture.error && (
-                    <Notice tone="warn" msg={session.videoCapture.error} />
-                  )}
-                </div>
+                {(session.error ||
+                  session.audioCapture.error ||
+                  speech.error ||
+                  vad.error ||
+                  selectedJobQuery.error) && (
+                  <div className="mt-4 w-full max-w-2xl space-y-2">
+                    {selectedJobQuery.isLoading && (
+                      <Notice
+                        tone="info"
+                        msg="Loading role details for this session…"
+                      />
+                    )}
+                    {selectedJobQuery.error && (
+                      <Notice
+                        tone="warn"
+                        msg="Role details are unavailable right now. You can still practice in this session."
+                      />
+                    )}
+                    {session.error && (
+                      <Notice tone="warn" msg={session.error} />
+                    )}
+                    {session.audioCapture.error && (
+                      <Notice tone="error" msg={session.audioCapture.error} />
+                    )}
+                    {speech.error && <Notice tone="warn" msg={speech.error} />}
+                    {vad.error && (
+                      <Notice
+                        tone="info"
+                        msg="Smart voice activity detection is unavailable; the call continues with browser audio detection."
+                      />
+                    )}
+                  </div>
+                )}
               </div>
 
               <StageFooter

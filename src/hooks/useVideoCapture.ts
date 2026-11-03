@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 
-export const useVideoCapture = () => {
+export const useVideoCapture = (deviceId?: string) => {
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -14,7 +14,10 @@ export const useVideoCapture = () => {
     try {
       setError(null);
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
+        video: {
+          width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user',
+          ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+        },
         audio: false,
       });
       if (generation !== captureGenerationRef.current) {
@@ -45,7 +48,7 @@ export const useVideoCapture = () => {
                 : 'Camera unavailable. Check your device and browser permissions.';
       setError(message);
     }
-  }, []);
+  }, [deviceId]);
 
   const stopCapture = useCallback(() => {
     captureGenerationRef.current += 1;

@@ -28,7 +28,7 @@ export default function PaymentSuccessPage() {
     const timeout = setTimeout(() => {
       console.log('Payment verification timeout, proceeding to dashboard');
       setIsVerifying(false);
-      router.push('/dashboard');
+      router.push('/onboarding');
     }, 10000); // 10 second timeout
 
     if (sessionId) {
@@ -45,7 +45,7 @@ export default function PaymentSuccessPage() {
           
           // Auto-redirect to dashboard after showing success state for a moment
           setTimeout(() => {
-            router.push('/dashboard');
+            router.push('/onboarding');
           }, 2000);
         } catch (error) {
           console.error('Failed to refresh user data:', error);
@@ -53,7 +53,7 @@ export default function PaymentSuccessPage() {
           setIsVerifying(false);
           // Still proceed to dashboard so user can continue
           setTimeout(() => {
-            router.push('/dashboard');
+            router.push('/onboarding');
           }, 1000);
         }
       };
@@ -64,7 +64,7 @@ export default function PaymentSuccessPage() {
       clearTimeout(timeout);
       setTimeout(() => {
         setIsVerifying(false);
-        router.push('/dashboard');
+            router.push('/onboarding');
       }, 2000);
     }
 

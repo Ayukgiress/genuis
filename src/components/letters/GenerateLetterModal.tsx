@@ -5,28 +5,35 @@ import { letterApi, resumeApi } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import type { LetterGenerateRequest, Resume, LetterType } from '@/types';
 import { toast } from 'react-toastify';
+import { addInAppNotification } from '@/lib/in-app-notifications';
+import { isProActive, isUsageLimitError } from '@/lib/usage';
+import { UpgradePrompt } from '@/components/usage/UpgradePrompt';
 
 interface GenerateLetterModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  initialData?: Partial<LetterGenerateRequest>;
 }
 
 export const GenerateLetterModal: React.FC<GenerateLetterModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
+  initialData,
 }) => {
   const { user } = useAuth();
   const [isGenerating, setIsGenerating] = useState(false);
+  const [upgradeRequired, setUpgradeRequired] = useState(false);
   const [resumes, setResumes] = useState<Resume[]>([]);
-  const [formData, setFormData] = useState<LetterGenerateRequest>({
+  const [formData, setFormData] = useState<LetterGenerateRequest>(() => ({
     job_title: '',
     company_name: '',
     recipient_name: '',
     letter_type: 'cover_letter',
     custom_instructions: '',
-  });
+    ...initialData,
+  }));
 
   useEffect(() => {
     if (isOpen) {
@@ -50,14 +57,16 @@ export const GenerateLetterModal: React.FC<GenerateLetterModalProps> = ({
     if (!user) return;
 
     // Check subscription
-    if (user.subscription_plan !== 'pro') {
+    if (!isProActive(user)) {
+      setUpgradeRequired(true);
       toast.error('Custom letter generation is available for Pro users only. Please upgrade your subscription.');
       return;
     }
 
     try {
       setIsGenerating(true);
-      await letterApi.generate(formData);
+      const generatedLetter = await letterApi.generate(formData);
+      addInAppNotification({ title: 'Letter draft ready', body: `${generatedLetter.title} is ready to review.`, href: `/letters/${generatedLetter.id}` });
       onSuccess();
       onClose();
       // Reset form
@@ -70,6 +79,7 @@ export const GenerateLetterModal: React.FC<GenerateLetterModalProps> = ({
       });
     } catch (err) {
       console.error('Failed to generate letter:', err);
+      if (isUsageLimitError(err)) setUpgradeRequired(true);
       const errorMessage = err instanceof Error ? err.message : 'Failed to generate letter. Please try again.';
       toast.error(errorMessage);
     } finally {
@@ -217,21 +227,8 @@ export const GenerateLetterModal: React.FC<GenerateLetterModalProps> = ({
           </div>
 
           {/* Subscription Notice */}
-          {user?.subscription_plan !== 'pro' && (
-            <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
-              <div className="flex items-center gap-3">
-                <svg viewBox="0 0 24 24" className="w-5 h-5 text-yellow-500 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="12" y1="8" x2="12" y2="12" />
-                  <line x1="12" y1="16" x2="12.01" y2="16" />
-                </svg>
-                <div>
-                  <p className="text-yellow-400 text-sm font-bold">Pro Feature</p>
-                  <p className="text-yellow-500 text-xs">Custom letter generation requires a Pro subscription</p>
-                </div>
-              </div>
-            </div>
-          )}
+          {!isProActive(user) && <UpgradePrompt title="Custom letters are a Pro feature" message="Upgrade to Pro to generate tailored professional letters." />}
+          {upgradeRequired && <UpgradePrompt title="Usage limit reached" message="Your current plan has reached this AI feature limit." />}
 
           {/* Actions */}
           <div className="flex gap-3 pt-4">
@@ -244,7 +241,7 @@ export const GenerateLetterModal: React.FC<GenerateLetterModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isGenerating || user?.subscription_plan !== 'pro'}
+              disabled={isGenerating || !isProActive(user)}
               className="flex-1 px-4 py-3 bg-primary text-black font-bold rounded-xl hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {isGenerating ? 'Generating...' : 'Generate Letter'}

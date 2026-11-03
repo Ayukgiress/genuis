@@ -81,6 +81,7 @@ export function useDashboardData(enabled: boolean) {
     analyses: analysesQ.data ?? [],
     analyticsSummary: summaryQ.data ?? null,
     boards: boardsQ.data ?? [],
+    interviews: interviewsQ.data ?? [],
     interviewMap,
     appliedJobs,
     isLoading,

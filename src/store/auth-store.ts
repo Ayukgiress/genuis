@@ -3,6 +3,7 @@ import { persist } from "zustand/middleware";
 import { api, setAuthToken, getAuthToken, ApiError } from "@/lib/api";
 import { queryClient } from "@/lib/query-client";
 import type { AuthUser, Token, UserCreate, VerificationResponse, RegisterResponse, GoogleOAuthResponse } from "@/types";
+import { clearLocalUserData } from "@/lib/local-user-data";
 
 interface AuthState {
   user: AuthUser | null;
@@ -74,6 +75,7 @@ export const useAuthStore = create<AuthState>()(
         } catch (error) {
           console.error('Logout failed:', error);
         } finally {
+          clearLocalUserData();
           setAuthToken(null);
           queryClient.clear();
           set({
@@ -229,6 +231,17 @@ export const useAuthStore = create<AuthState>()(
           const user: AuthUser = await api.get<AuthUser>("/auth/me");
           set({ user, isAuthenticated: true, isLoading: false });
         } catch (error) {
+          const isNetworkFailure = error instanceof TypeError || (typeof navigator !== 'undefined' && !navigator.onLine);
+          if (isNetworkFailure) {
+            const current = get();
+            set({
+              isAuthenticated: Boolean(token),
+              isLoading: false,
+              error: 'Could not refresh your profile while offline. Some features may be unavailable.',
+              ...(current.user ? {} : { user: null }),
+            });
+            return;
+          }
           // Token might be invalid
           setAuthToken(null);
           set({ user: null, token: null, isAuthenticated: false, isLoading: false });
@@ -242,6 +255,10 @@ export const useAuthStore = create<AuthState>()(
         // Only redirect new users to plans if they don't have a subscription plan
         if (isNewUser && !user.subscription_plan) {
           return '/plans';
+        }
+
+        if (!user.career_profile?.onboarding_completed && !user.career_preferences?.onboarding_completed) {
+          return '/onboarding';
         }
 
         // Otherwise, go to dashboard

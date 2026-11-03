@@ -15,6 +15,10 @@ export interface CareerPreferences {
   relocation?: boolean;
   preferred_locations?: string[];
   job_types?: string[];
+  target_role?: string;
+  goals?: string[];
+  onboarding_completed?: boolean;
+  resume_id?: number;
 }
 
 // Auth Types (matching backend)
@@ -36,6 +40,7 @@ export interface AuthUser {
   bio?: string;
   profile_picture?: string;
   career_preferences?: CareerPreferences;
+  career_profile?: CareerPreferences;
   is_verified?: boolean;
   created_at?: string;
   subscription_plan?: 'free' | 'pro';

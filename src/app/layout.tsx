@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/components/providers/AuthProvider";
+import { GlobalWorkspaceTools } from "@/components/global/GlobalWorkspaceTools";
+import { GlobalNetworkStatus } from "@/components/global/GlobalNetworkStatus";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
@@ -21,6 +23,8 @@ export default function RootLayout({
       >
         <AuthProvider>
           {children}
+          <GlobalWorkspaceTools />
+          <GlobalNetworkStatus />
           <ToastContainer />
         </AuthProvider>
       </body>

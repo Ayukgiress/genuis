@@ -6,10 +6,12 @@ import { analysisApi, resumeApi, ApiError, getAuthToken } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import type { Analysis, Resume, FocusArea } from '@/types';
 import { OptimizationPreview } from '@/components/resumes/OptimizationPreview';
+import { UpgradePrompt } from '@/components/usage/UpgradePrompt';
+import { countCurrentMonthAnalyses, FREE_RESUME_ANALYSIS_LIMIT, isProActive, isUsageLimitError } from '@/lib/usage';
 
 export default function AnalysisPage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading: authLoading, logout } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, logout, user } = useAuth();
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [resumes, setResumes] = useState<Resume[]>([]);
   const [selectedAnalysis, setSelectedAnalysis] = useState<Analysis | null>(null);
@@ -20,6 +22,7 @@ export default function AnalysisPage() {
   const [selectedFocusArea, setSelectedFocusArea] = useState<FocusArea | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [upgradeRequired, setUpgradeRequired] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -60,10 +63,15 @@ export default function AnalysisPage() {
   }, [authLoading, isAuthenticated, router, fetchData]);
 
   const handleAnalyzeResume = async (resumeId: string) => {
+    if (!isProActive(user) && FREE_RESUME_ANALYSIS_LIMIT !== null && countCurrentMonthAnalyses(analyses) >= FREE_RESUME_ANALYSIS_LIMIT) {
+      setUpgradeRequired(true);
+      return;
+    }
     try {
       setIsAnalyzing(true);
       setError(null);
       setSuccess(null);
+      setUpgradeRequired(false);
       
       const result = await analysisApi.analyze(resumeId);
       const resumeIdNum = Number(resumeId);
@@ -78,7 +86,9 @@ export default function AnalysisPage() {
       setSuccess('Resume analyzed successfully!');
     } catch (err) {
       console.error('Failed to analyze resume:', err);
-      if (err instanceof ApiError) {
+      if (isUsageLimitError(err)) {
+        setUpgradeRequired(true);
+      } else if (err instanceof ApiError) {
         setError(err.message);
       } else {
         setError('Failed to analyze resume. Please try again.');
@@ -157,6 +167,7 @@ export default function AnalysisPage() {
           {success}
         </div>
       )}
+      {upgradeRequired && <UpgradePrompt title="Resume analysis limit reached" message="Your Free plan includes a limited number of resume analyses each month. Upgrade to Pro to continue." />}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Sidebar - Analysis List */}
