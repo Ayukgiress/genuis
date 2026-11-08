@@ -106,10 +106,22 @@ export default function EditMasterPage({ params }: EditPageProps) {
       }
       setUpgradeRequired(false);
       
-      const result = await analysisApi.analyze(resume.id);
-      setAnalysis(result);
-      setActiveTab('suggestions');
-      setSuccess('Resume analyzed! Review the suggestions below.');
+      const queued = await analysisApi.analyze(resume.id);
+      setSuccess('Analysis started, please wait...');
+
+      // Poll until complete
+      for (let i = 0; i < 20; i++) {
+        await new Promise(r => setTimeout(r, 3000));
+        const done = await analysisApi.get(queued.analysis_id);
+        if (done.status === 'completed') {
+          setAnalysis(done);
+          setActiveTab('suggestions');
+          setSuccess('Resume analyzed! Review the suggestions below.');
+          return;
+        }
+        if (done.status === 'failed') throw new Error('Analysis failed');
+      }
+      throw new Error('Analysis timed out');
     } catch (err) {
       console.error('Failed to analyze resume:', err);
       if (isUsageLimitError(err)) {
