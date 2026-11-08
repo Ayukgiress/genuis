@@ -72,15 +72,32 @@ export default function AnalysisPage() {
       setError(null);
       setSuccess(null);
       setUpgradeRequired(false);
-      
-      const result = await analysisApi.analyze(resumeId);
+
+      // Backend returns 202 with { analysis_id, status: 'pending' } — poll until done
+      const queued = await analysisApi.analyze(resumeId) as unknown as { analysis_id: string; status: string };
+      const analysisId = queued?.analysis_id ?? (queued as unknown as Analysis)?.id;
+
+      if (!analysisId) throw new Error('No analysis ID returned');
+
+      // Poll every 3s for up to 60s
+      let result: Analysis | null = null;
+      for (let i = 0; i < 20; i++) {
+        await new Promise(r => setTimeout(r, 3000));
+        const polled = await analysisApi.get(String(analysisId));
+        if (polled.status === 'completed' || polled.status === 'failed') {
+          result = polled;
+          break;
+        }
+      }
+
+      if (!result) throw new Error('Analysis timed out. Please try again.');
+      if (result.status === 'failed') throw new Error('Analysis failed. Please try again.');
+
       const resumeIdNum = Number(resumeId);
       setAnalyses(prev => {
         const existing = prev.find(a => a.resume_id === resumeIdNum);
-        if (existing) {
-          return prev.map(a => a.resume_id === resumeIdNum ? result : a);
-        }
-        return [...prev, result];
+        if (existing) return prev.map(a => a.resume_id === resumeIdNum ? result! : a);
+        return [...prev, result!];
       });
       setSelectedAnalysis(result);
       setSuccess('Resume analyzed successfully!');
@@ -91,7 +108,7 @@ export default function AnalysisPage() {
       } else if (err instanceof ApiError) {
         setError(err.message);
       } else {
-        setError('Failed to analyze resume. Please try again.');
+        setError(err instanceof Error ? err.message : 'Failed to analyze resume. Please try again.');
       }
     } finally {
       setIsAnalyzing(false);

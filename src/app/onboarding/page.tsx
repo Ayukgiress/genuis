@@ -89,7 +89,7 @@ export default function OnboardingPage() {
         onboarding_completed: true,
       };
       const updatedUser = await authApi.updateCareerProfile(updatedProfile);
-      // Update store directly so getRedirectPath sees the flag immediately
+      // Update store so getRedirectPath sees the flag immediately
       useAuthStore.setState((state) => ({
         user: {
           ...state.user!,
