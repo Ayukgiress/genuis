@@ -202,7 +202,7 @@ export const analysisApi = {
   getByResume: (resumeId: string | number) => api.get<Analysis>(`/api/analysis/resume/${resumeId}`),
   create: (data: AnalysisCreate) => api.post<Analysis>("/api/analysis", data),
   update: (analysisId: string, data: AnalysisUpdate) => api.patch<Analysis>(`/api/analysis/${analysisId}`, data),
-  analyze: (resumeId: string | number) => api.post<Analysis>(`/api/analysis/resume/${resumeId}/analyze`),
+  analyze: (resumeId: string | number) => api.post<{ analysis_id: number; status: string; message: string }>(`/api/analysis/resume/${resumeId}/analyze`),
   getSuggestions: (resumeId: string | number, focusArea?: string) => 
     api.post<{ suggestions: string[] }>(`/api/analysis/resume/${resumeId}/suggestions`, { focus_area: focusArea }),
 };

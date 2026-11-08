@@ -74,7 +74,7 @@ export default function AnalysisPage() {
       setUpgradeRequired(false);
 
       // Backend returns 202 with { analysis_id, status: 'pending' } — poll until done
-      const queued = await analysisApi.analyze(resumeId) as unknown as { analysis_id: string; status: string };
+      const queued = await analysisApi.analyze(resumeId);
       const analysisId = queued?.analysis_id ?? (queued as unknown as Analysis)?.id;
 
       if (!analysisId) throw new Error('No analysis ID returned');
