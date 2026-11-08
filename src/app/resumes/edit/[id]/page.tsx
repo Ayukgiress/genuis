@@ -112,7 +112,7 @@ export default function EditMasterPage({ params }: EditPageProps) {
       // Poll until complete
       for (let i = 0; i < 20; i++) {
         await new Promise(r => setTimeout(r, 3000));
-        const done = await analysisApi.get(queued.analysis_id);
+        const done = await analysisApi.get(String(queued.analysis_id));
         if (done.status === 'completed') {
           setAnalysis(done);
           setActiveTab('suggestions');
