@@ -137,8 +137,7 @@ export const CareerSection = () => {
             ))}
             <div className="flex items-center gap-1.5">
               <input
-                type="number"
-                min="0"
+                type="text"
                 value={newRole}
                 onChange={(e) => setNewRole(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleAddRole()}
