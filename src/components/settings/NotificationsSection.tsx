@@ -170,7 +170,7 @@ export const NotificationsSection = () => {
 
         <div className="pt-6 border-t border-zinc-800/70">
           <p className="text-xs text-zinc-500 mb-4">
-            <Icons.InfoIcon className="inline w-3 h-3 mr-1" /> Push notifications require browser permission.{" "}
+            <Icons.InfoCircledIcon className="inline w-3 h-3 mr-1" /> Push notifications require browser permission.{" "}
             <button
               type="button"
               onClick={() => Notification.requestPermission()}
