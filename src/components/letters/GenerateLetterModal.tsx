@@ -1,0 +1,313 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { letterApi, resumeApi } from '@/lib/api';
+import { useAuth } from '@/hooks/useAuth';
+import type { LetterGenerateRequest, Resume, LetterType } from '@/types';
+import { toast } from 'react-toastify';
+import { addInAppNotification } from '@/lib/in-app-notifications';
+import { isProActive, isUsageLimitError } from '@/lib/usage';
+import { UpgradePrompt } from '@/components/usage/UpgradePrompt';
+
+interface GenerateLetterModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+  initialData?: Partial<LetterGenerateRequest>;
+}
+
+const toneOptions = [
+  { value: 'professional', label: 'Professional', description: 'Formal and polished' },
+  { value: 'enthusiastic', label: 'Enthusiastic', description: 'Energetic and passionate' },
+  { value: 'concise', label: 'Concise', description: 'Brief and to the point' },
+  { value: 'conversational', label: 'Conversational', description: 'Warm and approachable' },
+] as const;
+
+const lengthOptions = [
+  { value: 'short', label: 'Short', description: '~150 words' },
+  { value: 'standard', label: 'Standard', description: '~300 words' },
+  { value: 'detailed', label: 'Detailed', description: '~500 words' },
+] as const;
+
+export const GenerateLetterModal: React.FC<GenerateLetterModalProps> = ({
+  isOpen,
+  onClose,
+  onSuccess,
+  initialData,
+}) => {
+  const { user } = useAuth();
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [upgradeRequired, setUpgradeRequired] = useState(false);
+  const [resumes, setResumes] = useState<Resume[]>([]);
+  const [tone, setTone] = useState<'professional' | 'enthusiastic' | 'concise' | 'conversational'>('professional');
+  const [length, setLength] = useState<'short' | 'standard' | 'detailed'>('standard');
+  const [formData, setFormData] = useState<LetterGenerateRequest>(() => ({
+    job_title: '',
+    company_name: '',
+    recipient_name: '',
+    letter_type: 'cover_letter',
+    custom_instructions: '',
+    ...initialData,
+  }));
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchResumes();
+    }
+  }, [isOpen]);
+
+  const fetchResumes = async () => {
+    try {
+      const data = await resumeApi.getUserResumes();
+      setResumes(data);
+    } catch (err) {
+      console.error('Failed to fetch resumes:', err);
+      setResumes([]);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!user) return;
+
+    // Check subscription
+    if (!isProActive(user)) {
+      setUpgradeRequired(true);
+      toast.error('Custom letter generation is available for Pro users only. Please upgrade your subscription.');
+      return;
+    }
+
+    try {
+      setIsGenerating(true);
+      const toneInstruction = `Tone: ${tone}. Length: ${length}.`;
+      const combinedInstructions = [toneInstruction, formData.custom_instructions].filter(Boolean).join(' ');
+      const generatedLetter = await letterApi.generate({ ...formData, custom_instructions: combinedInstructions });
+      addInAppNotification({ title: 'Letter draft ready', body: `${generatedLetter.title} is ready to review.`, href: `/letters/${generatedLetter.id}` });
+      onSuccess();
+      onClose();
+      // Reset form
+      setFormData({
+        job_title: '',
+        company_name: '',
+        recipient_name: '',
+        letter_type: 'cover_letter',
+        custom_instructions: '',
+      });
+      setTone('professional');
+      setLength('standard');
+    } catch (err) {
+      console.error('Failed to generate letter:', err);
+      if (isUsageLimitError(err)) setUpgradeRequired(true);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to generate letter. Please try again.';
+      toast.error(errorMessage);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleInputChange = (field: keyof LetterGenerateRequest, value: string | number | undefined) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const letterTypeOptions: { value: LetterType; label: string; description: string }[] = [
+    {
+      value: 'cover_letter',
+      label: 'Cover Letter',
+      description: 'Professional letter to accompany your resume'
+    },
+    {
+      value: 'thank_you_letter',
+      label: 'Thank You Letter',
+      description: 'Follow up after an interview or meeting'
+    },
+    {
+      value: 'follow_up_letter',
+      label: 'Follow Up Letter',
+      description: 'Reconnect with a contact or company'
+    },
+    {
+      value: 'custom_letter',
+      label: 'Custom Letter',
+      description: 'Any other professional correspondence'
+    },
+  ];
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="mb-6">
+          <h3 className="font-bold text-white text-xl">Generate Custom Letter</h3>
+          <p className="text-zinc-500 text-sm mt-1">AI-powered professional letter generation</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Letter Type */}
+          <div>
+            <label className="block text-sm font-bold text-zinc-400 mb-2">
+              Letter Type *
+            </label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {letterTypeOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => handleInputChange('letter_type', option.value)}
+                  className={`p-4 rounded-xl border text-left transition-all ${
+                    formData.letter_type === option.value
+                      ? 'border-primary bg-primary/10'
+                      : 'border-zinc-800 bg-zinc-900/50 hover:border-zinc-700'
+                  }`}
+                >
+                  <div className="font-bold text-white">{option.label}</div>
+                  <div className="text-zinc-500 text-sm mt-1">{option.description}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Job Title & Company */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-bold text-zinc-400 mb-2">
+                Job Title *
+              </label>
+              <input
+                type="text"
+                required
+                value={formData.job_title}
+                onChange={(e) => handleInputChange('job_title', e.target.value)}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary transition-colors"
+                placeholder="e.g., Software Engineer"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-zinc-400 mb-2">
+                Company Name *
+              </label>
+              <input
+                type="text"
+                required
+                value={formData.company_name}
+                onChange={(e) => handleInputChange('company_name', e.target.value)}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary transition-colors"
+                placeholder="e.g., Google"
+              />
+            </div>
+          </div>
+
+          {/* Recipient Name */}
+          <div>
+            <label className="block text-sm font-bold text-zinc-400 mb-2">
+              Recipient Name
+            </label>
+            <input
+              type="text"
+              value={formData.recipient_name || ''}
+              onChange={(e) => handleInputChange('recipient_name', e.target.value)}
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary transition-colors"
+              placeholder="e.g., John Smith (optional)"
+            />
+          </div>
+
+          {/* Resume Selection */}
+          <div>
+            <label className="block text-sm font-bold text-zinc-400 mb-2">
+              Use Resume (Optional)
+            </label>
+            <select
+              value={formData.resume_id || ''}
+              onChange={(e) => handleInputChange('resume_id', e.target.value ? parseInt(e.target.value) : undefined)}
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary transition-colors appearance-none"
+            >
+              <option value="">No resume - generate from scratch</option>
+              {resumes.map((resume) => (
+                <option key={resume.id} value={resume.id}>
+                  {resume.file_name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Tone */}
+          <div>
+            <label className="block text-sm font-bold text-zinc-400 mb-2">Tone</label>
+            <div className="grid grid-cols-2 gap-2">
+              {toneOptions.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setTone(opt.value)}
+                  className={`p-3 rounded-xl border text-left transition-all ${
+                    tone === opt.value ? 'border-primary bg-primary/10' : 'border-zinc-800 bg-zinc-900/50 hover:border-zinc-700'
+                  }`}
+                >
+                  <div className="font-bold text-white text-sm">{opt.label}</div>
+                  <div className="text-zinc-500 text-xs mt-0.5">{opt.description}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Length */}
+          <div>
+            <label className="block text-sm font-bold text-zinc-400 mb-2">Length</label>
+            <div className="grid grid-cols-3 gap-2">
+              {lengthOptions.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setLength(opt.value)}
+                  className={`p-3 rounded-xl border text-left transition-all ${
+                    length === opt.value ? 'border-primary bg-primary/10' : 'border-zinc-800 bg-zinc-900/50 hover:border-zinc-700'
+                  }`}
+                >
+                  <div className="font-bold text-white text-sm">{opt.label}</div>
+                  <div className="text-zinc-500 text-xs mt-0.5">{opt.description}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Custom Instructions */}
+          <div>
+            <label className="block text-sm font-bold text-zinc-400 mb-2">
+              Additional Instructions
+            </label>
+            <textarea
+              rows={3}
+              value={formData.custom_instructions || ''}
+              onChange={(e) => handleInputChange('custom_instructions', e.target.value)}
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary transition-colors resize-none"
+              placeholder="Mention specific achievements, skills to highlight, or anything else..."
+            />
+          </div>
+
+          {/* Subscription Notice */}
+          {!isProActive(user) && <UpgradePrompt title="Custom letters are a Pro feature" message="Upgrade to Pro to generate tailored professional letters." />}
+          {upgradeRequired && <UpgradePrompt title="Usage limit reached" message="Your current plan has reached this AI feature limit." />}
+
+          {/* Actions */}
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-3 bg-zinc-800 hover:bg-zinc-700 text-white font-bold rounded-xl transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isGenerating || !isProActive(user)}
+              className="flex-1 px-4 py-3 bg-primary text-black font-bold rounded-xl hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {isGenerating ? 'Generating...' : 'Generate Letter'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
