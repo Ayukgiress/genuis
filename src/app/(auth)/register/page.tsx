@@ -84,22 +84,25 @@ function RegisterForm() {
   const [verificationSuccess, setVerificationSuccess] = useState(false);
   const hasVerifiedRef = useRef(false);
 
-  const handleVerifyEmail = useCallback(async (token: string) => {
-    if (hasVerifiedRef.current) return;
-    hasVerifiedRef.current = true;
-    try {
-      await verifyEmail(token);
-      setVerificationSuccess(true);
-      setShowVerificationMessage(false);
-    } catch {}
-  }, [verifyEmail, setShowVerificationMessage]);
-
   useEffect(() => {
     const token = searchParams.get("token");
-    if (token && !hasVerifiedRef.current) handleVerifyEmail(token);
-  }, [searchParams, handleVerifyEmail]);
+    if (token && !hasVerifiedRef.current) {
+      hasVerifiedRef.current = true;
+      (async () => {
+        try {
+          await verifyEmail(token);
+          setVerificationSuccess(true);
+          setShowVerificationMessage(false);
+        } catch {}
+      })();
+    }
+  }, [searchParams, verifyEmail, setShowVerificationMessage]);
 
   useEffect(() => () => clearError(), [clearError]);
+
+  useEffect(() => {
+    if (isAuthenticated) router.push("/dashboard");
+  }, [isAuthenticated, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,7 +129,6 @@ function RegisterForm() {
   };
 
   if (isAuthenticated) {
-    router.push("/dashboard");
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">

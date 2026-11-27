@@ -47,6 +47,7 @@ export default function KanbanPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isCreatingBoard, setIsCreatingBoard] = useState(false);
   const [isCreatingCard, setIsCreatingCard] = useState(false);
+  const [viewMode, setViewMode] = useState<'board' | 'list'>('board');
   const [newBoardName, setNewBoardName] = useState("");
   const [selectedColumn, setSelectedColumn] = useState<KanbanColumnId | null>(
     null,
@@ -278,16 +279,18 @@ export default function KanbanPage() {
           )}
           <div className="flex bg-zinc-900/50 border border-zinc-800 rounded-xl p-1">
             <Button
-              variant="primary"
+              variant={viewMode === 'board' ? 'primary' : 'ghost'}
               size="sm"
               className="text-xs font-black uppercase tracking-widest rounded-lg"
+              onClick={() => setViewMode('board')}
             >
               Board
             </Button>
             <Button
-              variant="ghost"
+              variant={viewMode === 'list' ? 'primary' : 'ghost'}
               size="sm"
               className="text-xs font-black uppercase tracking-widest"
+              onClick={() => setViewMode('list')}
             >
               List
             </Button>
@@ -437,7 +440,7 @@ export default function KanbanPage() {
       )}
 
       {/* Kanban Board — smooth drag & drop */}
-      {currentBoard && (
+      {currentBoard && viewMode === 'board' && (
         <KanbanBoardDnD
           cards={cards}
           setCards={setCards}
@@ -446,6 +449,35 @@ export default function KanbanPage() {
           onMoveCard={handleMoveCard}
           onSelectCard={setSelectedPrepCard}
         />
+      )}
+      {currentBoard && viewMode === 'list' && (
+        <div className="space-y-3">
+          {cards.length === 0 ? (
+            <p className="text-zinc-500 text-sm text-center py-12">No applications yet. Add one from the board view.</p>
+          ) : (
+            cards.map((card) => (
+              <div key={card.id} className="flex items-center justify-between p-4 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-700 transition-all">
+                <div className="min-w-0 flex-1">
+                  <p className="font-bold text-white truncate">{card.title}</p>
+                  <p className="text-sm text-zinc-400 truncate">{card.company}{card.location ? ` · ${card.location}` : ''}</p>
+                </div>
+                <div className="flex items-center gap-3 ml-4">
+                  <span className={`px-2 py-1 rounded-lg text-xs font-bold border ${
+                    card.column_id === 'done' ? 'bg-green-500/10 border-green-500/20 text-green-400' :
+                    card.column_id === 'review' ? 'bg-primary/10 border-primary/20 text-primary' :
+                    card.column_id === 'in_progress' ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' :
+                    'bg-zinc-800 border-zinc-700 text-zinc-400'
+                  }`}>
+                    {card.column_id === 'todo' ? 'Wishlist' : card.column_id === 'in_progress' ? 'Applied' : card.column_id === 'review' ? 'Interview' : 'Offer'}
+                  </span>
+                  <button onClick={() => handleDeleteCard(card.id)} className="p-1.5 text-zinc-600 hover:text-red-400 transition-colors">
+                    <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       )}
       {selectedPrepCard && (
         <PrepCardPanel
