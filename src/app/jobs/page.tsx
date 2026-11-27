@@ -36,6 +36,9 @@ export default function JobsPage() {
   const [selectedJobForApply, setSelectedJobForApply] = useState<Job | null>(null);
   const [selectedJobForTailoring, setSelectedJobForTailoring] = useState<Job | null>(null);
   const [boards, setBoards] = useState<KanbanBoard[]>([]);
+  const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
+  const [savedJobs, setSavedJobs] = useState<Set<string>>(new Set());
+  const [minSalary, setMinSalary] = useState('');
   const { applications, addApplication } = useApplicationStore();
 
   const loadRecommendations = useCallback(async (resumeId?: number) => {
@@ -142,6 +145,7 @@ export default function JobsPage() {
       if (location) params.location = location;
       if (remoteOnly) params.remote = 'true';
       if (jobType) params.job_type = jobType;
+      if (minSalary) params.min_salary = minSalary;
       
       const data = await jobApi.search(params) as unknown as JobApiResponse;
       let jobsArray: Job[] = [];
@@ -275,6 +279,24 @@ export default function JobsPage() {
             <option value="contract">Contract</option>
             <option value="internship">Internship</option>
           </select>
+          <div className="w-36">
+            <input
+              type="number"
+              value={minSalary}
+              onChange={(e) => setMinSalary(e.target.value)}
+              placeholder="Min salary $"
+              className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl py-3 px-4 text-sm text-zinc-300 focus:outline-none focus:border-primary transition-all"
+            />
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer whitespace-nowrap">
+            <input
+              type="checkbox"
+              checked={remoteOnly}
+              onChange={(e) => setRemoteOnly(e.target.checked)}
+              className="h-4 w-4 accent-[#00f29c]"
+            />
+            <span className="text-sm text-zinc-300 font-medium">Remote only</span>
+          </label>
           <button
             onClick={handleSearch}
             className="px-6 py-3 bg-primary text-black font-bold rounded-xl hover:opacity-90 transition-all"
@@ -371,6 +393,12 @@ export default function JobsPage() {
                           ))}
                         </div>
                       )}
+                      {expandedJobId === job.id && job.description && (
+                        <div className="mt-4 pt-4 border-t border-zinc-800">
+                          <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Job Description</p>
+                          <p className="text-sm text-zinc-400 leading-relaxed whitespace-pre-line">{job.description}</p>
+                        </div>
+                      )}
                     </div>
                     
                     <div className="flex flex-col gap-2">
@@ -379,15 +407,13 @@ export default function JobsPage() {
                         className={`flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold transition-all text-sm ${
                           applications.some(app => app.jobId === job.id)
                             ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
-                            : job.match_score && job.match_score >= 80
-                            ? 'bg-primary text-black hover:opacity-90'
                             : 'bg-primary text-black hover:opacity-90'
                         }`}
                         disabled={applications.some(app => app.jobId === job.id)}
                       >
-                        {applications.some(app => app.jobId === job.id) 
-                          ? 'Applied' 
-                          : job.match_score 
+                        {applications.some(app => app.jobId === job.id)
+                          ? 'Applied'
+                          : job.match_score
                             ? `Apply (${job.match_score}% Match)`
                             : 'Apply'
                         }
@@ -413,8 +439,29 @@ export default function JobsPage() {
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-4 text-xs text-zinc-500 mt-4 pt-4 border-t border-zinc-800">
+                  <div className="flex items-center justify-between gap-4 text-xs text-zinc-500 mt-4 pt-4 border-t border-zinc-800">
                     <span>Posted {formatDate(job.posted_at)}</span>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => setSavedJobs(prev => { const next = new Set(prev); next.has(job.id) ? next.delete(job.id) : next.add(job.id); return next; })}
+                        className={`flex items-center gap-1.5 text-xs font-bold transition-colors ${
+                          savedJobs.has(job.id) ? 'text-primary' : 'text-zinc-500 hover:text-zinc-300'
+                        }`}
+                        title={savedJobs.has(job.id) ? 'Remove from saved' : 'Save for later'}
+                      >
+                        <svg viewBox="0 0 24 24" className="w-4 h-4" fill={savedJobs.has(job.id) ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /></svg>
+                        {savedJobs.has(job.id) ? 'Saved' : 'Save'}
+                      </button>
+                      {job.description && (
+                        <button
+                          onClick={() => setExpandedJobId(expandedJobId === job.id ? null : job.id)}
+                          className="flex items-center gap-1.5 text-xs font-bold text-zinc-500 hover:text-zinc-300 transition-colors"
+                        >
+                          <svg viewBox="0 0 24 24" className={`w-4 h-4 transition-transform ${expandedJobId === job.id ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>
+                          {expandedJobId === job.id ? 'Hide details' : 'View details'}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}

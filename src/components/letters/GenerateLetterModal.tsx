@@ -16,6 +16,19 @@ interface GenerateLetterModalProps {
   initialData?: Partial<LetterGenerateRequest>;
 }
 
+const toneOptions = [
+  { value: 'professional', label: 'Professional', description: 'Formal and polished' },
+  { value: 'enthusiastic', label: 'Enthusiastic', description: 'Energetic and passionate' },
+  { value: 'concise', label: 'Concise', description: 'Brief and to the point' },
+  { value: 'conversational', label: 'Conversational', description: 'Warm and approachable' },
+] as const;
+
+const lengthOptions = [
+  { value: 'short', label: 'Short', description: '~150 words' },
+  { value: 'standard', label: 'Standard', description: '~300 words' },
+  { value: 'detailed', label: 'Detailed', description: '~500 words' },
+] as const;
+
 export const GenerateLetterModal: React.FC<GenerateLetterModalProps> = ({
   isOpen,
   onClose,
@@ -26,6 +39,8 @@ export const GenerateLetterModal: React.FC<GenerateLetterModalProps> = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [upgradeRequired, setUpgradeRequired] = useState(false);
   const [resumes, setResumes] = useState<Resume[]>([]);
+  const [tone, setTone] = useState<'professional' | 'enthusiastic' | 'concise' | 'conversational'>('professional');
+  const [length, setLength] = useState<'short' | 'standard' | 'detailed'>('standard');
   const [formData, setFormData] = useState<LetterGenerateRequest>(() => ({
     job_title: '',
     company_name: '',
@@ -65,7 +80,9 @@ export const GenerateLetterModal: React.FC<GenerateLetterModalProps> = ({
 
     try {
       setIsGenerating(true);
-      const generatedLetter = await letterApi.generate(formData);
+      const toneInstruction = `Tone: ${tone}. Length: ${length}.`;
+      const combinedInstructions = [toneInstruction, formData.custom_instructions].filter(Boolean).join(' ');
+      const generatedLetter = await letterApi.generate({ ...formData, custom_instructions: combinedInstructions });
       addInAppNotification({ title: 'Letter draft ready', body: `${generatedLetter.title} is ready to review.`, href: `/letters/${generatedLetter.id}` });
       onSuccess();
       onClose();
@@ -77,6 +94,8 @@ export const GenerateLetterModal: React.FC<GenerateLetterModalProps> = ({
         letter_type: 'cover_letter',
         custom_instructions: '',
       });
+      setTone('professional');
+      setLength('standard');
     } catch (err) {
       console.error('Failed to generate letter:', err);
       if (isUsageLimitError(err)) setUpgradeRequired(true);
@@ -212,17 +231,57 @@ export const GenerateLetterModal: React.FC<GenerateLetterModalProps> = ({
             </select>
           </div>
 
+          {/* Tone */}
+          <div>
+            <label className="block text-sm font-bold text-zinc-400 mb-2">Tone</label>
+            <div className="grid grid-cols-2 gap-2">
+              {toneOptions.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setTone(opt.value)}
+                  className={`p-3 rounded-xl border text-left transition-all ${
+                    tone === opt.value ? 'border-primary bg-primary/10' : 'border-zinc-800 bg-zinc-900/50 hover:border-zinc-700'
+                  }`}
+                >
+                  <div className="font-bold text-white text-sm">{opt.label}</div>
+                  <div className="text-zinc-500 text-xs mt-0.5">{opt.description}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Length */}
+          <div>
+            <label className="block text-sm font-bold text-zinc-400 mb-2">Length</label>
+            <div className="grid grid-cols-3 gap-2">
+              {lengthOptions.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setLength(opt.value)}
+                  className={`p-3 rounded-xl border text-left transition-all ${
+                    length === opt.value ? 'border-primary bg-primary/10' : 'border-zinc-800 bg-zinc-900/50 hover:border-zinc-700'
+                  }`}
+                >
+                  <div className="font-bold text-white text-sm">{opt.label}</div>
+                  <div className="text-zinc-500 text-xs mt-0.5">{opt.description}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Custom Instructions */}
           <div>
             <label className="block text-sm font-bold text-zinc-400 mb-2">
-              Custom Instructions
+              Additional Instructions
             </label>
             <textarea
-              rows={4}
+              rows={3}
               value={formData.custom_instructions || ''}
               onChange={(e) => handleInputChange('custom_instructions', e.target.value)}
               className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary transition-colors resize-none"
-              placeholder="Any specific requirements, tone preferences, or additional context..."
+              placeholder="Mention specific achievements, skills to highlight, or anything else..."
             />
           </div>
 

@@ -86,7 +86,7 @@ function LettersWorkspace() {
   };
 
   const getLetterTypeLabel = (type: string) => {
-    return type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+    return type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
 
   if (isLoading || isLoadingLetters) {
