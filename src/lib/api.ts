@@ -245,15 +245,8 @@ export const authApi = {
   resendVerification: (email: string) => api.post<VerificationResponse>(`/auth/resend-verification?email=${email}`),
   login: (data: Record<string, string>) => api.postForm<Token>("/auth/token", data),
   getMe: () => api.get<AuthUser>("/auth/me"),
-  updateMe: (data: { name?: string; bio?: string; profile_picture?: string; career_preferences?: unknown; career_profile?: unknown }) => {
-    const params: Record<string, string> = {};
-    if (data.name !== undefined) params.name = data.name;
-    if (data.bio !== undefined) params.bio = data.bio;
-    if (data.profile_picture !== undefined) params.profile_picture = data.profile_picture;
-    if (data.career_preferences !== undefined) params.career_preferences = JSON.stringify(data.career_preferences);
-    if (data.career_profile !== undefined) params.career_profile = JSON.stringify(data.career_profile);
-    return api.put<AuthUser>("/auth/me", undefined, params);
-  },
+  updateMe: (data: { name?: string; bio?: string; profile_picture?: string; career_preferences?: unknown; career_profile?: unknown }) =>
+    api.patch<AuthUser>("/auth/me", data),
   updateCareerProfile: (careerProfile: CareerPreferences) =>
     api.patch<AuthUser>("/auth/me", { career_profile: careerProfile }),
   deleteAccount: () => api.delete<void>("/auth/me"),

@@ -257,9 +257,7 @@ export const useAuthStore = create<AuthState>()(
         }
 
         const profile = user.career_profile || user.career_preferences;
-        const onboardingDone =
-          profile?.onboarding_completed === true ||
-          Boolean(profile?.target_role);
+        const onboardingDone = profile?.onboarding_completed === true;
 
         if (!onboardingDone) {
           return '/onboarding';

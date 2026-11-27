@@ -4,12 +4,40 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/store/auth-store";
 
+function EyeIcon({ open }: { open: boolean }) {
+  return open ? (
+    <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  ) : (
+    <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24" />
+      <line x1="1" y1="1" x2="23" y2="23" />
+    </svg>
+  );
+}
+
+function Logo() {
+  return (
+    <div className="flex items-center gap-2.5">
+      <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+        <svg viewBox="0 0 24 24" className="w-4 h-4 text-black" fill="currentColor">
+          <path d="M12.871 4.285a.75.75 0 0 0-1.142 0l-4.7 5.485c-.566.66-.188 1.73.682 1.73h2.039v5.25a.75.75 0 0 0 1.5 0v-5.25h2.039c.87 0 1.248-1.07.682-1.73l-4.7-5.485zM4 19.25a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H4.75a.75.75 0 0 1-.75-.75z" />
+        </svg>
+      </div>
+      <span className="text-lg font-bold tracking-tight">Genius</span>
+    </div>
+  );
+}
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isAuthenticated, user, isLoading, error, login, clearError, loginWithGoogle, handleGoogleCallback, getRedirectPath } = useAuthStore();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState("");
 
   useEffect(() => {
@@ -58,52 +86,54 @@ function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white selection:bg-primary/30 grid grid-cols-1 lg:grid-cols-2 items-center">
+    <div className="min-h-screen bg-black text-white selection:bg-primary/30 grid grid-cols-1 lg:grid-cols-2 items-center relative">
       {/* Left Side - Branding */}
       <div className="hidden lg:flex flex-col justify-center items-center p-16 relative overflow-hidden">
-        {/* Decorative background glow */}
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-[120px] -z-10" />
+        <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-primary/5 rounded-full blur-[80px] -z-10" />
 
-        <div className="space-y-12 max-w-2xl">
-          {/* Logo */}
+        <div className="space-y-10 max-w-lg w-full">
+          <Logo />
 
-
-          <div className="space-y-6 w-full text-center">
-            <h1 className="text-7xl font-bold leading-[1.1] tracking-tight">
+          <div className="space-y-5">
+            <h1 className="text-6xl font-bold leading-[1.1] tracking-tight">
               Elevate Your <br />
               <span className="text-primary">Career</span> Path.
             </h1>
-            <p className="text-zinc-400 text-lg leading-relaxed">
+            <p className="text-zinc-400 text-base leading-relaxed">
               A high-end AI platform designed for the modern job seeker.
-              Leverage obsidian-grade intelligence to land your dream role.
+              Leverage intelligence to land your dream role.
             </p>
           </div>
 
-          {/* Feature Badges */}
-          <div className="flex flex-wrap justify-center gap-4 pt-4">
-            <div className="flex items-center gap-2 px-4 py-2 rounded-full border border-zinc-800 bg-zinc-900/50 backdrop-blur-sm text-sm text-zinc-300">
-              <svg viewBox="0 0 24 24" className="w-4 h-4 text-primary fill-current">
-                <path d="M12 2l2.4 7.2h7.6l-6 4.8 2.4 7.2-6-4.8-6 4.8 2.4-7.2-6-4.8h7.6z" />
-              </svg>
-              AI Resume Intelligence
-            </div>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-full border border-zinc-800 bg-zinc-900/50 backdrop-blur-sm text-sm text-zinc-300">
-              <svg viewBox="0 0 24 24" className="w-4 h-4 text-primary" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10" />
-                <circle cx="12" cy="12" r="4" />
-              </svg>
-              Elite Job Matching
-            </div>
+          <div className="flex flex-wrap gap-3">
+            {[
+              { label: "AI Resume Intelligence", filled: true, icon: <path d="M12 2l2.4 7.2h7.6l-6 4.8 2.4 7.2-6-4.8-6 4.8 2.4-7.2-6-4.8h7.6z" /> },
+              { label: "Elite Job Matching", filled: false, icon: <><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="4" /></> },
+              { label: "Interview Coaching", filled: false, icon: <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /> },
+            ].map(({ label, filled, icon }) => (
+              <div key={label} className="flex items-center gap-2 px-4 py-2 rounded-full border border-zinc-800 bg-zinc-900/50 backdrop-blur-sm text-sm text-zinc-300">
+                <svg viewBox="0 0 24 24" className="w-4 h-4 text-primary" fill={filled ? "currentColor" : "none"} stroke={filled ? "none" : "currentColor"} strokeWidth="2">
+                  {icon}
+                </svg>
+                {label}
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
       {/* Right Side - Login Form */}
       <div className="flex items-center justify-center min-h-screen p-6 lg:p-12 w-full">
-        <div className="w-full max-w-[440px] space-y-8 bg-[#0D0D0D] border border-zinc-800/50 p-10 rounded-3xl shadow-2xl">
-          <div className="space-y-2">
-            <h2 className="text-3xl font-bold tracking-tight">Login</h2>
-            <p className="text-zinc-500 text-sm">Continue with your professional profile.</p>
+        {/* Mobile Logo */}
+        <div className="lg:hidden absolute top-6 left-6">
+          <Logo />
+        </div>
+
+        <div className="w-full max-w-[440px] space-y-7 bg-[#0D0D0D] border border-zinc-800/50 p-10 rounded-3xl shadow-2xl">
+          <div className="space-y-1">
+            <h2 className="text-3xl font-bold tracking-tight">Welcome Back</h2>
+            <p className="text-zinc-500 text-sm">Sign in to continue your career journey.</p>
           </div>
 
           {/* Social Login */}
@@ -132,51 +162,70 @@ function LoginForm() {
           </div>
 
           {/* Form */}
-          <form className="space-y-6" onSubmit={handleSubmit}>
+          <form className="space-y-5" onSubmit={handleSubmit} noValidate>
             {(error || formError) && (
-              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/50 text-red-400 text-sm">
+              <div role="alert" className="p-3 rounded-lg bg-red-500/10 border border-red-500/50 text-red-400 text-sm flex items-start gap-2">
+                <svg viewBox="0 0 24 24" className="w-4 h-4 mt-0.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
                 {formError || error}
               </div>
             )}
 
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 px-1">
+            <div className="space-y-1.5">
+              <label htmlFor="email" className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 px-1">
                 Email Address
               </label>
               <input
+                id="email"
+                name="email"
                 type="email"
+                autoComplete="email"
                 placeholder="name@company.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3.5 rounded-xl bg-zinc-900/30 border border-zinc-800 text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-primary/50 transition-colors"
+                className="w-full px-4 py-3.5 rounded-xl bg-zinc-900/30 border border-zinc-800 text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/20 transition-all"
               />
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <div className="flex justify-between items-center px-1">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                <label htmlFor="password" className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
                   Password
                 </label>
-                <a href="#" className="text-[10px] font-bold text-primary hover:opacity-80 transition-opacity">
-                  Reset Password?
+                <a href="/forgot-password" className="text-[10px] font-bold text-primary hover:opacity-80 transition-opacity">
+                  Forgot Password?
                 </a>
               </div>
-              <input
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3.5 rounded-xl bg-zinc-900/30 border border-zinc-800 text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-primary/50 transition-colors"
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-3.5 pr-11 rounded-xl bg-zinc-900/30 border border-zinc-800 text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/20 transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
+                >
+                  <EyeIcon open={showPassword} />
+                </button>
+              </div>
             </div>
 
             <div className="flex items-center gap-3 px-1">
-              <input 
-                type="checkbox" 
+              <input
+                type="checkbox"
                 id="remember"
                 className="w-4 h-4 rounded border-zinc-800 bg-zinc-900 text-primary focus:ring-primary/20 accent-primary"
               />
-              <label htmlFor="remember" className="text-sm text-zinc-400 select-none">
+              <label htmlFor="remember" className="text-sm text-zinc-400 select-none cursor-pointer">
                 Keep me logged in
               </label>
             </div>
@@ -184,9 +233,16 @@ function LoginForm() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-4 rounded-full bg-primary text-black font-bold text-sm hover:opacity-90 transition-all shadow-[0_0_20px_rgba(0,242,156,0.2)] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full py-4 rounded-full bg-primary text-black font-bold text-sm hover:opacity-90 transition-all shadow-[0_0_20px_rgba(0,242,156,0.2)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              {isLoading ? "Signing In..." : "Sign In to Dashboard"}
+              {isLoading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                  Signing In...
+                </>
+              ) : (
+                "Sign In to Dashboard"
+              )}
             </button>
           </form>
 
@@ -199,18 +255,9 @@ function LoginForm() {
         </div>
       </div>
 
-      {/* Desktop Footer */}
-      <div className="hidden lg:flex absolute bottom-6 left-6 gap-8 text-[10px] tracking-widest text-zinc-600 uppercase">
-        <a href="#" className="hover:text-zinc-400 transition-colors">Privacy Protocol</a>
-        <a href="#" className="hover:text-zinc-400 transition-colors">Service Terms</a>
-      </div>
-
-      {/* Mobile Footer */}
-      <div className="lg:hidden absolute bottom-6 w-full text-center space-y-2 text-[10px] tracking-widest text-zinc-600 uppercase">
-        <div className="flex justify-center gap-4">
-          <a href="#">Privacy Protocol</a>
-          <a href="#">Service Terms</a>
-        </div>
+      <div className="absolute bottom-6 left-0 right-0 flex justify-center lg:justify-start lg:left-6 gap-6 text-[10px] tracking-widest text-zinc-600 uppercase">
+        <a href="/privacy" className="hover:text-zinc-400 transition-colors">Privacy Policy</a>
+        <a href="/terms" className="hover:text-zinc-400 transition-colors">Terms of Service</a>
       </div>
     </div>
   );
