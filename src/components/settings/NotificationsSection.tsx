@@ -37,9 +37,9 @@ export const NotificationsSection = () => {
     try {
       setIsLoading(true);
       const userData = await authApi.getMe();
-      const profile = userData.career_profile || userData.career_preferences || {};
+      const profile = (userData.career_profile || userData.career_preferences || {}) as Record<string, unknown>;
       if (profile.notifications) {
-        setPrefs(prev => ({ ...prev, ...profile.notifications }));
+        setPrefs(prev => ({ ...prev, ...(profile.notifications as Partial<NotificationPreferences>) }));
       }
     } catch (err) {
       console.error('Failed to load notification preferences:', err);
@@ -66,7 +66,7 @@ export const NotificationsSection = () => {
       await authApi.updateCareerProfile({
         ...prefs,
         notifications: prefs,
-      });
+      } as any);
 
       setSuccess('Notification preferences saved successfully!');
       await loadPreferences();

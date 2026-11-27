@@ -131,7 +131,7 @@ export const AppearanceSection = () => {
   const themes: { value: Theme; label: string; description: string; icon: React.ReactNode }[] = [
     { value: 'dark', label: 'Dark', description: 'Always use dark mode', icon: <Icons.MoonIcon className="w-5 h-5" /> },
     { value: 'light', label: 'Light', description: 'Always use light mode', icon: <Icons.SunIcon className="w-5 h-5" /> },
-    { value: 'system', label: 'System', description: 'Match your system setting', icon: <Icons.MonitorIcon className="w-5 h-5" /> },
+    { value: 'system', label: 'System', description: 'Match your system setting', icon: <Icons.DesktopIcon className="w-5 h-5" /> },
   ];
 
   const fontSizes: { value: FontSize; label: string; preview: string }[] = [
@@ -314,7 +314,7 @@ export const AppearanceSection = () => {
             <div>
               <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Secondary Button</p>
               <button className="mt-2 inline-flex items-center gap-2 px-4 py-2 border border-zinc-700 text-zinc-300 font-bold text-sm rounded-lg hover:bg-zinc-800 transition-all">
-                <Icons.SettingsIcon className="w-4 h-4" />
+                <Icons.GearIcon className="w-4 h-4" />
                 Settings
               </button>
             </div>

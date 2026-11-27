@@ -106,7 +106,7 @@ export const SecuritySection = () => {
       setError(null);
       setSuccess(null);
 
-      await authApi.updateMe({ password: newPassword });
+      await authApi.updateMe({ password: newPassword } as any);
 
       setCurrentPassword('');
       setNewPassword('');
@@ -256,9 +256,9 @@ export const SecuritySection = () => {
       {/* Tab Navigation */}
       <div className="flex border-b border-zinc-800 mx-8">
         {[
-          { id: 'password', label: 'Password', icon: Icons.LockIcon },
-          { id: '2fa', label: 'Two-Factor Auth', icon: Icons.ShieldCheckIcon },
-          { id: 'sessions', label: 'Active Sessions', icon: Icons.MonitorIcon },
+          { id: 'password', label: 'Password', icon: Icons.LockClosedIcon },
+          { id: '2fa', label: 'Two-Factor Auth', icon: Icons.LockClosedIcon },
+          { id: 'sessions', label: 'Active Sessions', icon: Icons.DesktopIcon },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -358,7 +358,7 @@ export const SecuritySection = () => {
                 <div className="p-6 rounded-xl border border-zinc-800 bg-black/30">
                   <div className="flex items-start gap-4">
                     <div className="p-3 rounded-xl bg-primary/10 border border-primary/20 shrink-0">
-                      <Icons.ShieldCheckIcon className="w-6 h-6 text-primary" />
+                      <Icons.LockClosedIcon className="w-6 h-6 text-primary" />
                     </div>
                     <div className="flex-1">
                       <h3 className="text-lg font-bold text-white">Enable Two-Factor Authentication</h3>
@@ -460,7 +460,7 @@ export const SecuritySection = () => {
                 <div className="p-6 rounded-xl border border-primary/20 bg-primary/5">
                   <div className="flex items-center gap-4">
                     <div className="p-3 rounded-xl bg-primary/10 border border-primary/20">
-                      <Icons.ShieldCheckIcon className="w-6 h-6 text-primary" />
+                      <Icons.LockClosedIcon className="w-6 h-6 text-primary" />
                     </div>
                     <div>
                       <h3 className="text-lg font-bold text-white">Two-Factor Authentication Enabled</h3>
@@ -474,7 +474,7 @@ export const SecuritySection = () => {
                     onClick={() => setShowBackupCodes(true)}
                     className="px-6 py-2.5 border border-zinc-700 text-zinc-300 rounded-xl text-sm font-bold hover:bg-zinc-800 transition-all"
                   >
-                    <Icons.KeyIcon className="w-4 h-4 mr-2" />
+                    <Icons.LockClosedIcon className="w-4 h-4 mr-2" />
                     View Backup Codes
                   </button>
                   <button
@@ -523,7 +523,7 @@ export const SecuritySection = () => {
                   >
                     <div className="flex items-center gap-4 min-w-0 flex-1">
                       <div className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 shrink-0">
-                        <Icons.MonitorIcon className="w-5 h-5 text-zinc-400" />
+                        <Icons.DesktopIcon className="w-5 h-5 text-zinc-400" />
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
@@ -544,7 +544,7 @@ export const SecuritySection = () => {
                         disabled={revokingSession === session.id}
                         className="px-3 py-1.5 text-xs font-bold text-red-500 hover:bg-red-500/10 rounded-lg border border-red-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                       >
-                        <Icons.LogOutIcon className="w-3 h-3" />
+                        <Icons.ExitIcon className="w-3 h-3" />
                         Revoke
                       </button>
                     )}
@@ -558,7 +558,7 @@ export const SecuritySection = () => {
                 onClick={handleLogoutAll}
                 className="w-full px-6 py-2.5 border border-red-500/30 bg-red-500/10 text-red-500 rounded-xl text-sm font-bold hover:bg-red-500/20 transition-all flex items-center justify-center gap-2"
               >
-                <Icons.LogOutIcon className="w-4 h-4" />
+                <Icons.ExitIcon className="w-4 h-4" />
                 Sign Out Everywhere
               </button>
             </div>

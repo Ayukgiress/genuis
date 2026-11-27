@@ -197,7 +197,7 @@ export const IntegrationsSection = () => {
                       disabled={connecting === integration.id || disconnecting === integration.id}
                       className="px-3 py-1.5 text-xs font-bold text-red-500 hover:bg-red-500/10 rounded-lg border border-red-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                     >
-                      <Icons.UnlinkIcon className="w-3 h-3" />
+                      <Icons.LinkBreak2Icon className="w-3 h-3" />
                       Disconnect
                     </button>
                   </>
@@ -214,7 +214,7 @@ export const IntegrationsSection = () => {
                       </>
                     ) : (
                       <>
-                        <Icons.LinkIcon className="w-4 h-4" />
+                        <Icons.Link2Icon className="w-4 h-4" />
                         Connect
                       </>
                     )}
@@ -241,7 +241,7 @@ export const IntegrationsSection = () => {
 
         {/* Coming Soon */}
         <div className="rounded-xl border border-dashed border-zinc-800 bg-black/20 p-6 text-center">
-          <Icons.PlusCircleIcon className="w-10 h-10 text-zinc-600 mx-auto mb-3" />
+          <Icons.PlusCircledIcon className="w-10 h-10 text-zinc-600 mx-auto mb-3" />
           <h3 className="font-bold text-white mb-1">More integrations coming soon</h3>
           <p className="text-sm text-zinc-500 max-w-md mx-auto">
             We&apos;re working on adding support for Microsoft Outlook, Discord, Trello, Asana, and more.
